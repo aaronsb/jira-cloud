@@ -43,6 +43,13 @@ interface JiraIssueDetails {
   }>;
 }
 
+interface AdfNode {
+  type: string;
+  text?: string;
+  content?: AdfNode[];
+  attrs?: Record<string, any>;
+}
+
 class JiraServer {
   private server: Server;
   private jiraClient: Version3Client;
@@ -77,6 +84,31 @@ class JiraServer {
       await this.server.close();
       process.exit(0);
     });
+  }
+
+  private extractTextFromAdf(node: AdfNode): string {
+    if (!node) return '';
+
+    if (node.type === 'text') {
+      return node.text || '';
+    }
+
+    if (node.type === 'mention') {
+      return `@${node.attrs?.text?.replace('@', '') || ''}`;
+    }
+
+    if (node.type === 'hardBreak' || node.type === 'paragraph') {
+      return '\n';
+    }
+
+    if (node.content) {
+      return node.content
+        .map(child => this.extractTextFromAdf(child))
+        .join('')
+        .replace(/\n{3,}/g, '\n\n'); // Normalize multiple newlines
+    }
+
+    return '';
   }
 
   private isFieldPopulated(value: any): boolean {
@@ -244,35 +276,7 @@ class JiraServer {
             
             // Handle rich text content
             if (comment.body?.content) {
-              interface ContentBlock {
-                content?: ContentItem[];
-                type?: string;
-              }
-
-              interface ContentItem {
-                type: string;
-                text?: string;
-                attrs?: {
-                  text?: string;
-                };
-              }
-
-              body = comment.body.content
-                .map((block: ContentBlock) => {
-                  if (block.content) {
-                    return block.content
-                      .map((item: ContentItem) => {
-                        if (item.type === 'text') return item.text || '';
-                        if (item.type === 'mention') return `@${item.attrs?.text?.replace('@', '') || ''}`;
-                        if (item.type === 'hardBreak') return '\n';
-                        return '';
-                      })
-                      .join('');
-                  }
-                  return '';
-                })
-                .filter((text: string) => text)
-                .join('\n');
+              body = this.extractTextFromAdf(comment.body);
             } else {
               body = String(comment.body || '');
             }
@@ -325,8 +329,8 @@ class JiraServer {
       }
 
       // Handle rich text content
-      if (value.content?.[0]?.content?.[0]?.text) {
-        return value.content[0].content[0].text;
+      if (value.content) {
+        return this.extractTextFromAdf(value);
       }
 
       // Handle simple name/value objects
@@ -763,7 +767,7 @@ class JiraServer {
     const issueDetails: JiraIssueDetails = {
       key: issue.key,
       summary: issue.fields.summary,
-      description: issue.fields.description?.content?.[0]?.content?.[0]?.text || '',
+      description: issue.fields.description ? this.extractTextFromAdf(issue.fields.description) : '',
       assignee: issue.fields.assignee?.displayName || null,
       reporter: issue.fields.reporter?.displayName || '',
       status: issue.fields.status?.name || '',
@@ -790,7 +794,7 @@ class JiraServer {
         .map(comment => ({
           id: comment.id!,
           author: comment.author!.displayName!,
-          body: String(comment.body),
+          body: comment.body?.content ? this.extractTextFromAdf(comment.body) : String(comment.body),
           created: comment.created!,
         }));
     }
@@ -834,7 +838,7 @@ class JiraServer {
     const issues: JiraIssueDetails[] = (searchResults.issues || []).map(issue => ({
       key: issue.key,
       summary: issue.fields.summary,
-      description: issue.fields.description?.content?.[0]?.content?.[0]?.text || '',
+      description: issue.fields.description ? this.extractTextFromAdf(issue.fields.description) : '',
       assignee: issue.fields.assignee?.displayName || null,
       reporter: issue.fields.reporter?.displayName || '',
       status: issue.fields.status?.name || '',
@@ -967,7 +971,7 @@ class JiraServer {
     const issues: JiraIssueDetails[] = (searchResults.issues || []).map(issue => ({
       key: issue.key,
       summary: issue.fields.summary,
-      description: issue.fields.description?.content?.[0]?.content?.[0]?.text || '',
+      description: issue.fields.description ? this.extractTextFromAdf(issue.fields.description) : '',
       assignee: issue.fields.assignee?.displayName || null,
       reporter: issue.fields.reporter?.displayName || '',
       status: issue.fields.status?.name || '',
