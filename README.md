@@ -51,6 +51,11 @@ The server provides several powerful tools for Jira interaction:
     - `filterId` (required): The ID of the saved filter
   - Returns issues matching the filter criteria
 
+- `list_my_filters` - List all Jira filters owned by the authenticated user
+  - Parameters:
+    - `expand` (optional): Boolean to include additional filter details like description and JQL
+  - Returns list of filters with basic info (ID, name, owner, favorite status) and optionally expanded details
+
 ## Development
 
 Install dependencies:

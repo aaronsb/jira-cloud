@@ -493,6 +493,20 @@ class JiraServer {
             required: ['issueKey'],
           },
         },
+        {
+          name: 'list_my_filters',
+          description: 'List all Jira filters owned by the authenticated user',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              expand: {
+                type: 'boolean',
+                description: 'Whether to include additional filter details like description and JQL',
+                default: false
+              }
+            }
+          }
+        },
       ],
     }));
 
@@ -513,6 +527,8 @@ class JiraServer {
             return await this.handleGetTransitions(request.params.arguments);
           case 'get_populated_fields':
             return await this.handleGetPopulatedFields(request.params.arguments);
+          case 'list_my_filters':
+            return await this.handleListMyFilters(request.params.arguments);
           default:
             throw new McpError(
               ErrorCode.MethodNotFound,
@@ -527,6 +543,48 @@ class JiraServer {
         );
       }
     });
+  }
+
+  private async handleListMyFilters(args: any): Promise<{ content: Array<{ type: string; text: string }> }> {
+    const expand = args.expand === true;
+    
+    // Get filters owned by the authenticated user
+    const filters = await this.jiraClient.filters.getMyFilters();
+    
+    // Map the filters to a more concise format
+    const formattedFilters = await Promise.all(filters.map(async filter => {
+      const basic = {
+        id: filter.id,
+        name: filter.name,
+        owner: filter.owner?.displayName || 'Unknown',
+        favourite: filter.favourite || false,
+        viewUrl: filter.viewUrl
+      };
+      
+      if (expand) {
+        return {
+          ...basic,
+          description: filter.description || '',
+          jql: filter.jql || '',
+          sharePermissions: filter.sharePermissions?.map(perm => ({
+            type: perm.type,
+            group: perm.group?.name,
+            project: perm.project?.name
+          })) || []
+        };
+      }
+      
+      return basic;
+    }));
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(formattedFilters, null, 2)
+        }
+      ]
+    };
   }
 
   private async handleGetPopulatedFields(args: any): Promise<{ content: Array<{ type: string; text: string }> }> {
