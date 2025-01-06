@@ -243,6 +243,41 @@ export class JiraClient {
       }));
   }
 
+  async transitionIssue(issueKey: string, transitionId: string, comment?: string): Promise<void> {
+    const transitionRequest: any = {
+      issueIdOrKey: issueKey,
+      transition: {
+        id: transitionId
+      }
+    };
+
+    if (comment) {
+      transitionRequest.update = {
+        comment: [{
+          add: {
+            body: {
+              version: 1,
+              type: "doc",
+              content: [
+                {
+                  type: "paragraph",
+                  content: [
+                    {
+                      type: "text",
+                      text: comment
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }]
+      };
+    }
+
+    await this.client.issues.doTransition(transitionRequest);
+  }
+
   async getPopulatedFields(issueKey: string): Promise<string> {
     const issue = await this.client.issues.getIssue({
       issueIdOrKey: issueKey,

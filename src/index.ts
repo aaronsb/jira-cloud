@@ -89,7 +89,7 @@ class JiraServer {
 
       try {
         // Issue-related tools
-        if (['get_issue', 'update_issue', 'add_comment', 'get_transitions', 'get_populated_fields'].includes(name)) {
+        if (['get_issue', 'update_issue', 'add_comment', 'get_transitions', 'get_populated_fields', 'transition_issue'].includes(name)) {
           return await setupIssueHandlers(this.server, this.jiraClient, request);
         }
         

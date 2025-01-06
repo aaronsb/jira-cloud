@@ -18,6 +18,12 @@ type AddCommentArgs = {
   body: string;
 };
 
+type TransitionIssueArgs = {
+  issueKey: string;
+  transitionId: string;
+  comment?: string;
+};
+
 function isGetIssueArgs(args: unknown): args is GetIssueArgs {
   return typeof args === 'object' && args !== null && 
     typeof (args as GetIssueArgs).issueKey === 'string';
@@ -32,6 +38,12 @@ function isAddCommentArgs(args: unknown): args is AddCommentArgs {
   return typeof args === 'object' && args !== null && 
     typeof (args as AddCommentArgs).issueKey === 'string' &&
     typeof (args as AddCommentArgs).body === 'string';
+}
+
+function isTransitionIssueArgs(args: unknown): args is TransitionIssueArgs {
+  return typeof args === 'object' && args !== null && 
+    typeof (args as TransitionIssueArgs).issueKey === 'string' &&
+    typeof (args as TransitionIssueArgs).transitionId === 'string';
 }
 
 function hasIssueKey(args: unknown): args is { issueKey: string } {
@@ -160,6 +172,36 @@ export async function setupIssueHandlers(
                 {
                   message: 'Comment added successfully',
                   body: args.body,
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      }
+
+      case 'transition_issue': {
+        console.error('Processing transition_issue request');
+        if (!isTransitionIssueArgs(args)) {
+          throw new McpError(ErrorCode.InvalidParams, 'Invalid transition_issue arguments');
+        }
+
+        await jiraClient.transitionIssue(
+          args.issueKey,
+          args.transitionId,
+          args.comment
+        );
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  message: 'Issue transitioned successfully',
+                  transitionId: args.transitionId,
+                  comment: args.comment || 'No comment provided',
                 },
                 null,
                 2

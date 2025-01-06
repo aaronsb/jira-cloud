@@ -85,6 +85,13 @@ The server provides several powerful tools for Jira interaction:
     - `expand` (optional): Boolean to include additional filter details like description and JQL
   - Returns list of filters with basic info (ID, name, owner, favorite status) and optionally expanded details
 
+- `transition_issue` - Transition a Jira issue to a new status
+  - Parameters:
+    - `issueKey` (required): The Jira issue key
+    - `transitionId` (required): The ID of the transition to perform
+    - `comment` (optional): Comment to add with the transition
+  - Transitions the issue to a new status and optionally adds a comment
+
 ## Extending the Server
 
 To add new capabilities to the server:
@@ -155,3 +162,13 @@ The server implements robust error handling for common scenarios:
 - Permission errors
 
 Each error response includes detailed information to help diagnose and resolve the issue.
+
+### API Behavior Notes
+
+The server interacts with Jira's REST API which has some important behavioral characteristics:
+- Updates may not be immediately visible due to Jira's eventual consistency model
+- Successful operations (like updating fields or adding comments) will return success responses immediately
+- The actual changes may take a few moments to be reflected in subsequent API calls
+- Rate limiting may affect the speed of consecutive operations
+
+These behaviors are normal and don't indicate errors as long as success responses are received from the API.

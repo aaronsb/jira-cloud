@@ -139,4 +139,26 @@ export const toolSchemas = {
       },
     },
   },
+  transition_issue: {
+    name: 'transition_issue',
+    description: 'Transition a Jira issue to a new status with an optional comment',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        issueKey: {
+          type: 'string',
+          description: 'The Jira issue key (e.g., PROJ-123)',
+        },
+        transitionId: {
+          type: 'string',
+          description: 'The ID of the transition to perform',
+        },
+        comment: {
+          type: 'string',
+          description: 'Optional comment to add with the transition',
+        },
+      },
+      required: ['issueKey', 'transitionId'],
+    },
+  },
 };
