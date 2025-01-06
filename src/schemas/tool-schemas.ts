@@ -1,13 +1,13 @@
 export const toolSchemas = {
   get_issue: {
     name: 'get_issue',
-    description: 'Get detailed information about a Jira issue',
+    description: 'Get detailed information about a Jira issue. Note: Use "prima" server for DEAL issues, "jvl" server for others.',
     inputSchema: {
       type: 'object',
       properties: {
         issueKey: {
           type: 'string',
-          description: 'The Jira issue key (e.g., PROJ-123)',
+          description: 'The Jira issue key (e.g., DEAL-123). Can also use snake_case "issue_key".',
         },
         includeComments: {
           type: 'boolean',
@@ -26,7 +26,7 @@ export const toolSchemas = {
       properties: {
         filterId: {
           type: 'string',
-          description: 'The ID of the saved Jira filter',
+          description: 'The ID of the saved Jira filter. Can also use snake_case "filter_id".',
         },
       },
       required: ['filterId'],
@@ -34,13 +34,13 @@ export const toolSchemas = {
   },
   update_issue: {
     name: 'update_issue',
-    description: 'Update the summary and/or description of a Jira issue',
+    description: 'Update the summary and/or description of a Jira issue. Note: Use "prima" server for DEAL issues, "jvl" server for others.',
     inputSchema: {
       type: 'object',
       properties: {
         issueKey: {
           type: 'string',
-          description: 'The Jira issue key (e.g., PROJ-123)',
+          description: 'The Jira issue key (e.g., DEAL-123). Can also use snake_case "issue_key".',
         },
         summary: {
           type: 'string',
@@ -56,13 +56,13 @@ export const toolSchemas = {
   },
   add_comment: {
     name: 'add_comment',
-    description: 'Add a comment to a Jira issue',
+    description: 'Add a comment to a Jira issue. Note: Use "prima" server for DEAL issues, "jvl" server for others.',
     inputSchema: {
       type: 'object',
       properties: {
         issueKey: {
           type: 'string',
-          description: 'The Jira issue key (e.g., PROJ-123)',
+          description: 'The Jira issue key (e.g., DEAL-123). Can also use snake_case "issue_key".',
         },
         body: {
           type: 'string',
@@ -84,12 +84,12 @@ export const toolSchemas = {
         },
         startAt: {
           type: 'number',
-          description: 'Index of the first issue to return (0-based)',
+          description: 'Index of the first issue to return (0-based). Can also use snake_case "start_at".',
           default: 0,
         },
         maxResults: {
           type: 'number',
-          description: 'Maximum number of issues to return (default: 25, max: 100)',
+          description: 'Maximum number of issues to return (default: 25, max: 100). Can also use snake_case "max_results".',
           default: 25,
           maximum: 100,
         },
@@ -99,13 +99,13 @@ export const toolSchemas = {
   },
   get_transitions: {
     name: 'get_transitions',
-    description: 'Get all allowed transitions for a Jira issue',
+    description: 'Get all allowed transitions for a Jira issue. Note: Use "prima" server for DEAL issues, "jvl" server for others.',
     inputSchema: {
       type: 'object',
       properties: {
         issueKey: {
           type: 'string',
-          description: 'The Jira issue key (e.g., PROJ-123)',
+          description: 'The Jira issue key (e.g., DEAL-123). Can also use snake_case "issue_key".',
         },
       },
       required: ['issueKey'],
@@ -113,13 +113,13 @@ export const toolSchemas = {
   },
   get_populated_fields: {
     name: 'get_populated_fields',
-    description: 'Get all populated fields for a Jira issue, excluding empty fields and system metadata',
+    description: 'Get all populated fields for a Jira issue, excluding empty fields and system metadata. Note: Use "prima" server for DEAL issues, "jvl" server for others.',
     inputSchema: {
       type: 'object',
       properties: {
         issueKey: {
           type: 'string',
-          description: 'The Jira issue key (e.g., PROJ-123)',
+          description: 'The Jira issue key (e.g., DEAL-123). Can also use snake_case "issue_key".',
         },
       },
       required: ['issueKey'],
@@ -141,17 +141,17 @@ export const toolSchemas = {
   },
   transition_issue: {
     name: 'transition_issue',
-    description: 'Transition a Jira issue to a new status with an optional comment',
+    description: 'Transition a Jira issue to a new status with an optional comment. Note: Use "prima" server for DEAL issues, "jvl" server for others.',
     inputSchema: {
       type: 'object',
       properties: {
         issueKey: {
           type: 'string',
-          description: 'The Jira issue key (e.g., PROJ-123)',
+          description: 'The Jira issue key (e.g., DEAL-123). Can also use snake_case "issue_key".',
         },
         transitionId: {
           type: 'string',
-          description: 'The ID of the transition to perform',
+          description: 'The ID of the transition to perform. Can also use snake_case "transition_id".',
         },
         comment: {
           type: 'string',

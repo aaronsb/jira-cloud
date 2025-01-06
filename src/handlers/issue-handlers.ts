@@ -24,31 +24,88 @@ type TransitionIssueArgs = {
   comment?: string;
 };
 
+// Helper function to normalize parameter names (support both snake_case and camelCase)
+function normalizeArgs(args: Record<string, unknown>): Record<string, unknown> {
+  const normalized: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(args)) {
+    // Convert snake_case to camelCase
+    if (key === 'issue_key') {
+      normalized['issueKey'] = value;
+    } else {
+      normalized[key] = value;
+    }
+  }
+  return normalized;
+}
+
+// Enhanced parameter validation with helpful error messages
+function validateIssueKey(args: unknown, toolName: string): void {
+  if (typeof args !== 'object' || args === null) {
+    throw new McpError(
+      ErrorCode.InvalidParams,
+      `Invalid ${toolName} arguments: Expected an object with an issueKey parameter. Example: { "issueKey": "DEAL-123" } or { "issue_key": "DEAL-123" }`
+    );
+  }
+
+  const normalizedArgs = normalizeArgs(args as Record<string, unknown>);
+  
+  if (typeof normalizedArgs.issueKey !== 'string') {
+    throw new McpError(
+      ErrorCode.InvalidParams,
+      `Missing or invalid issueKey parameter. Please provide a valid issue key using either "issueKey" or "issue_key". Example: { "issueKey": "DEAL-123" }`
+    );
+  }
+
+  // Add server selection guidance based on issue key prefix
+  const issueKeyPrefix = (normalizedArgs.issueKey as string).split('-')[0];
+  const expectedServer = issueKeyPrefix === 'DEAL' ? 'prima' : 'jvl';
+  const currentServer = process.env.JIRA_HOST?.includes('cprimeglobalsolutions') ? 'prima' : 'jvl';
+  
+  if (expectedServer !== currentServer) {
+    throw new McpError(
+      ErrorCode.InvalidParams,
+      `Issue key "${normalizedArgs.issueKey}" should be used with the "${expectedServer}" server, but you're currently using "${currentServer}". DEAL issues use the prima server, other issues use the jvl server.`
+    );
+  }
+}
+
 function isGetIssueArgs(args: unknown): args is GetIssueArgs {
-  return typeof args === 'object' && args !== null && 
-    typeof (args as GetIssueArgs).issueKey === 'string';
+  validateIssueKey(args, 'get_issue');
+  return true;
 }
 
 function isUpdateIssueArgs(args: unknown): args is UpdateIssueArgs {
-  return typeof args === 'object' && args !== null && 
-    typeof (args as UpdateIssueArgs).issueKey === 'string';
+  validateIssueKey(args, 'update_issue');
+  return true;
 }
 
 function isAddCommentArgs(args: unknown): args is AddCommentArgs {
-  return typeof args === 'object' && args !== null && 
-    typeof (args as AddCommentArgs).issueKey === 'string' &&
-    typeof (args as AddCommentArgs).body === 'string';
+  validateIssueKey(args, 'add_comment');
+  const normalizedArgs = normalizeArgs(args as Record<string, unknown>);
+  if (typeof normalizedArgs.body !== 'string') {
+    throw new McpError(
+      ErrorCode.InvalidParams,
+      'Missing or invalid body parameter. Please provide a comment body as a string.'
+    );
+  }
+  return true;
 }
 
 function isTransitionIssueArgs(args: unknown): args is TransitionIssueArgs {
-  return typeof args === 'object' && args !== null && 
-    typeof (args as TransitionIssueArgs).issueKey === 'string' &&
-    typeof (args as TransitionIssueArgs).transitionId === 'string';
+  validateIssueKey(args, 'transition_issue');
+  const normalizedArgs = normalizeArgs(args as Record<string, unknown>);
+  if (typeof normalizedArgs.transitionId !== 'string') {
+    throw new McpError(
+      ErrorCode.InvalidParams,
+      'Missing or invalid transitionId parameter. Please provide a valid transition ID as a string.'
+    );
+  }
+  return true;
 }
 
 function hasIssueKey(args: unknown): args is { issueKey: string } {
-  return typeof args === 'object' && args !== null && 
-    typeof (args as { issueKey: string }).issueKey === 'string';
+  validateIssueKey(args, 'get_populated_fields');
+  return true;
 }
 
 export async function setupIssueHandlers(
@@ -66,19 +123,25 @@ export async function setupIssueHandlers(
   const args = request.params.arguments;
 
   if (!args) {
-    throw new McpError(ErrorCode.InvalidParams, 'Missing arguments');
+    throw new McpError(
+      ErrorCode.InvalidParams,
+      'Missing arguments. Please provide the required parameters for this operation.'
+    );
   }
+
+  // Normalize arguments to support both snake_case and camelCase
+  const normalizedArgs = normalizeArgs(args);
 
   switch (name) {
       case 'get_issue': {
         console.error('Processing get_issue request');
-        if (!isGetIssueArgs(args)) {
+        if (!isGetIssueArgs(normalizedArgs)) {
           throw new McpError(ErrorCode.InvalidParams, 'Invalid get_issue arguments');
         }
 
         const issue = await jiraClient.getIssue(
-          args.issueKey,
-          args.includeComments || false
+          normalizedArgs.issueKey as string,
+          normalizedArgs.includeComments as boolean || false
         );
 
         return {
@@ -93,11 +156,11 @@ export async function setupIssueHandlers(
 
       case 'get_populated_fields': {
         console.error('Processing get_populated_fields request');
-        if (!hasIssueKey(args)) {
+        if (!hasIssueKey(normalizedArgs)) {
           throw new McpError(ErrorCode.InvalidParams, 'Invalid get_populated_fields arguments');
         }
 
-        const fields = await jiraClient.getPopulatedFields(args.issueKey);
+        const fields = await jiraClient.getPopulatedFields(normalizedArgs.issueKey as string);
 
         return {
           content: [
@@ -111,11 +174,11 @@ export async function setupIssueHandlers(
 
       case 'get_transitions': {
         console.error('Processing get_transitions request');
-        if (!hasIssueKey(args)) {
+        if (!hasIssueKey(normalizedArgs)) {
           throw new McpError(ErrorCode.InvalidParams, 'Invalid get_transitions arguments');
         }
 
-        const transitions = await jiraClient.getTransitions(args.issueKey);
+        const transitions = await jiraClient.getTransitions(normalizedArgs.issueKey as string);
 
         return {
           content: [
@@ -129,11 +192,11 @@ export async function setupIssueHandlers(
 
       case 'update_issue': {
         console.error('Processing update_issue request');
-        if (!isUpdateIssueArgs(args)) {
+        if (!isUpdateIssueArgs(normalizedArgs)) {
           throw new McpError(ErrorCode.InvalidParams, 'Invalid update_issue arguments');
         }
 
-        if (!args.summary && !args.description) {
+        if (!normalizedArgs.summary && !normalizedArgs.description) {
           throw new McpError(
             ErrorCode.InvalidParams,
             'Must provide at least one of summary or description'
@@ -141,9 +204,9 @@ export async function setupIssueHandlers(
         }
 
         await jiraClient.updateIssue(
-          args.issueKey,
-          args.summary,
-          args.description
+          normalizedArgs.issueKey as string,
+          normalizedArgs.summary as string | undefined,
+          normalizedArgs.description as string | undefined
         );
 
         return {
@@ -158,11 +221,11 @@ export async function setupIssueHandlers(
 
       case 'add_comment': {
         console.error('Processing add_comment request');
-        if (!isAddCommentArgs(args)) {
+        if (!isAddCommentArgs(normalizedArgs)) {
           throw new McpError(ErrorCode.InvalidParams, 'Invalid add_comment arguments');
         }
 
-        await jiraClient.addComment(args.issueKey, args.body);
+        await jiraClient.addComment(normalizedArgs.issueKey as string, normalizedArgs.body as string);
 
         return {
           content: [
@@ -171,7 +234,7 @@ export async function setupIssueHandlers(
               text: JSON.stringify(
                 {
                   message: 'Comment added successfully',
-                  body: args.body,
+                  body: normalizedArgs.body,
                 },
                 null,
                 2
@@ -183,14 +246,14 @@ export async function setupIssueHandlers(
 
       case 'transition_issue': {
         console.error('Processing transition_issue request');
-        if (!isTransitionIssueArgs(args)) {
+        if (!isTransitionIssueArgs(normalizedArgs)) {
           throw new McpError(ErrorCode.InvalidParams, 'Invalid transition_issue arguments');
         }
 
         await jiraClient.transitionIssue(
-          args.issueKey,
-          args.transitionId,
-          args.comment
+          normalizedArgs.issueKey as string,
+          normalizedArgs.transitionId as string,
+          normalizedArgs.comment as string | undefined
         );
 
         return {
@@ -200,8 +263,8 @@ export async function setupIssueHandlers(
               text: JSON.stringify(
                 {
                   message: 'Issue transitioned successfully',
-                  transitionId: args.transitionId,
-                  comment: args.comment || 'No comment provided',
+                  transitionId: normalizedArgs.transitionId,
+                  comment: normalizedArgs.comment || 'No comment provided',
                 },
                 null,
                 2
