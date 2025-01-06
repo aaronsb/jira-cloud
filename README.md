@@ -4,6 +4,35 @@ A Model Context Protocol server for interacting with Jira Cloud instances.
 
 This TypeScript-based MCP server provides a robust interface to Jira Cloud, enabling seamless integration with Jira's issue tracking and project management capabilities through the MCP protocol.
 
+## Architecture
+
+The server is built with a modular architecture that separates concerns and promotes maintainability:
+
+```
+src/
+├── client/
+│   └── jira-client.ts     # Core Jira API client implementation
+├── handlers/
+│   ├── issue-handlers.ts  # MCP tool handlers for issue operations
+│   └── search-handlers.ts # MCP tool handlers for search operations
+├── schemas/
+│   ├── tool-schemas.ts    # JSON schemas defining tool interfaces
+│   └── request-schemas.ts # Request validation schemas
+├── types/
+│   └── index.ts          # TypeScript type definitions
+├── utils/
+│   └── text-processing.ts # Utility functions
+└── index.ts              # Server entry point and configuration
+```
+
+### Key Components
+
+- **JiraClient**: A TypeScript class that encapsulates all Jira API interactions, providing type-safe methods for each API operation.
+- **Handlers**: Bridge between MCP tools and the JiraClient, handling request validation and response formatting.
+- **Schemas**: JSON Schema definitions for each tool's input parameters, enabling strict validation and clear documentation.
+- **Types**: TypeScript interfaces and types ensuring type safety across the codebase.
+- **Utils**: Shared utility functions for common operations.
+
 ## Features
 
 ### Tools
@@ -55,6 +84,16 @@ The server provides several powerful tools for Jira interaction:
   - Parameters:
     - `expand` (optional): Boolean to include additional filter details like description and JQL
   - Returns list of filters with basic info (ID, name, owner, favorite status) and optionally expanded details
+
+## Extending the Server
+
+To add new capabilities to the server:
+
+1. **Add Types**: Define new interfaces in `src/types/index.ts`
+2. **Define Schema**: Add tool schema in `src/schemas/tool-schemas.ts`
+3. **Implement Client Method**: Add new method to `JiraClient` in `src/client/jira-client.ts`
+4. **Create Handler**: Add handler function in appropriate handler file or create new one
+5. **Register Tool**: Connect handler in `src/index.ts`
 
 ## Development
 
