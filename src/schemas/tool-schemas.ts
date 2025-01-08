@@ -7,6 +7,20 @@ export const toolSchemas = {
       properties: {},
     },
   },
+  list_board_sprints: {
+    name: 'list_board_sprints',
+    description: 'Get a list of all sprints in a Jira board',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        boardId: {
+          type: 'integer',
+          description: 'The ID of the board to get sprints from. Can also use snake_case "board_id".',
+        },
+      },
+      required: ['boardId'],
+    },
+  },
   list_jira_projects: {
     name: 'list_jira_projects',
     description: 'Get a list of all projects in Jira',

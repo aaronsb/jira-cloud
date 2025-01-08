@@ -89,3 +89,14 @@ export interface BoardResponse {
   };
   self: string;
 }
+
+export interface SprintResponse {
+  id: number;
+  name: string;
+  state: string;
+  startDate?: string;
+  endDate?: string;
+  completeDate?: string;
+  goal?: string;
+  boardId: number;
+}

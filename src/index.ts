@@ -14,7 +14,7 @@ import { JiraClient } from './client/jira-client.js';
 import { setupIssueHandlers } from './handlers/issue-handlers.js';
 import { setupSearchHandlers } from './handlers/search-handlers.js';
 import { setupProjectHandlers } from './handlers/project-handlers.js';
-import { handleListBoards } from './handlers/board-handlers.js';
+import { handleListBoards, handleListBoardSprints } from './handlers/board-handlers.js';
 import { toolSchemas } from './schemas/tool-schemas.js';
 
 // Jira credentials from environment variables
@@ -149,6 +149,18 @@ class JiraServer {
               {
                 type: 'text',
                 text: JSON.stringify(boards, null, 2)
+              }
+            ]
+          };
+        }
+
+        if (name === 'list_board_sprints') {
+          const sprints = await handleListBoardSprints(this.jiraClient, request.params.arguments);
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(sprints, null, 2)
               }
             ]
           };

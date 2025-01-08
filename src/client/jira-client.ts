@@ -1,6 +1,6 @@
 import { Version3Client, AgileClient } from 'jira.js';
 import type { Project } from 'jira.js/out/version3/models';
-import { JiraConfig, JiraIssueDetails, FilterResponse, TransitionDetails, SearchResponse, BoardResponse } from '../types/index.js';
+import { JiraConfig, JiraIssueDetails, FilterResponse, TransitionDetails, SearchResponse, BoardResponse, SprintResponse } from '../types/index.js';
 import { TextProcessor } from '../utils/text-processing.js';
 
 export class JiraClient {
@@ -420,6 +420,7 @@ export class JiraClient {
   }
 
   async listBoards(): Promise<BoardResponse[]> {
+    console.error('Fetching all boards...');
     const response = await this.agileClient.board.getAllBoards();
     
     return (response.values || [])
@@ -433,6 +434,27 @@ export class JiraClient {
           projectName: board.location.projectName || ''
         } : undefined,
         self: board.self || ''
+      }));
+  }
+
+  async listBoardSprints(boardId: number): Promise<SprintResponse[]> {
+    console.error(`Fetching sprints for board ${boardId}...`);
+    const response = await this.agileClient.board.getAllSprints({
+      boardId: boardId,
+      state: 'future,active'
+    });
+    
+    return (response.values || [])
+      .filter(sprint => sprint.id && sprint.name)
+      .map(sprint => ({
+        id: sprint.id!,
+        name: sprint.name!,
+        state: sprint.state || 'unknown',
+        startDate: sprint.startDate,
+        endDate: sprint.endDate,
+        completeDate: sprint.completeDate,
+        goal: sprint.goal,
+        boardId
       }));
   }
 
