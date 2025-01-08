@@ -1,7 +1,15 @@
 #!/usr/bin/env node
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { CallToolRequestSchema, ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { 
+  CallToolRequestSchema, 
+  ErrorCode, 
+  ListResourcesRequestSchema,
+  ListResourceTemplatesRequestSchema,
+  ListToolsRequestSchema,
+  McpError,
+  ReadResourceRequestSchema
+} from '@modelcontextprotocol/sdk/types.js';
 import { JiraClient } from './client/jira-client.js';
 import { setupIssueHandlers } from './handlers/issue-handlers.js';
 import { setupSearchHandlers } from './handlers/search-handlers.js';
@@ -60,6 +68,9 @@ class JiraServer {
           tools: {
             schemas: tools,
           },
+          resources: {
+            schemas: [], // Explicitly define empty resources
+          },
         },
       }
     );
@@ -80,7 +91,32 @@ class JiraServer {
   }
 
   private setupHandlers() {
-    // Set up a single CallToolRequestSchema handler that routes to the appropriate handler
+    // Set up required MCP protocol handlers
+    this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
+      tools: Object.entries(toolSchemas).map(([key, schema]) => ({
+        name: key,
+        description: schema.description,
+        inputSchema: {
+          type: 'object',
+          properties: schema.inputSchema.properties,
+          ...(('required' in schema.inputSchema) ? { required: schema.inputSchema.required } : {}),
+        },
+      })),
+    }));
+
+    this.server.setRequestHandler(ListResourcesRequestSchema, async () => ({
+      resources: [], // No resources provided by this server
+    }));
+
+    this.server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => ({
+      resourceTemplates: [], // No resource templates provided by this server
+    }));
+
+    this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+      throw new McpError(ErrorCode.InvalidRequest, `No resources available: ${request.params.uri}`);
+    });
+
+    // Set up tool handlers
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       console.error('Received request:', JSON.stringify(request, null, 2));
 

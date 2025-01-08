@@ -1,11 +1,11 @@
 {
-  "name": "jira-cloud-prima",
+  "name": "jira-cloud",
   "version": "0.1.0",
   "description": "A Model Context Protocol server",
   "private": true,
   "type": "module",
   "bin": {
-    "jira-cloud-prima": "./build/index.js"
+    "jira-cloud": "build/index.js"
   },
   "files": [
     "build"
@@ -17,7 +17,7 @@
     "inspector": "npx @modelcontextprotocol/inspector build/index.js"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "0.6.0",
+    "@modelcontextprotocol/sdk": "^0.6.0",
     "jira.js": "^4.0.5"
   },
   "devDependencies": {

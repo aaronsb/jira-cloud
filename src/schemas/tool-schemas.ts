@@ -1,7 +1,7 @@
 export const toolSchemas = {
-  get_issue: {
-    name: 'get_issue',
-    description: 'Get detailed information about a Jira issue. Note: Use "prima" server for DEAL issues, "jvl" server for others.',
+  get_jira_issue: {
+    name: 'get_jira_issue',
+    description: 'Get detailed information about a Jira issue',
     inputSchema: {
       type: 'object',
       properties: {
@@ -18,8 +18,8 @@ export const toolSchemas = {
       required: ['issueKey'],
     },
   },
-  get_filter_issues: {
-    name: 'get_filter_issues',
+  get_jira_filter_issues: {
+    name: 'get_jira_filter_issues',
     description: 'Get all issues from a saved Jira filter',
     inputSchema: {
       type: 'object',
@@ -32,9 +32,9 @@ export const toolSchemas = {
       required: ['filterId'],
     },
   },
-  update_issue: {
-    name: 'update_issue',
-    description: 'Update the summary and/or description of a Jira issue. Note: Use "prima" server for DEAL issues, "jvl" server for others.',
+  update_jira_issue: {
+    name: 'update_jira_issue',
+    description: 'Update the summary and/or description of a Jira issue',
     inputSchema: {
       type: 'object',
       properties: {
@@ -54,9 +54,9 @@ export const toolSchemas = {
       required: ['issueKey'],
     },
   },
-  add_comment: {
-    name: 'add_comment',
-    description: 'Add a comment to a Jira issue. Note: Use "prima" server for DEAL issues, "jvl" server for others.',
+  add_jira_comment: {
+    name: 'add_jira_comment',
+    description: 'Add a comment to a Jira issue',
     inputSchema: {
       type: 'object',
       properties: {
@@ -72,8 +72,8 @@ export const toolSchemas = {
       required: ['issueKey', 'body'],
     },
   },
-  search_issues: {
-    name: 'search_issues',
+  search_jira_issues: {
+    name: 'search_jira_issues',
     description: 'Search for issues using JQL with pagination support',
     inputSchema: {
       type: 'object',
@@ -97,9 +97,9 @@ export const toolSchemas = {
       required: ['jql'],
     },
   },
-  get_transitions: {
-    name: 'get_transitions',
-    description: 'Get all allowed transitions for a Jira issue. Note: Use "prima" server for DEAL issues, "jvl" server for others.',
+  get_jira_transitions: {
+    name: 'get_jira_transitions',
+    description: 'Get all allowed transitions for a Jira issue',
     inputSchema: {
       type: 'object',
       properties: {
@@ -111,9 +111,9 @@ export const toolSchemas = {
       required: ['issueKey'],
     },
   },
-  get_populated_fields: {
-    name: 'get_populated_fields',
-    description: 'Get all populated fields for a Jira issue, excluding empty fields and system metadata. Note: Use "prima" server for DEAL issues, "jvl" server for others.',
+  get_jira_populated_fields: {
+    name: 'get_jira_populated_fields',
+    description: 'Get all populated fields for a Jira issue, excluding empty fields and system metadata',
     inputSchema: {
       type: 'object',
       properties: {
@@ -125,8 +125,8 @@ export const toolSchemas = {
       required: ['issueKey'],
     },
   },
-  list_my_filters: {
-    name: 'list_my_filters',
+  list_my_jira_filters: {
+    name: 'list_my_jira_filters',
     description: 'List all Jira filters owned by the authenticated user',
     inputSchema: {
       type: 'object',
@@ -139,9 +139,9 @@ export const toolSchemas = {
       },
     },
   },
-  transition_issue: {
-    name: 'transition_issue',
-    description: 'Transition a Jira issue to a new status with an optional comment. Note: Use "prima" server for DEAL issues, "jvl" server for others.',
+  transition_jira_issue: {
+    name: 'transition_jira_issue',
+    description: 'Transition a Jira issue to a new status with an optional comment',
     inputSchema: {
       type: 'object',
       properties: {
