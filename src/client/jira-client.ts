@@ -5,6 +5,10 @@ import { TextProcessor } from '../utils/text-processing.js';
 
 export class JiraClient {
   private client: Version3Client;
+  private customFields: {
+    startDate: string;
+    storyPoints: string;
+  };
 
   constructor(config: JiraConfig) {
     this.client = new Version3Client({
@@ -16,6 +20,12 @@ export class JiraClient {
         },
       },
     });
+
+    // Set custom field mappings with defaults
+    this.customFields = {
+      startDate: config.customFields?.startDate ?? 'customfield_10015',
+      storyPoints: config.customFields?.storyPoints ?? 'customfield_10016',
+    };
   }
 
   async getIssue(issueKey: string, includeComments = false): Promise<JiraIssueDetails> {
@@ -27,8 +37,8 @@ export class JiraClient {
       'status',
       'resolution',
       'duedate',
-      'customfield_10015', // Start date
-      'customfield_10016', // Story points
+      this.customFields.startDate,
+      this.customFields.storyPoints,
       'timeestimate',
       'issuelinks',
     ];
@@ -53,8 +63,8 @@ export class JiraClient {
       status: issue.fields.status?.name || '',
       resolution: issue.fields.resolution?.name || null,
       dueDate: issue.fields.duedate || null,
-      startDate: issue.fields.customfield_10015 || null,
-      storyPoints: issue.fields.customfield_10016 || null,
+      startDate: issue.fields[this.customFields.startDate] || null,
+      storyPoints: issue.fields[this.customFields.storyPoints] || null,
       timeEstimate: issue.fields.timeestimate || null,
       issueLinks: (issue.fields.issuelinks || []).map(link => ({
         type: link.type?.name || '',
@@ -101,8 +111,8 @@ export class JiraClient {
         'status',
         'resolution',
         'duedate',
-        'customfield_10015',
-        'customfield_10016',
+        this.customFields.startDate,
+        this.customFields.storyPoints,
         'timeestimate',
         'issuelinks',
       ],
@@ -117,8 +127,8 @@ export class JiraClient {
       status: issue.fields.status?.name || '',
       resolution: issue.fields.resolution?.name || null,
       dueDate: issue.fields.duedate || null,
-      startDate: issue.fields.customfield_10015 || null,
-      storyPoints: issue.fields.customfield_10016 || null,
+      startDate: issue.fields[this.customFields.startDate] || null,
+      storyPoints: issue.fields[this.customFields.storyPoints] || null,
       timeEstimate: issue.fields.timeestimate || null,
       issueLinks: (issue.fields.issuelinks || []).map(link => ({
         type: link.type?.name || '',
@@ -194,8 +204,8 @@ export class JiraClient {
         'status',
         'resolution',
         'duedate',
-        'customfield_10015',
-        'customfield_10016',
+        this.customFields.startDate,
+        this.customFields.storyPoints,
         'timeestimate',
         'issuelinks',
       ],
@@ -210,8 +220,8 @@ export class JiraClient {
       status: issue.fields.status?.name || '',
       resolution: issue.fields.resolution?.name || null,
       dueDate: issue.fields.duedate || null,
-      startDate: issue.fields.customfield_10015 || null,
-      storyPoints: issue.fields.customfield_10016 || null,
+      startDate: issue.fields[this.customFields.startDate] || null,
+      storyPoints: issue.fields[this.customFields.storyPoints] || null,
       timeEstimate: issue.fields.timeestimate || null,
       issueLinks: (issue.fields.issuelinks || []).map(link => ({
         type: link.type?.name || '',
