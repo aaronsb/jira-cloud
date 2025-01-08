@@ -176,11 +176,16 @@ export class JiraClient {
   }
 
   async searchIssues(jql: string, startAt = 0, maxResults = 25): Promise<SearchResponse> {
-    const searchResults = await this.client.issueSearch.searchForIssuesUsingJql({
-      jql,
-      startAt,
-      maxResults: Math.min(maxResults, 100),
-      fields: [
+    try {
+      // Remove escaped quotes from JQL
+      const cleanJql = jql.replace(/\\"/g, '"');
+      console.error(`Executing JQL search with query: ${cleanJql}`);
+      
+      const searchResults = await this.client.issueSearch.searchForIssuesUsingJql({
+        jql: cleanJql,
+        startAt,
+        maxResults: Math.min(maxResults, 100),
+        fields: [
         'summary',
         'description',
         'assignee',
@@ -214,15 +219,19 @@ export class JiraClient {
       })),
     }));
 
-    return {
-      issues,
-      pagination: {
-        startAt,
-        maxResults,
-        total: searchResults.total || 0,
-        hasMore: (startAt + issues.length) < (searchResults.total || 0)
-      }
-    };
+      return {
+        issues,
+        pagination: {
+          startAt,
+          maxResults,
+          total: searchResults.total || 0,
+          hasMore: (startAt + issues.length) < (searchResults.total || 0)
+        }
+      };
+    } catch (error) {
+      console.error('Error executing JQL search:', error);
+      throw error;
+    }
   }
 
   async getTransitions(issueKey: string): Promise<TransitionDetails[]> {

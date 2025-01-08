@@ -125,12 +125,12 @@ class JiraServer {
 
       try {
         // Issue-related tools
-        if (['get_issue', 'update_issue', 'add_comment', 'get_transitions', 'get_populated_fields', 'transition_issue'].includes(name)) {
+        if (['get_jira_issue', 'update_jira_issue', 'add_jira_comment', 'get_jira_transitions', 'get_jira_populated_fields', 'transition_jira_issue'].includes(name)) {
           return await setupIssueHandlers(this.server, this.jiraClient, request);
         }
         
         // Search-related tools
-        if (['search_issues', 'get_filter_issues', 'list_my_filters'].includes(name)) {
+        if (['search_jira_issues', 'get_jira_filter_issues', 'list_my_jira_filters'].includes(name)) {
           return await setupSearchHandlers(this.server, this.jiraClient, request);
         }
 

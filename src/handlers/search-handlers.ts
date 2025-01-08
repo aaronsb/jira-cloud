@@ -49,62 +49,89 @@ export async function setupSearchHandlers(
   }
 
   switch (name) {
-      case 'search_issues': {
-        console.error('Processing search_issues request');
+      case 'search_jira_issues': {
+        console.error('Processing search_jira_issues request');
         if (!isSearchIssuesArgs(args)) {
-          throw new McpError(ErrorCode.InvalidParams, 'Invalid search_issues arguments');
+          throw new McpError(ErrorCode.InvalidParams, 'Invalid search_jira_issues arguments');
         }
 
-        const results = await jiraClient.searchIssues(
-          args.jql,
-          args.startAt,
-          args.maxResults
-        );
+        try {
+          console.error(`Executing search with args:`, JSON.stringify(args, null, 2));
+          const results = await jiraClient.searchIssues(
+            args.jql,
+            args.startAt,
+            args.maxResults
+          );
 
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(results, null, 2),
-            },
-          ],
-        };
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(results, null, 2),
+              },
+            ],
+          };
+        } catch (error) {
+          console.error('Error in search_jira_issues:', error);
+          if (error instanceof Error) {
+            throw new McpError(ErrorCode.InvalidRequest, `Jira API error: ${error.message}`);
+          }
+          throw new McpError(ErrorCode.InvalidRequest, 'Failed to execute Jira search');
+        }
       }
 
-      case 'get_filter_issues': {
-        console.error('Processing get_filter_issues request');
+      case 'get_jira_filter_issues': {
+        console.error('Processing get_jira_filter_issues request');
         if (!isGetFilterIssuesArgs(args)) {
-          throw new McpError(ErrorCode.InvalidParams, 'Invalid get_filter_issues arguments');
+          throw new McpError(ErrorCode.InvalidParams, 'Invalid get_jira_filter_issues arguments');
         }
 
-        const issues = await jiraClient.getFilterIssues(args.filterId);
+        try {
+          console.error(`Executing filter issues with args:`, JSON.stringify(args, null, 2));
+          const issues = await jiraClient.getFilterIssues(args.filterId);
 
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(issues, null, 2),
-            },
-          ],
-        };
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(issues, null, 2),
+              },
+            ],
+          };
+        } catch (error) {
+          console.error('Error in get_jira_filter_issues:', error);
+          if (error instanceof Error) {
+            throw new McpError(ErrorCode.InvalidRequest, `Jira API error: ${error.message}`);
+          }
+          throw new McpError(ErrorCode.InvalidRequest, 'Failed to get filter issues');
+        }
       }
 
-      case 'list_my_filters': {
-        console.error('Processing list_my_filters request');
+      case 'list_my_jira_filters': {
+        console.error('Processing list_my_jira_filters request');
         if (!isListMyFiltersArgs(args)) {
-          throw new McpError(ErrorCode.InvalidParams, 'Invalid list_my_filters arguments');
+          throw new McpError(ErrorCode.InvalidParams, 'Invalid list_my_jira_filters arguments');
         }
 
-        const filters = await jiraClient.listMyFilters(args.expand || false);
+        try {
+          console.error(`Executing list filters with args:`, JSON.stringify(args, null, 2));
+          const filters = await jiraClient.listMyFilters(args.expand || false);
 
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(filters, null, 2),
-            },
-          ],
-        };
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(filters, null, 2),
+              },
+            ],
+          };
+        } catch (error) {
+          console.error('Error in list_my_jira_filters:', error);
+          if (error instanceof Error) {
+            throw new McpError(ErrorCode.InvalidRequest, `Jira API error: ${error.message}`);
+          }
+          throw new McpError(ErrorCode.InvalidRequest, 'Failed to list filters');
+        }
       }
 
       default: {
