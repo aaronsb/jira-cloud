@@ -1,4 +1,12 @@
 export const toolSchemas = {
+  list_jira_projects: {
+    name: 'list_jira_projects',
+    description: 'Get a list of all projects in Jira',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
   get_jira_issue: {
     name: 'get_jira_issue',
     description: 'Get detailed information about a Jira issue',

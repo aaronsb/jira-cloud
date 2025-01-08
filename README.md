@@ -13,8 +13,9 @@ src/
 ├── client/
 │   └── jira-client.ts     # Core Jira API client implementation
 ├── handlers/
-│   ├── issue-handlers.ts  # MCP tool handlers for issue operations
-│   └── search-handlers.ts # MCP tool handlers for search operations
+│   ├── issue-handlers.ts    # MCP tool handlers for issue operations
+│   ├── project-handlers.ts  # MCP tool handlers for project operations
+│   └── search-handlers.ts   # MCP tool handlers for search operations
 ├── schemas/
 │   ├── tool-schemas.ts    # JSON schemas defining tool interfaces
 │   └── request-schemas.ts # Request validation schemas
@@ -39,53 +40,57 @@ src/
 
 The server provides several powerful tools for Jira interaction:
 
-- `get_issue` - Retrieve detailed information about a Jira issue
+- `list_jira_projects` - Get a list of all projects in Jira
+  - Parameters: None
+  - Returns list of projects with their IDs, keys, names, descriptions, leads, and URLs
+
+- `get_jira_issue` - Retrieve detailed information about a Jira issue
   - Parameters:
     - `issueKey` (required): The Jira issue key (e.g., "PROJ-123")
     - `includeComments` (optional): Boolean to include issue comments
   - Returns comprehensive issue data including summary, description, assignee, status, and more
 
-- `search_issues` - Search for issues using JQL (Jira Query Language)
+- `search_jira_issues` - Search for issues using JQL (Jira Query Language)
   - Parameters:
     - `jql` (required): JQL query string
     - `startAt` (optional): Pagination start index
     - `maxResults` (optional): Maximum results to return (default: 25, max: 100)
   - Returns paginated search results with issue details
 
-- `update_issue` - Update issue fields
+- `update_jira_issue` - Update issue fields
   - Parameters:
     - `issueKey` (required): The Jira issue key
     - `summary` (optional): New issue summary
     - `description` (optional): New issue description
   - Updates the specified fields of the issue
 
-- `add_comment` - Add a comment to an issue
+- `add_jira_comment` - Add a comment to an issue
   - Parameters:
     - `issueKey` (required): The Jira issue key
     - `body` (required): The comment text
   - Adds the comment to the specified issue
 
-- `get_transitions` - Get available status transitions for an issue
+- `get_jira_transitions` - Get available status transitions for an issue
   - Parameters:
     - `issueKey` (required): The Jira issue key
   - Returns list of available status transitions
 
-- `get_populated_fields` - Get all populated fields for an issue
+- `get_jira_populated_fields` - Get all populated fields for an issue
   - Parameters:
     - `issueKey` (required): The Jira issue key
   - Returns all non-empty fields and their values
 
-- `get_filter_issues` - Get issues from a saved Jira filter
+- `get_jira_filter_issues` - Get issues from a saved Jira filter
   - Parameters:
     - `filterId` (required): The ID of the saved filter
   - Returns issues matching the filter criteria
 
-- `list_my_filters` - List all Jira filters owned by the authenticated user
+- `list_my_jira_filters` - List all Jira filters owned by the authenticated user
   - Parameters:
     - `expand` (optional): Boolean to include additional filter details like description and JQL
   - Returns list of filters with basic info (ID, name, owner, favorite status) and optionally expanded details
 
-- `transition_issue` - Transition a Jira issue to a new status
+- `transition_jira_issue` - Transition a Jira issue to a new status
   - Parameters:
     - `issueKey` (required): The Jira issue key
     - `transitionId` (required): The ID of the transition to perform
@@ -127,13 +132,22 @@ For VSCode:
 ```json
 {
   "mcpServers": {
-    "jira": {
+    "jvl": {
       "command": "node",
       "args": ["/path/to/jira-cloud/build/index.js"],
       "env": {
         "JIRA_API_TOKEN": "your-api-token",
         "JIRA_EMAIL": "your-email",
-        "JIRA_HOST": "your-instance.atlassian.net"
+        "JIRA_HOST": "jvl-instance.atlassian.net"
+      }
+    },
+    "prima": {
+      "command": "node",
+      "args": ["/path/to/jira-cloud/build/index.js"],
+      "env": {
+        "JIRA_API_TOKEN": "your-api-token",
+        "JIRA_EMAIL": "your-email",
+        "JIRA_HOST": "cprimeglobalsolutions.atlassian.net"
       }
     }
   }

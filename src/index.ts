@@ -13,6 +13,7 @@ import {
 import { JiraClient } from './client/jira-client.js';
 import { setupIssueHandlers } from './handlers/issue-handlers.js';
 import { setupSearchHandlers } from './handlers/search-handlers.js';
+import { setupProjectHandlers } from './handlers/project-handlers.js';
 import { toolSchemas } from './schemas/tool-schemas.js';
 
 // Jira credentials from environment variables
@@ -132,6 +133,11 @@ class JiraServer {
         // Search-related tools
         if (['search_jira_issues', 'get_jira_filter_issues', 'list_my_jira_filters'].includes(name)) {
           return await setupSearchHandlers(this.server, this.jiraClient, request);
+        }
+
+        // Project-related tools
+        if (['list_jira_projects'].includes(name)) {
+          return await setupProjectHandlers(this.server, this.jiraClient, request);
         }
 
         console.error(`Unknown tool requested: ${name}`);

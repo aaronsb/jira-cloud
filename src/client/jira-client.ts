@@ -1,4 +1,5 @@
 import { Version3Client } from 'jira.js';
+import type { Project } from 'jira.js/out/version3/models';
 import { JiraConfig, JiraIssueDetails, FilterResponse, TransitionDetails, SearchResponse } from '../types/index.js';
 import { TextProcessor } from '../utils/text-processing.js';
 
@@ -402,6 +403,29 @@ export class JiraClient {
     }
 
     return lines.join('\n');
+  }
+
+  async listProjects(): Promise<Array<{
+    id: string;
+    key: string;
+    name: string;
+    description: string | null;
+    lead: string | null;
+    url: string;
+  }>> {
+    const { values: projects } = await this.client.projects.searchProjects();
+    
+    return projects
+      .filter((project): project is Project => 
+        Boolean(project?.id && project?.key && project?.name))
+      .map(project => ({
+        id: project.id!,
+        key: project.key!,
+        name: project.name!,
+        description: project.description || null,
+        lead: project.lead?.displayName || null,
+        url: project.self || ''
+      }));
   }
 
   async listMyFilters(expand = false): Promise<FilterResponse[]> {
