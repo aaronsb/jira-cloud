@@ -70,17 +70,17 @@ function validateIssueKey(args: unknown, toolName: string): void {
 }
 
 function isGetIssueArgs(args: unknown): args is GetIssueArgs {
-  validateIssueKey(args, 'get_issue');
+  validateIssueKey(args, 'get_jira_issue');
   return true;
 }
 
 function isUpdateIssueArgs(args: unknown): args is UpdateIssueArgs {
-  validateIssueKey(args, 'update_issue');
+  validateIssueKey(args, 'update_jira_issue');
   return true;
 }
 
 function isAddCommentArgs(args: unknown): args is AddCommentArgs {
-  validateIssueKey(args, 'add_comment');
+  validateIssueKey(args, 'add_jira_comment');
   const normalizedArgs = normalizeArgs(args as Record<string, unknown>);
   if (typeof normalizedArgs.body !== 'string') {
     throw new McpError(
@@ -92,7 +92,7 @@ function isAddCommentArgs(args: unknown): args is AddCommentArgs {
 }
 
 function isTransitionIssueArgs(args: unknown): args is TransitionIssueArgs {
-  validateIssueKey(args, 'transition_issue');
+  validateIssueKey(args, 'transition_jira_issue');
   const normalizedArgs = normalizeArgs(args as Record<string, unknown>);
   if (typeof normalizedArgs.transitionId !== 'string') {
     throw new McpError(
@@ -133,10 +133,10 @@ export async function setupIssueHandlers(
   const normalizedArgs = normalizeArgs(args);
 
   switch (name) {
-      case 'get_issue': {
-        console.error('Processing get_issue request');
+      case 'get_jira_issue': {
+        console.error('Processing get_jira_issue request');
         if (!isGetIssueArgs(normalizedArgs)) {
-          throw new McpError(ErrorCode.InvalidParams, 'Invalid get_issue arguments');
+          throw new McpError(ErrorCode.InvalidParams, 'Invalid get_jira_issue arguments');
         }
 
         const issue = await jiraClient.getIssue(
@@ -172,10 +172,10 @@ export async function setupIssueHandlers(
         };
       }
 
-      case 'get_transitions': {
-        console.error('Processing get_transitions request');
+      case 'get_jira_transitions': {
+        console.error('Processing get_jira_transitions request');
         if (!hasIssueKey(normalizedArgs)) {
-          throw new McpError(ErrorCode.InvalidParams, 'Invalid get_transitions arguments');
+          throw new McpError(ErrorCode.InvalidParams, 'Invalid get_jira_transitions arguments');
         }
 
         const transitions = await jiraClient.getTransitions(normalizedArgs.issueKey as string);
@@ -190,10 +190,10 @@ export async function setupIssueHandlers(
         };
       }
 
-      case 'update_issue': {
-        console.error('Processing update_issue request');
+      case 'update_jira_issue': {
+        console.error('Processing update_jira_issue request');
         if (!isUpdateIssueArgs(normalizedArgs)) {
-          throw new McpError(ErrorCode.InvalidParams, 'Invalid update_issue arguments');
+          throw new McpError(ErrorCode.InvalidParams, 'Invalid update_jira_issue arguments');
         }
 
         if (!normalizedArgs.summary && !normalizedArgs.description) {
@@ -219,10 +219,10 @@ export async function setupIssueHandlers(
         };
       }
 
-      case 'add_comment': {
-        console.error('Processing add_comment request');
+      case 'add_jira_comment': {
+        console.error('Processing add_jira_comment request');
         if (!isAddCommentArgs(normalizedArgs)) {
-          throw new McpError(ErrorCode.InvalidParams, 'Invalid add_comment arguments');
+          throw new McpError(ErrorCode.InvalidParams, 'Invalid add_jira_comment arguments');
         }
 
         await jiraClient.addComment(normalizedArgs.issueKey as string, normalizedArgs.body as string);
@@ -244,10 +244,10 @@ export async function setupIssueHandlers(
         };
       }
 
-      case 'transition_issue': {
-        console.error('Processing transition_issue request');
+      case 'transition_jira_issue': {
+        console.error('Processing transition_jira_issue request');
         if (!isTransitionIssueArgs(normalizedArgs)) {
-          throw new McpError(ErrorCode.InvalidParams, 'Invalid transition_issue arguments');
+          throw new McpError(ErrorCode.InvalidParams, 'Invalid transition_jira_issue arguments');
         }
 
         await jiraClient.transitionIssue(
