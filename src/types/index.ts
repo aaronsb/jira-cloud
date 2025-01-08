@@ -78,3 +78,14 @@ export interface TransitionDetails {
     description?: string;
   };
 }
+
+export interface BoardResponse {
+  id: number;
+  name: string;
+  type: string;
+  location?: {
+    projectId: number;
+    projectName: string;
+  };
+  self: string;
+}

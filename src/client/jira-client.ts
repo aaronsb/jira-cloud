@@ -1,17 +1,18 @@
-import { Version3Client } from 'jira.js';
+import { Version3Client, AgileClient } from 'jira.js';
 import type { Project } from 'jira.js/out/version3/models';
-import { JiraConfig, JiraIssueDetails, FilterResponse, TransitionDetails, SearchResponse } from '../types/index.js';
+import { JiraConfig, JiraIssueDetails, FilterResponse, TransitionDetails, SearchResponse, BoardResponse } from '../types/index.js';
 import { TextProcessor } from '../utils/text-processing.js';
 
 export class JiraClient {
   private client: Version3Client;
+  private agileClient: AgileClient;
   private customFields: {
     startDate: string;
     storyPoints: string;
   };
 
   constructor(config: JiraConfig) {
-    this.client = new Version3Client({
+    const clientConfig = {
       host: config.host,
       authentication: {
         basic: {
@@ -19,7 +20,10 @@ export class JiraClient {
           apiToken: config.apiToken,
         },
       },
-    });
+    };
+    
+    this.client = new Version3Client(clientConfig);
+    this.agileClient = new AgileClient(clientConfig);
 
     // Set custom field mappings with defaults
     this.customFields = {
@@ -413,6 +417,23 @@ export class JiraClient {
     }
 
     return lines.join('\n');
+  }
+
+  async listBoards(): Promise<BoardResponse[]> {
+    const response = await this.agileClient.board.getAllBoards();
+    
+    return (response.values || [])
+      .filter(board => board.id && board.name)
+      .map(board => ({
+        id: board.id!,
+        name: board.name!,
+        type: board.type || 'scrum',
+        location: board.location ? {
+          projectId: board.location.projectId!,
+          projectName: board.location.projectName || ''
+        } : undefined,
+        self: board.self || ''
+      }));
   }
 
   async listProjects(): Promise<Array<{

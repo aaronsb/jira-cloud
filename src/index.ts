@@ -14,6 +14,7 @@ import { JiraClient } from './client/jira-client.js';
 import { setupIssueHandlers } from './handlers/issue-handlers.js';
 import { setupSearchHandlers } from './handlers/search-handlers.js';
 import { setupProjectHandlers } from './handlers/project-handlers.js';
+import { handleListBoards } from './handlers/board-handlers.js';
 import { toolSchemas } from './schemas/tool-schemas.js';
 
 // Jira credentials from environment variables
@@ -138,6 +139,19 @@ class JiraServer {
         // Project-related tools
         if (['list_jira_projects'].includes(name)) {
           return await setupProjectHandlers(this.server, this.jiraClient, request);
+        }
+
+        // Board-related tools
+        if (name === 'list_jira_boards') {
+          const boards = await handleListBoards(this.jiraClient);
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(boards, null, 2)
+              }
+            ]
+          };
         }
 
         console.error(`Unknown tool requested: ${name}`);
