@@ -15,7 +15,7 @@ export const toolSchemas = {
       properties: {
         issueKey: {
           type: 'string',
-          description: 'The Jira issue key (e.g., DEAL-123). Can also use snake_case "issue_key".',
+          description: 'The Jira issue key (e.g., WORK-123). Can also use snake_case "issue_key".',
         },
         includeComments: {
           type: 'boolean',
@@ -48,7 +48,7 @@ export const toolSchemas = {
       properties: {
         issueKey: {
           type: 'string',
-          description: 'The Jira issue key (e.g., DEAL-123). Can also use snake_case "issue_key".',
+          description: 'The Jira issue key (e.g., WORK-123). Can also use snake_case "issue_key".',
         },
         summary: {
           type: 'string',
@@ -70,7 +70,7 @@ export const toolSchemas = {
       properties: {
         issueKey: {
           type: 'string',
-          description: 'The Jira issue key (e.g., DEAL-123). Can also use snake_case "issue_key".',
+          description: 'The Jira issue key (e.g., WORK-123). Can also use snake_case "issue_key".',
         },
         body: {
           type: 'string',
@@ -113,7 +113,7 @@ export const toolSchemas = {
       properties: {
         issueKey: {
           type: 'string',
-          description: 'The Jira issue key (e.g., DEAL-123). Can also use snake_case "issue_key".',
+          description: 'The Jira issue key (e.g., WORK-123). Can also use snake_case "issue_key".',
         },
       },
       required: ['issueKey'],
@@ -127,7 +127,7 @@ export const toolSchemas = {
       properties: {
         issueKey: {
           type: 'string',
-          description: 'The Jira issue key (e.g., DEAL-123). Can also use snake_case "issue_key".',
+          description: 'The Jira issue key (e.g., WORK-123). Can also use snake_case "issue_key".',
         },
       },
       required: ['issueKey'],
@@ -155,7 +155,7 @@ export const toolSchemas = {
       properties: {
         issueKey: {
           type: 'string',
-          description: 'The Jira issue key (e.g., DEAL-123). Can also use snake_case "issue_key".',
+          description: 'The Jira issue key (e.g., WORK-123). Can also use snake_case "issue_key".',
         },
         transitionId: {
           type: 'string',

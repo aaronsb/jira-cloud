@@ -43,7 +43,7 @@ function validateIssueKey(args: unknown, toolName: string): void {
   if (typeof args !== 'object' || args === null) {
     throw new McpError(
       ErrorCode.InvalidParams,
-      `Invalid ${toolName} arguments: Expected an object with an issueKey parameter. Example: { "issueKey": "DEAL-123" } or { "issue_key": "DEAL-123" }`
+      `Invalid ${toolName} arguments: Expected an object with an issueKey parameter. Example: { "issueKey": "WORK-123" } or { "issue_key": "WORK-123" }`
     );
   }
 
@@ -52,7 +52,7 @@ function validateIssueKey(args: unknown, toolName: string): void {
   if (typeof normalizedArgs.issueKey !== 'string') {
     throw new McpError(
       ErrorCode.InvalidParams,
-      `Missing or invalid issueKey parameter. Please provide a valid issue key using either "issueKey" or "issue_key". Example: { "issueKey": "DEAL-123" }`
+      `Missing or invalid issueKey parameter. Please provide a valid issue key using either "issueKey" or "issue_key". Example: { "issueKey": "WORK-123" }`
     );
   }
 
