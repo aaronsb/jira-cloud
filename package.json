@@ -18,9 +18,13 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^0.6.0",
-    "jira.js": "^4.0.5"
+    "jira.js": "^4.0.5",
+    "jsdom": "^26.0.0",
+    "markdown-it": "^14.1.0"
   },
   "devDependencies": {
+    "@types/jsdom": "^21.1.7",
+    "@types/markdown-it": "^14.1.2",
     "@types/node": "^20.11.24",
     "typescript": "^5.3.3"
   }

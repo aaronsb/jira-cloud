@@ -56,14 +56,15 @@ class JiraServer {
 
     console.error('Initializing server with tools:', JSON.stringify(tools, null, 2));
 
-    // Use the same name as in MCP settings
-    const serverName = process.env.JIRA_HOST?.includes('cprimeglobalsolutions') ? 'prima' : 'jvl';
+    // Use environment-provided name or default to 'jira-cloud'
+    const serverName = process.env.MCP_SERVER_NAME || 'jira-cloud';
     console.error(`Using server name: ${serverName}`);
 
     this.server = new Server(
       {
         name: serverName,
         version: '0.1.0',
+        description: 'Jira Cloud MCP Server - Provides tools for interacting with any Jira Cloud instance'
       },
       {
         capabilities: {
@@ -127,7 +128,7 @@ class JiraServer {
 
       try {
         // Issue-related tools
-        if (['get_jira_issue', 'update_jira_issue', 'add_jira_comment', 'get_jira_transitions', 'get_jira_populated_fields', 'transition_jira_issue'].includes(name)) {
+        if (['get_jira_issue', 'update_jira_issue', 'add_jira_comment', 'get_jira_transitions', 'get_jira_populated_fields', 'transition_jira_issue', 'create_jira_issue'].includes(name)) {
           return await setupIssueHandlers(this.server, this.jiraClient, request);
         }
         

@@ -1,6 +1,180 @@
 import { AdfNode } from '../types/index.js';
+import MarkdownIt from 'markdown-it';
 
 export class TextProcessor {
+  private static md = new MarkdownIt();
+  
+  static markdownToAdf(markdown: string): any {
+    const tokens = TextProcessor.md.parse(markdown, {});
+    const content: any[] = [];
+    let currentListItems: any[] = [];
+    let isInList = false;
+    let listType: string | null = null;
+
+    for (const token of tokens) {
+      switch (token.type) {
+        case 'heading_open':
+          // Start a new heading block
+          content.push({
+            type: 'heading',
+            attrs: { level: parseInt(token.tag.slice(1)) },
+            content: []
+          });
+          break;
+
+        case 'heading_close':
+          break;
+
+        case 'paragraph_open':
+          if (!isInList) {
+            content.push({
+              type: 'paragraph',
+              content: []
+            });
+          }
+          break;
+
+        case 'paragraph_close':
+          break;
+
+        case 'bullet_list_open':
+        case 'ordered_list_open':
+          isInList = true;
+          listType = token.type === 'bullet_list_open' ? 'bulletList' : 'orderedList';
+          currentListItems = [];
+          break;
+
+        case 'bullet_list_close':
+        case 'ordered_list_close':
+          if (currentListItems.length > 0) {
+            content.push({
+              type: listType!,
+              content: currentListItems
+            });
+          }
+          isInList = false;
+          listType = null;
+          currentListItems = [];
+          break;
+
+        case 'list_item_open':
+          currentListItems.push({
+            type: 'listItem',
+            content: [{
+              type: 'paragraph',
+              content: []
+            }]
+          });
+          break;
+
+        case 'list_item_close':
+          break;
+
+        case 'inline':
+          const lastBlock = isInList 
+            ? currentListItems[currentListItems.length - 1].content[0]
+            : content[content.length - 1];
+          
+          if (!lastBlock) continue;
+
+          let currentText = '';
+          let marks: any[] = [];
+
+          for (let i = 0; i < token.children!.length; i++) {
+            const child = token.children![i];
+
+            if (child.type === 'text') {
+              if (currentText && marks.length > 0) {
+                lastBlock.content.push({
+                  type: 'text',
+                  text: currentText,
+                  marks
+                });
+                currentText = '';
+                marks = [];
+              }
+              currentText = child.content;
+            } else if (child.type === 'strong_open') {
+              if (currentText) {
+                lastBlock.content.push({
+                  type: 'text',
+                  text: currentText
+                });
+                currentText = '';
+              }
+              marks.push({ type: 'strong' });
+            } else if (child.type === 'em_open') {
+              if (currentText) {
+                lastBlock.content.push({
+                  type: 'text',
+                  text: currentText
+                });
+                currentText = '';
+              }
+              marks.push({ type: 'em' });
+            } else if (child.type === 'link_open') {
+              if (currentText) {
+                lastBlock.content.push({
+                  type: 'text',
+                  text: currentText
+                });
+                currentText = '';
+              }
+              marks.push({
+                type: 'link',
+                attrs: {
+                  href: child.attrs![0][1]
+                }
+              });
+            } else if (child.type === 'code_inline') {
+              if (currentText) {
+                lastBlock.content.push({
+                  type: 'text',
+                  text: currentText
+                });
+                currentText = '';
+              }
+              lastBlock.content.push({
+                type: 'text',
+                text: child.content,
+                marks: [{ type: 'code' }]
+              });
+            }
+          }
+
+          if (currentText) {
+            lastBlock.content.push({
+              type: 'text',
+              text: currentText,
+              ...(marks.length > 0 && { marks })
+            });
+          }
+          break;
+
+        case 'hr':
+          content.push({
+            type: 'rule'
+          });
+          break;
+
+        case 'hardbreak':
+          const lastContent = content[content.length - 1];
+          if (lastContent && lastContent.content) {
+            lastContent.content.push({
+              type: 'hardBreak'
+            });
+          }
+          break;
+      }
+    }
+
+    return {
+      type: 'doc',
+      version: 1,
+      content
+    };
+  }
+
   static extractTextFromAdf(node: AdfNode): string {
     if (!node) return '';
 

@@ -50,18 +50,15 @@ export class JiraClient {
     const params: any = {
       issueIdOrKey: issueKey,
       fields,
+      expand: includeComments ? 'renderedFields,comments' : 'renderedFields'
     };
-
-    if (includeComments) {
-      params.expand = 'renderedFields,comments';
-    }
 
     const issue = await this.client.issues.getIssue(params);
 
     const issueDetails: JiraIssueDetails = {
       key: issue.key,
       summary: issue.fields.summary,
-      description: issue.fields.description ? TextProcessor.extractTextFromAdf(issue.fields.description) : '',
+      description: (issue as any).renderedFields?.description || '',
       assignee: issue.fields.assignee?.displayName || null,
       reporter: issue.fields.reporter?.displayName || '',
       status: issue.fields.status?.name || '',
@@ -120,12 +117,13 @@ export class JiraClient {
         'timeestimate',
         'issuelinks',
       ],
+      expand: 'renderedFields'
     });
 
     return (searchResults.issues || []).map(issue => ({
       key: issue.key,
       summary: issue.fields.summary,
-      description: issue.fields.description ? TextProcessor.extractTextFromAdf(issue.fields.description) : '',
+      description: (issue as any).renderedFields?.description || '',
       assignee: issue.fields.assignee?.displayName || null,
       reporter: issue.fields.reporter?.displayName || '',
       status: issue.fields.status?.name || '',
@@ -146,21 +144,7 @@ export class JiraClient {
     const fields: any = {};
     if (summary) fields.summary = summary;
     if (description) {
-      fields.description = {
-        version: 1,
-        type: "doc",
-        content: [
-          {
-            type: "paragraph",
-            content: [
-              {
-                type: "text",
-                text: description
-              }
-            ]
-          }
-        ]
-      };
+      fields.description = TextProcessor.markdownToAdf(description);
     }
 
     await this.client.issues.editIssue({
@@ -172,21 +156,7 @@ export class JiraClient {
   async addComment(issueKey: string, commentBody: string): Promise<void> {
     await this.client.issueComments.addComment({
       issueIdOrKey: issueKey,
-      comment: {
-        version: 1,
-        type: "doc",
-        content: [
-          {
-            type: "paragraph",
-            content: [
-              {
-                type: "text",
-                text: commentBody
-              }
-            ]
-          }
-        ]
-      }
+      comment: TextProcessor.markdownToAdf(commentBody)
     });
   }
 
@@ -213,12 +183,13 @@ export class JiraClient {
         'timeestimate',
         'issuelinks',
       ],
+      expand: 'renderedFields'
     });
 
     const issues = (searchResults.issues || []).map(issue => ({
       key: issue.key,
       summary: issue.fields.summary,
-      description: issue.fields.description ? TextProcessor.extractTextFromAdf(issue.fields.description) : '',
+      description: (issue as any).renderedFields?.description || '',
       assignee: issue.fields.assignee?.displayName || null,
       reporter: issue.fields.reporter?.displayName || '',
       status: issue.fields.status?.name || '',
@@ -279,21 +250,7 @@ export class JiraClient {
       transitionRequest.update = {
         comment: [{
           add: {
-            body: {
-              version: 1,
-              type: "doc",
-              content: [
-                {
-                  type: "paragraph",
-                  content: [
-                    {
-                      type: "text",
-                      text: comment
-                    }
-                  ]
-                }
-              ]
-            }
+            body: TextProcessor.markdownToAdf(comment)
           }
         }]
       };
@@ -479,6 +436,37 @@ export class JiraClient {
         lead: project.lead?.displayName || null,
         url: project.self || ''
       }));
+  }
+
+  async createIssue(params: {
+    projectKey: string;
+    summary: string;
+    description?: string;
+    issueType: string;
+    priority?: string;
+    assignee?: string;
+    labels?: string[];
+    customFields?: Record<string, any>;
+  }): Promise<{ key: string }> {
+    const fields: any = {
+      project: { key: params.projectKey },
+      summary: params.summary,
+      issuetype: { name: params.issueType },
+    };
+
+    if (params.description) {
+      fields.description = TextProcessor.markdownToAdf(params.description);
+    }
+
+    if (params.priority) fields.priority = { id: params.priority };
+    if (params.assignee) fields.assignee = { name: params.assignee };
+    if (params.labels) fields.labels = params.labels;
+    if (params.customFields) {
+      Object.assign(fields, params.customFields);
+    }
+
+    const response = await this.client.issues.createIssue({ fields });
+    return { key: response.key };
   }
 
   async listMyFilters(expand = false): Promise<FilterResponse[]> {

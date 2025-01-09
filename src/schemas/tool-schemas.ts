@@ -191,4 +191,49 @@ export const toolSchemas = {
       required: ['issueKey', 'transitionId'],
     },
   },
+  create_jira_issue: {
+    name: 'create_jira_issue',
+    description: 'Create a new Jira issue',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectKey: {
+          type: 'string',
+          description: 'Project key (e.g., PROJ)',
+        },
+        summary: {
+          type: 'string',
+          description: 'Issue summary/title',
+        },
+        description: {
+          type: 'string',
+          description: 'Detailed description of the issue',
+        },
+        issueType: {
+          type: 'string',
+          description: 'Type of issue (e.g., Story, Bug, Task)',
+        },
+        priority: {
+          type: 'string',
+          description: 'Issue priority (e.g., High, Medium, Low)',
+        },
+        assignee: {
+          type: 'string',
+          description: 'Username of the assignee',
+        },
+        labels: {
+          type: 'array',
+          items: {
+            type: 'string'
+          },
+          description: 'Array of labels to apply to the issue',
+        },
+        customFields: {
+          type: 'object',
+          description: 'Custom field values as key-value pairs',
+        },
+      },
+      required: ['projectKey', 'summary', 'issueType'],
+    },
+  },
 };

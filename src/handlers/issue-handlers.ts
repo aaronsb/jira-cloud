@@ -24,6 +24,17 @@ type TransitionIssueArgs = {
   comment?: string;
 };
 
+type CreateIssueArgs = {
+  projectKey: string;
+  summary: string;
+  description?: string;
+  issueType: string;
+  priority?: string;
+  assignee?: string;
+  labels?: string[];
+  customFields?: Record<string, any>;
+};
+
 // Helper function to normalize parameter names (support both snake_case and camelCase)
 function normalizeArgs(args: Record<string, unknown>): Record<string, unknown> {
   const normalized: Record<string, unknown> = {};
@@ -56,15 +67,11 @@ function validateIssueKey(args: unknown, toolName: string): void {
     );
   }
 
-  // Add server selection guidance based on issue key prefix
-  const issueKeyPrefix = (normalizedArgs.issueKey as string).split('-')[0];
-  const expectedServer = issueKeyPrefix === 'DEAL' ? 'prima' : 'jvl';
-  const currentServer = process.env.JIRA_HOST?.includes('cprimeglobalsolutions') ? 'prima' : 'jvl';
-  
-  if (expectedServer !== currentServer) {
+  // Validate issue key format (e.g., PROJ-123)
+  if (!/^[A-Z][A-Z0-9_]+(-\d+)?$/.test(normalizedArgs.issueKey as string)) {
     throw new McpError(
       ErrorCode.InvalidParams,
-      `Issue key "${normalizedArgs.issueKey}" should be used with the "${expectedServer}" server, but you're currently using "${currentServer}". DEAL issues use the prima server, other issues use the jvl server.`
+      `Invalid issue key format. Expected format: PROJ-123`
     );
   }
 }
@@ -91,6 +98,22 @@ function isAddCommentArgs(args: unknown): args is AddCommentArgs {
   return true;
 }
 
+function isCreateIssueArgs(args: unknown): args is CreateIssueArgs {
+  const typedArgs = args as CreateIssueArgs;
+  return (
+    typeof args === 'object' &&
+    args !== null &&
+    typeof typedArgs.projectKey === 'string' &&
+    typeof typedArgs.summary === 'string' &&
+    typeof typedArgs.issueType === 'string' &&
+    (typedArgs.description === undefined || typeof typedArgs.description === 'string') &&
+    (typedArgs.priority === undefined || typeof typedArgs.priority === 'string') &&
+    (typedArgs.assignee === undefined || typeof typedArgs.assignee === 'string') &&
+    (typedArgs.labels === undefined || Array.isArray(typedArgs.labels)) &&
+    (typedArgs.customFields === undefined || typeof typedArgs.customFields === 'object')
+  );
+}
+
 function isTransitionIssueArgs(args: unknown): args is TransitionIssueArgs {
   validateIssueKey(args, 'transition_jira_issue');
   const normalizedArgs = normalizeArgs(args as Record<string, unknown>);
@@ -104,7 +127,7 @@ function isTransitionIssueArgs(args: unknown): args is TransitionIssueArgs {
 }
 
 function hasIssueKey(args: unknown): args is { issueKey: string } {
-  validateIssueKey(args, 'get_populated_fields');
+  validateIssueKey(args, 'get_jira_populated_fields');
   return true;
 }
 
@@ -154,10 +177,10 @@ export async function setupIssueHandlers(
         };
       }
 
-      case 'get_populated_fields': {
-        console.error('Processing get_populated_fields request');
+      case 'get_jira_populated_fields': {
+        console.error('Processing get_jira_populated_fields request');
         if (!hasIssueKey(normalizedArgs)) {
-          throw new McpError(ErrorCode.InvalidParams, 'Invalid get_populated_fields arguments');
+          throw new McpError(ErrorCode.InvalidParams, 'Invalid get_jira_populated_fields arguments');
         }
 
         const fields = await jiraClient.getPopulatedFields(normalizedArgs.issueKey as string);
@@ -265,6 +288,34 @@ export async function setupIssueHandlers(
                   message: 'Issue transitioned successfully',
                   transitionId: normalizedArgs.transitionId,
                   comment: normalizedArgs.comment || 'No comment provided',
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      }
+
+      case 'create_jira_issue': {
+        console.error('Processing create_jira_issue request');
+        if (!isCreateIssueArgs(normalizedArgs)) {
+          throw new McpError(
+            ErrorCode.InvalidParams,
+            'Invalid create_jira_issue arguments. Required: projectKey (string), summary (string), issueType (string)'
+          );
+        }
+
+        const result = await jiraClient.createIssue(normalizedArgs);
+        
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  message: 'Issue created successfully',
+                  key: result.key
                 },
                 null,
                 2
