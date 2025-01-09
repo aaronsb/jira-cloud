@@ -126,33 +126,58 @@ npm run watch
 
 ## Installation
 
-To use this MCP server, add the server configuration to your MCP settings:
+To use this MCP server, add the server configuration to your MCP settings. The configuration varies slightly based on your operating system and editor:
 
-For VSCode:
+### VSCode
+
+For VSCode, the configuration goes in:
+- Windows: `%APPDATA%\Code\User\globalStorage\saoudrizwan.claude-dev\settings\cline_mcp_settings.json`
+- macOS: `~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
+- Linux: `~/.config/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
+
+Example configuration:
 ```json
 {
   "mcpServers": {
-    "jvl": {
+    "team1": {
       "command": "node",
-      "args": ["/path/to/jira-cloud/build/index.js"],
+      "args": ["${userHome}/path/to/jira-cloud/build/index.js"],
       "env": {
         "JIRA_API_TOKEN": "your-api-token",
         "JIRA_EMAIL": "your-email",
-        "JIRA_HOST": "jvl-instance.atlassian.net"
+        "JIRA_HOST": "your-team.atlassian.net"
       }
     },
-    "prima": {
+    "team2": {
       "command": "node",
-      "args": ["/path/to/jira-cloud/build/index.js"],
+      "args": ["${userHome}/path/to/jira-cloud/build/index.js"],
       "env": {
         "JIRA_API_TOKEN": "your-api-token",
         "JIRA_EMAIL": "your-email",
-        "JIRA_HOST": "cprimeglobalsolutions.atlassian.net"
+        "JIRA_HOST": "another-team.atlassian.net"
       }
     }
   }
 }
 ```
+
+### Claude Desktop App
+
+For the Claude desktop app, the configuration goes in:
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Linux: `~/.config/Claude/claude_desktop_config.json`
+
+The configuration format is the same as VSCode.
+
+### Path Variables
+
+The configuration supports the following path variables:
+- `${userHome}`: Expands to the user's home directory
+- `${workspaceFolder}`: (VSCode only) Expands to the opened workspace folder
+- `${extensionPath}`: (VSCode only) Expands to the extension installation directory
+
+Using these variables makes your configuration portable across different machines and operating systems.
 
 ### Environment Variables
 
