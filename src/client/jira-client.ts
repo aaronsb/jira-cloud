@@ -1,6 +1,6 @@
 import { Version3Client, AgileClient } from 'jira.js';
 import type { Project } from 'jira.js/out/version3/models';
-import { JiraConfig, JiraIssueDetails, FilterResponse, TransitionDetails, SearchResponse, BoardResponse, SprintResponse } from '../types/index.js';
+import { JiraConfig, JiraIssueDetails, FilterResponse, TransitionDetails, SearchResponse, BoardResponse, SprintResponse, JiraAttachment } from '../types/index.js';
 import { TextProcessor } from '../utils/text-processing.js';
 
 export class JiraClient {
@@ -32,7 +32,7 @@ export class JiraClient {
     };
   }
 
-  async getIssue(issueKey: string, includeComments = false): Promise<JiraIssueDetails> {
+  async getIssue(issueKey: string, includeComments = false, includeAttachments = false): Promise<JiraIssueDetails> {
     const fields = [
       'summary',
       'description',
@@ -46,6 +46,10 @@ export class JiraClient {
       'timeestimate',
       'issuelinks',
     ];
+
+    if (includeAttachments) {
+      fields.push('attachment');
+    }
 
     const params: any = {
       issueIdOrKey: issueKey,
@@ -90,7 +94,56 @@ export class JiraClient {
         }));
     }
 
+    if (includeAttachments && issue.fields.attachment) {
+      issueDetails.attachments = issue.fields.attachment
+        .filter(attachment => 
+          attachment.id &&
+          attachment.filename &&
+          attachment.mimeType &&
+          attachment.created &&
+          attachment.author?.displayName
+        )
+        .map(attachment => ({
+          id: attachment.id!,
+          filename: attachment.filename!,
+          mimeType: attachment.mimeType!,
+          size: attachment.size || 0,
+          created: attachment.created!,
+          author: attachment.author!.displayName!,
+          url: attachment.content || '',
+        }));
+    }
+
     return issueDetails;
+  }
+
+  async getIssueAttachments(issueKey: string): Promise<JiraAttachment[]> {
+    const issue = await this.client.issues.getIssue({
+      issueIdOrKey: issueKey,
+      fields: ['attachment'],
+    });
+
+    if (!issue.fields.attachment) {
+      return [];
+    }
+
+    return issue.fields.attachment
+      .filter(attachment => 
+        attachment.id &&
+        attachment.filename &&
+        attachment.mimeType &&
+        attachment.created &&
+        attachment.author?.displayName
+      )
+      .map(attachment => ({
+        id: attachment.id!,
+        filename: attachment.filename!,
+        mimeType: attachment.mimeType!,
+        size: attachment.size || 0,
+        created: attachment.created!,
+        author: attachment.author!.displayName!,
+        url: attachment.content || '',
+      }));
   }
 
   async getFilterIssues(filterId: string): Promise<JiraIssueDetails[]> {

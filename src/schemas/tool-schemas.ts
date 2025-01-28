@@ -45,7 +45,21 @@ export const toolSchemas = {
   },
   get_issue_details: {
     name: 'get_issue_details',
-    description: 'Get comprehensive information about a Jira issue including attachments',
+    description: 'Get comprehensive information about a Jira issue including comments',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        issueKey: {
+          type: 'string',
+          description: 'The Jira issue key (e.g., WORK-123). Can also use snake_case "issue_key".',
+        },
+      },
+      required: ['issueKey'],
+    },
+  },
+  get_issue_attachments: {
+    name: 'get_issue_attachments',
+    description: 'Get all attachments for a Jira issue with metadata and download URLs',
     inputSchema: {
       type: 'object',
       properties: {

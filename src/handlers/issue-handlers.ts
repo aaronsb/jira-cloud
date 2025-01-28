@@ -10,6 +10,10 @@ type GetIssueDetailsArgs = {
   issueKey: string;
 };
 
+type GetIssueAttachmentsArgs = {
+  issueKey: string;
+};
+
 // Basic issue response type for get_issue
 type BasicIssueResponse = {
   key: string;
@@ -94,6 +98,11 @@ function isGetIssueArgs(args: unknown): args is GetIssueArgs {
 
 function isGetIssueDetailsArgs(args: unknown): args is GetIssueDetailsArgs {
   validateIssueKey(args, 'get_issue_details');
+  return true;
+}
+
+function isGetIssueAttachmentsArgs(args: unknown): args is GetIssueAttachmentsArgs {
+  validateIssueKey(args, 'get_issue_attachments');
   return true;
 }
 
@@ -204,14 +213,32 @@ export async function setupIssueHandlers(
           throw new McpError(ErrorCode.InvalidParams, 'Invalid get_issue_details arguments');
         }
 
-        // Get full issue details including comments and attachments
-        const issue = await jiraClient.getIssue(normalizedArgs.issueKey as string, true);
+        // Get full issue details including comments but not attachments
+        const issue = await jiraClient.getIssue(normalizedArgs.issueKey as string, true, false);
 
         return {
           content: [
             {
               type: 'text',
               text: JSON.stringify(issue, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'get_issue_attachments': {
+        console.error('Processing get_issue_attachments request');
+        if (!isGetIssueAttachmentsArgs(normalizedArgs)) {
+          throw new McpError(ErrorCode.InvalidParams, 'Invalid get_issue_attachments arguments');
+        }
+
+        const attachments = await jiraClient.getIssueAttachments(normalizedArgs.issueKey as string);
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(attachments, null, 2),
             },
           ],
         };

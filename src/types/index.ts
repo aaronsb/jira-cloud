@@ -1,5 +1,15 @@
 import { Version3Models } from 'jira.js';
 
+export interface JiraAttachment {
+  id: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+  created: string;
+  author: string;
+  url: string;
+}
+
 export interface JiraIssueDetails {
   key: string;
   summary: string;
@@ -23,6 +33,7 @@ export interface JiraIssueDetails {
     body: string;
     created: string;
   }>;
+  attachments?: JiraAttachment[];
 }
 
 export interface AdfNode {
