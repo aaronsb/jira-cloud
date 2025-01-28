@@ -29,9 +29,9 @@ export const toolSchemas = {
       properties: {},
     },
   },
-  get_jira_issue: {
-    name: 'get_jira_issue',
-    description: 'Get detailed information about a Jira issue',
+  get_issue: {
+    name: 'get_issue',
+    description: 'Get basic information about a Jira issue',
     inputSchema: {
       type: 'object',
       properties: {
@@ -39,10 +39,19 @@ export const toolSchemas = {
           type: 'string',
           description: 'The Jira issue key (e.g., WORK-123). Can also use snake_case "issue_key".',
         },
-        includeComments: {
-          type: 'boolean',
-          description: 'Whether to include comments in the response',
-          default: false,
+      },
+      required: ['issueKey'],
+    },
+  },
+  get_issue_details: {
+    name: 'get_issue_details',
+    description: 'Get comprehensive information about a Jira issue including attachments',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        issueKey: {
+          type: 'string',
+          description: 'The Jira issue key (e.g., WORK-123). Can also use snake_case "issue_key".',
         },
       },
       required: ['issueKey'],

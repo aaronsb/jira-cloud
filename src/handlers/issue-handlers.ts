@@ -4,7 +4,18 @@ import { JiraClient } from '../client/jira-client.js';
 
 type GetIssueArgs = {
   issueKey: string;
-  includeComments?: boolean;
+};
+
+type GetIssueDetailsArgs = {
+  issueKey: string;
+};
+
+// Basic issue response type for get_issue
+type BasicIssueResponse = {
+  key: string;
+  summary: string;
+  status: string;
+  assignee: string | null;
 };
 
 type UpdateIssueArgs = {
@@ -77,7 +88,12 @@ function validateIssueKey(args: unknown, toolName: string): void {
 }
 
 function isGetIssueArgs(args: unknown): args is GetIssueArgs {
-  validateIssueKey(args, 'get_jira_issue');
+  validateIssueKey(args, 'get_issue');
+  return true;
+}
+
+function isGetIssueDetailsArgs(args: unknown): args is GetIssueDetailsArgs {
+  validateIssueKey(args, 'get_issue_details');
   return true;
 }
 
@@ -156,16 +172,40 @@ export async function setupIssueHandlers(
   const normalizedArgs = normalizeArgs(args);
 
   switch (name) {
-      case 'get_jira_issue': {
-        console.error('Processing get_jira_issue request');
+      case 'get_issue': {
+        console.error('Processing get_issue request');
         if (!isGetIssueArgs(normalizedArgs)) {
-          throw new McpError(ErrorCode.InvalidParams, 'Invalid get_jira_issue arguments');
+          throw new McpError(ErrorCode.InvalidParams, 'Invalid get_issue arguments');
         }
 
-        const issue = await jiraClient.getIssue(
-          normalizedArgs.issueKey as string,
-          normalizedArgs.includeComments as boolean || false
-        );
+        const issue = await jiraClient.getIssue(normalizedArgs.issueKey as string, false);
+        
+        // Return only basic information
+        const basicResponse: BasicIssueResponse = {
+          key: issue.key,
+          summary: issue.summary,
+          status: issue.status,
+          assignee: issue.assignee,
+        };
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(basicResponse, null, 2),
+            },
+          ],
+        };
+      }
+
+      case 'get_issue_details': {
+        console.error('Processing get_issue_details request');
+        if (!isGetIssueDetailsArgs(normalizedArgs)) {
+          throw new McpError(ErrorCode.InvalidParams, 'Invalid get_issue_details arguments');
+        }
+
+        // Get full issue details including comments and attachments
+        const issue = await jiraClient.getIssue(normalizedArgs.issueKey as string, true);
 
         return {
           content: [
