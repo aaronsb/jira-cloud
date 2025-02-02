@@ -21,6 +21,7 @@
    - ✅ Issue comments
    - ✅ Issue transitions
    - ✅ Issue updates
+   - ✅ Parent issue operations
 
 4. Search & Filtering
    - ✅ JQL search implementation
@@ -29,7 +30,13 @@
 
 ## Recently Completed
 
-1. Tool Redesign (merged to main)
+1. Parent Issue Support (merged to main)
+   - ✅ Add parent field to issue responses
+   - ✅ Support setting/removing parent
+   - ✅ Integration with existing tools
+   - ✅ Testing with real issues
+
+2. Tool Redesign (merged to main)
    - ✅ Split issue retrieval into basic/detailed
    - ✅ Add attachment handling
    - ✅ Testing new functionality
@@ -43,7 +50,6 @@ No active development work in progress.
 1. Issue Operations
    - ⏳ Bulk operations
    - ⏳ Issue creation
-   - ⏳ Issue linking
    - ⏳ Worklog management
 
 2. Sprint Management
