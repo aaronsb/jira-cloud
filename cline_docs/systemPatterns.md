@@ -41,6 +41,15 @@ src/
    - Detailed error information
    - Proper error propagation
 
+6. Tool Naming Convention
+   - Follow [verb]_jira_[noun] pattern
+   - Examples:
+     * list_jira_boards
+     * get_jira_issue
+     * update_jira_issue
+   - Ensures consistency and clarity
+   - Makes tool purpose immediately clear
+
 ## Design Patterns
 
 1. Singleton Pattern

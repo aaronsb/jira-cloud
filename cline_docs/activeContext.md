@@ -1,26 +1,30 @@
 # Active Context
 
 ## Current Work
-Main branch is up to date with all recent improvements to issue handling capabilities.
+Completed tool naming convention refactor to follow [verb]_jira_[noun] pattern.
 
 ## Recent Changes
-1. Added parent issue support (c00a91b)
-   - Added parent field to issue responses
-   - Enhanced update_jira_issue to support setting/removing parent
-   - Integrated into existing tools rather than separate tools
-   - All changes tested and verified with CT-4970
+1. Tool Naming Convention Refactor (refactor/tool-naming-convention)
+   - Renamed tools to follow [verb]_jira_[noun] pattern:
+     * list_board_sprints → list_jira_sprints
+     * get_issue → get_jira_issue
+     * get_issue_details → get_jira_issue_details
+     * get_issue_attachments → get_jira_issue_attachments
+     * get_jira_populated_fields → get_jira_fields
+     * list_my_jira_filters → list_jira_filters
+   - Updated all references in:
+     * tool-schemas.ts
+     * request-schemas.ts
+     * search-handlers.ts
+     * issue-handlers.ts
+     * board-handlers.ts
+     * index.ts
+   - All changes tested and verified working
 
-2. Fixed tool name registration (eadbd46)
-   - Updated issue tool names in handler registration to match new tool structure
-
-3. Completed and merged tool redesign (aa131e2)
-   - Added get_issue_attachments tool for retrieving attachments
-   - Split get_jira_issue into get_issue and get_issue_details
-   - Updated documentation for new tools
-   - Improved issue formatting
-   - All changes tested and verified
-
-4. Previous Updates
+2. Previous Updates
+   - Added parent issue support (c00a91b)
+   - Fixed tool name registration (eadbd46)
+   - Completed and merged tool redesign (aa131e2)
    - Added board and sprint functionality
    - Implemented custom fields configuration
    - Enhanced error handling and validation
