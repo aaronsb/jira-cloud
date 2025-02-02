@@ -4,7 +4,10 @@
 Main branch is up to date with all recent improvements to issue handling capabilities.
 
 ## Recent Changes
-1. Completed and merged tool redesign (aa131e2)
+1. Fixed tool name registration (eadbd46)
+   - Updated issue tool names in handler registration to match new tool structure
+
+2. Completed and merged tool redesign (aa131e2)
    - Added get_issue_attachments tool for retrieving attachments
    - Split get_jira_issue into get_issue and get_issue_details
    - Updated documentation for new tools
