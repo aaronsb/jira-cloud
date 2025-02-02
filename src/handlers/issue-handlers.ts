@@ -93,17 +93,17 @@ function validateIssueKey(args: unknown, toolName: string): void {
 }
 
 function isGetIssueArgs(args: unknown): args is GetIssueArgs {
-  validateIssueKey(args, 'get_issue');
+  validateIssueKey(args, 'get_jira_issue');
   return true;
 }
 
 function isGetIssueDetailsArgs(args: unknown): args is GetIssueDetailsArgs {
-  validateIssueKey(args, 'get_issue_details');
+  validateIssueKey(args, 'get_jira_issue_details');
   return true;
 }
 
 function isGetIssueAttachmentsArgs(args: unknown): args is GetIssueAttachmentsArgs {
-  validateIssueKey(args, 'get_issue_attachments');
+  validateIssueKey(args, 'get_jira_issue_attachments');
   return true;
 }
 
@@ -182,8 +182,8 @@ export async function setupIssueHandlers(
   const normalizedArgs = normalizeArgs(args);
 
   switch (name) {
-      case 'get_issue': {
-        console.error('Processing get_issue request');
+      case 'get_jira_issue': {
+        console.error('Processing get_jira_issue request');
         if (!isGetIssueArgs(normalizedArgs)) {
           throw new McpError(ErrorCode.InvalidParams, 'Invalid get_issue arguments');
         }
@@ -208,8 +208,8 @@ export async function setupIssueHandlers(
         };
       }
 
-      case 'get_issue_details': {
-        console.error('Processing get_issue_details request');
+      case 'get_jira_issue_details': {
+        console.error('Processing get_jira_issue_details request');
         if (!isGetIssueDetailsArgs(normalizedArgs)) {
           throw new McpError(ErrorCode.InvalidParams, 'Invalid get_issue_details arguments');
         }
@@ -227,8 +227,8 @@ export async function setupIssueHandlers(
         };
       }
 
-      case 'get_issue_attachments': {
-        console.error('Processing get_issue_attachments request');
+      case 'get_jira_issue_attachments': {
+        console.error('Processing get_jira_issue_attachments request');
         if (!isGetIssueAttachmentsArgs(normalizedArgs)) {
           throw new McpError(ErrorCode.InvalidParams, 'Invalid get_issue_attachments arguments');
         }
@@ -245,10 +245,10 @@ export async function setupIssueHandlers(
         };
       }
 
-      case 'get_jira_populated_fields': {
-        console.error('Processing get_jira_populated_fields request');
+      case 'get_jira_fields': {
+        console.error('Processing get_jira_fields request');
         if (!hasIssueKey(normalizedArgs)) {
-          throw new McpError(ErrorCode.InvalidParams, 'Invalid get_jira_populated_fields arguments');
+          throw new McpError(ErrorCode.InvalidParams, 'Invalid get_jira_fields arguments');
         }
 
         const fields = await jiraClient.getPopulatedFields(normalizedArgs.issueKey as string);

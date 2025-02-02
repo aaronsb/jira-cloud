@@ -2,13 +2,13 @@ import { JiraClient } from '../client/jira-client.js';
 import { BoardResponse, SprintResponse } from '../types/index.js';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
-type ListBoardSprintsArgs = {
+type ListJiraSprintsArgs = {
   boardId?: number;
   board_id?: number;
 };
 
-function isListBoardSprintsArgs(args: unknown): args is ListBoardSprintsArgs {
-  const typedArgs = args as ListBoardSprintsArgs;
+function isListJiraSprintsArgs(args: unknown): args is ListJiraSprintsArgs {
+  const typedArgs = args as ListJiraSprintsArgs;
   return (
     typeof args === 'object' && 
     args !== null && 
@@ -20,9 +20,9 @@ export async function handleListBoards(client: JiraClient): Promise<BoardRespons
   return client.listBoards();
 }
 
-export async function handleListBoardSprints(client: JiraClient, args: unknown): Promise<SprintResponse[]> {
-  if (!isListBoardSprintsArgs(args)) {
-    throw new McpError(ErrorCode.InvalidParams, 'Invalid board sprint arguments. Board ID must be a number.');
+export async function handleListJiraSprints(client: JiraClient, args: unknown): Promise<SprintResponse[]> {
+  if (!isListJiraSprintsArgs(args)) {
+    throw new McpError(ErrorCode.InvalidParams, 'Invalid sprint arguments. Board ID must be a number.');
   }
   
   const boardId = args.boardId || args.board_id;

@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const GetIssueSchema = z.object({
   method: z.literal('tools/call'),
   params: z.object({
-    name: z.literal('get_issue'),
+    name: z.literal('get_jira_issue'),
     arguments: z.object({
       issueKey: z.string(),
       includeComments: z.boolean().optional(),

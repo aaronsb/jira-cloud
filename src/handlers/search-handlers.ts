@@ -107,10 +107,10 @@ export async function setupSearchHandlers(
         }
       }
 
-      case 'list_my_jira_filters': {
-        console.error('Processing list_my_jira_filters request');
+      case 'list_jira_filters': {
+        console.error('Processing list_jira_filters request');
         if (!isListMyFiltersArgs(args)) {
-          throw new McpError(ErrorCode.InvalidParams, 'Invalid list_my_jira_filters arguments');
+          throw new McpError(ErrorCode.InvalidParams, 'Invalid list_jira_filters arguments');
         }
 
         try {
@@ -126,7 +126,7 @@ export async function setupSearchHandlers(
             ],
           };
         } catch (error) {
-          console.error('Error in list_my_jira_filters:', error);
+          console.error('Error in list_jira_filters:', error);
           if (error instanceof Error) {
             throw new McpError(ErrorCode.InvalidRequest, `Jira API error: ${error.message}`);
           }

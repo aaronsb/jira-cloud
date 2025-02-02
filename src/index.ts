@@ -14,7 +14,7 @@ import { JiraClient } from './client/jira-client.js';
 import { setupIssueHandlers } from './handlers/issue-handlers.js';
 import { setupSearchHandlers } from './handlers/search-handlers.js';
 import { setupProjectHandlers } from './handlers/project-handlers.js';
-import { handleListBoards, handleListBoardSprints } from './handlers/board-handlers.js';
+import { handleListBoards, handleListJiraSprints } from './handlers/board-handlers.js';
 import { toolSchemas } from './schemas/tool-schemas.js';
 
 // Jira credentials from environment variables
@@ -128,12 +128,12 @@ class JiraServer {
 
       try {
         // Issue-related tools
-        if (['get_issue', 'get_issue_details', 'get_issue_attachments', 'update_jira_issue', 'add_jira_comment', 'get_jira_transitions', 'get_jira_populated_fields', 'transition_jira_issue', 'create_jira_issue'].includes(name)) {
+        if (['get_jira_issue', 'get_jira_issue_details', 'get_jira_issue_attachments', 'update_jira_issue', 'add_jira_comment', 'get_jira_transitions', 'get_jira_fields', 'transition_jira_issue', 'create_jira_issue'].includes(name)) {
           return await setupIssueHandlers(this.server, this.jiraClient, request);
         }
         
         // Search-related tools
-        if (['search_jira_issues', 'get_jira_filter_issues', 'list_my_jira_filters'].includes(name)) {
+        if (['search_jira_issues', 'get_jira_filter_issues', 'list_jira_filters'].includes(name)) {
           return await setupSearchHandlers(this.server, this.jiraClient, request);
         }
 
@@ -155,8 +155,8 @@ class JiraServer {
           };
         }
 
-        if (name === 'list_board_sprints') {
-          const sprints = await handleListBoardSprints(this.jiraClient, request.params.arguments);
+        if (name === 'list_jira_sprints') {
+          const sprints = await handleListJiraSprints(this.jiraClient, request.params.arguments);
           return {
             content: [
               {
