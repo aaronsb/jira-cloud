@@ -4,6 +4,16 @@ A Model Context Protocol server for interacting with Jira Cloud instances.
 
 This TypeScript-based MCP server provides a robust interface to Jira Cloud, enabling seamless integration with Jira's issue tracking and project management capabilities through the MCP protocol.
 
+## Documentation
+
+The project maintains comprehensive documentation in the `cline_docs/` directory:
+
+- `productContext.md`: Project purpose, problems solved, and expected behavior
+- `activeContext.md`: Current work status and recent changes
+- `systemPatterns.md`: Architecture patterns and technical decisions
+- `techContext.md`: Technology stack and development setup
+- `progress.md`: Feature completion status and roadmap
+
 ## Architecture
 
 The server is built with a modular architecture that separates concerns and promotes maintainability:
@@ -44,11 +54,20 @@ The server provides several powerful tools for Jira interaction:
   - Parameters: None
   - Returns list of projects with their IDs, keys, names, descriptions, leads, and URLs
 
-- `get_jira_issue` - Retrieve detailed information about a Jira issue
+- `get_issue` - Retrieve basic information about a Jira issue
   - Parameters:
     - `issueKey` (required): The Jira issue key (e.g., "PROJ-123")
-    - `includeComments` (optional): Boolean to include issue comments
-  - Returns comprehensive issue data including summary, description, assignee, status, and more
+  - Returns basic issue data including summary, description, assignee, and status
+
+- `get_issue_details` - Retrieve comprehensive information about a Jira issue including comments
+  - Parameters:
+    - `issueKey` (required): The Jira issue key (e.g., "PROJ-123")
+  - Returns detailed issue data including all fields, comments, and history
+
+- `get_issue_attachments` - Retrieve attachments for a Jira issue
+  - Parameters:
+    - `issueKey` (required): The Jira issue key (e.g., "PROJ-123")
+  - Returns list of attachments with metadata and download URLs
 
 - `search_jira_issues` - Search for issues using JQL (Jira Query Language)
   - Parameters:
