@@ -7,8 +7,8 @@ export const toolSchemas = {
       properties: {},
     },
   },
-  list_board_sprints: {
-    name: 'list_board_sprints',
+  list_jira_sprints: {
+    name: 'list_jira_sprints',
     description: 'Get a list of all sprints in a Jira board',
     inputSchema: {
       type: 'object',
@@ -29,8 +29,8 @@ export const toolSchemas = {
       properties: {},
     },
   },
-  get_issue: {
-    name: 'get_issue',
+  get_jira_issue: {
+    name: 'get_jira_issue',
     description: 'Get basic information about a Jira issue',
     inputSchema: {
       type: 'object',
@@ -43,8 +43,8 @@ export const toolSchemas = {
       required: ['issueKey'],
     },
   },
-  get_issue_details: {
-    name: 'get_issue_details',
+  get_jira_issue_details: {
+    name: 'get_jira_issue_details',
     description: 'Get comprehensive information about a Jira issue including comments',
     inputSchema: {
       type: 'object',
@@ -57,8 +57,8 @@ export const toolSchemas = {
       required: ['issueKey'],
     },
   },
-  get_issue_attachments: {
-    name: 'get_issue_attachments',
+  get_jira_issue_attachments: {
+    name: 'get_jira_issue_attachments',
     description: 'Get all attachments for a Jira issue with metadata and download URLs',
     inputSchema: {
       type: 'object',
@@ -168,8 +168,8 @@ export const toolSchemas = {
       required: ['issueKey'],
     },
   },
-  get_jira_populated_fields: {
-    name: 'get_jira_populated_fields',
+  get_jira_fields: {
+    name: 'get_jira_fields',
     description: 'Get all populated fields for a Jira issue, excluding empty fields and system metadata',
     inputSchema: {
       type: 'object',
@@ -182,8 +182,8 @@ export const toolSchemas = {
       required: ['issueKey'],
     },
   },
-  list_my_jira_filters: {
-    name: 'list_my_jira_filters',
+  list_jira_filters: {
+    name: 'list_jira_filters',
     description: 'List all Jira filters owned by the authenticated user',
     inputSchema: {
       type: 'object',
