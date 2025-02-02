@@ -128,7 +128,7 @@ class JiraServer {
 
       try {
         // Issue-related tools
-        if (['get_jira_issue', 'update_jira_issue', 'add_jira_comment', 'get_jira_transitions', 'get_jira_populated_fields', 'transition_jira_issue', 'create_jira_issue'].includes(name)) {
+        if (['get_issue', 'get_issue_details', 'get_issue_attachments', 'update_jira_issue', 'add_jira_comment', 'get_jira_transitions', 'get_jira_populated_fields', 'transition_jira_issue', 'create_jira_issue'].includes(name)) {
           return await setupIssueHandlers(this.server, this.jiraClient, request);
         }
         
