@@ -87,7 +87,7 @@ export const toolSchemas = {
   },
   update_jira_issue: {
     name: 'update_jira_issue',
-    description: 'Update the summary and/or description of a Jira issue',
+    description: 'Update the summary, description, and/or parent of a Jira issue',
     inputSchema: {
       type: 'object',
       properties: {
@@ -102,6 +102,10 @@ export const toolSchemas = {
         description: {
           type: 'string',
           description: 'The new description for the issue',
+        },
+        parent: {
+          type: ['string', 'null'],
+          description: 'The key of the parent issue (e.g., PROJ-123) or null to remove parent',
         },
       },
       required: ['issueKey'],

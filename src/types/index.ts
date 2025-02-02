@@ -14,6 +14,7 @@ export interface JiraIssueDetails {
   key: string;
   summary: string;
   description: string;
+  parent: string | null;
   assignee: string | null;
   reporter: string;
   status: string;

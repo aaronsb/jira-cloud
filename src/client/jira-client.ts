@@ -36,6 +36,7 @@ export class JiraClient {
     const fields = [
       'summary',
       'description',
+      'parent',
       'assignee',
       'reporter',
       'status',
@@ -63,6 +64,7 @@ export class JiraClient {
       key: issue.key,
       summary: issue.fields.summary,
       description: (issue as any).renderedFields?.description || '',
+      parent: issue.fields.parent?.key || null,
       assignee: issue.fields.assignee?.displayName || null,
       reporter: issue.fields.reporter?.displayName || '',
       status: issue.fields.status?.name || '',
@@ -177,6 +179,7 @@ export class JiraClient {
       key: issue.key,
       summary: issue.fields.summary,
       description: (issue as any).renderedFields?.description || '',
+      parent: issue.fields.parent?.key || null,
       assignee: issue.fields.assignee?.displayName || null,
       reporter: issue.fields.reporter?.displayName || '',
       status: issue.fields.status?.name || '',
@@ -193,11 +196,14 @@ export class JiraClient {
     }));
   }
 
-  async updateIssue(issueKey: string, summary?: string, description?: string): Promise<void> {
+  async updateIssue(issueKey: string, summary?: string, description?: string, parentKey?: string | null): Promise<void> {
     const fields: any = {};
     if (summary) fields.summary = summary;
     if (description) {
       fields.description = TextProcessor.markdownToAdf(description);
+    }
+    if (parentKey !== undefined) {
+      fields.parent = parentKey ? { key: parentKey } : null;
     }
 
     await this.client.issues.editIssue({
@@ -243,6 +249,7 @@ export class JiraClient {
       key: issue.key,
       summary: issue.fields.summary,
       description: (issue as any).renderedFields?.description || '',
+      parent: issue.fields.parent?.key || null,
       assignee: issue.fields.assignee?.displayName || null,
       reporter: issue.fields.reporter?.displayName || '',
       status: issue.fields.status?.name || '',

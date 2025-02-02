@@ -26,6 +26,7 @@ type UpdateIssueArgs = {
   issueKey: string;
   summary?: string;
   description?: string;
+  parent?: string | null;
 };
 
 type AddCommentArgs = {
@@ -286,17 +287,18 @@ export async function setupIssueHandlers(
           throw new McpError(ErrorCode.InvalidParams, 'Invalid update_jira_issue arguments');
         }
 
-        if (!normalizedArgs.summary && !normalizedArgs.description) {
+        if (!normalizedArgs.summary && !normalizedArgs.description && normalizedArgs.parent === undefined) {
           throw new McpError(
             ErrorCode.InvalidParams,
-            'Must provide at least one of summary or description'
+            'Must provide at least one of summary, description, or parent'
           );
         }
 
         await jiraClient.updateIssue(
           normalizedArgs.issueKey as string,
           normalizedArgs.summary as string | undefined,
-          normalizedArgs.description as string | undefined
+          normalizedArgs.description as string | undefined,
+          normalizedArgs.parent as string | null | undefined
         );
 
         return {
