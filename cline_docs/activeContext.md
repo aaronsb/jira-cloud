@@ -1,10 +1,29 @@
 # Active Context
 
 ## Current Work
-Completed tool naming convention refactor to follow [verb]_jira_[noun] pattern.
+Completed comprehensive documentation update and verified all tool schemas are properly documented.
 
 ## Recent Changes
-1. Tool Naming Convention Refactor (refactor/tool-naming-convention)
+1. Documentation Improvements (docs/tool-documentation)
+   - Added detailed tool documentation to systemPatterns.md
+   - Categorized tools by functionality:
+     * Board and Project Management
+     * Issue Operations
+     * Issue Transitions and Comments
+     * Search and Filtering
+   - Documented all tool parameters and requirements
+   - Updated progress tracking
+
+2. Issue Creation Implementation (feature/issue-creation)
+   - Added create_jira_issue tool with support for:
+     * Required fields (projectKey, summary, issueType)
+     * Optional fields (description, priority, assignee)
+     * Custom fields handling
+     * Label management
+   - Tested and verified working
+   - Updated documentation
+
+3. Tool Naming Convention Refactor (refactor/tool-naming-convention)
    - Renamed tools to follow [verb]_jira_[noun] pattern:
      * list_board_sprints → list_jira_sprints
      * get_issue → get_jira_issue
@@ -32,9 +51,9 @@ Completed tool naming convention refactor to follow [verb]_jira_[noun] pattern.
 ## Next Steps
 1. Potential New Features
    - Consider adding bulk operations
-   - Implement issue creation capabilities
    - Add sprint management features
    - Enhance error handling for attachment operations
+   - Implement worklog management
 
 2. Technical Debt
    - Review and update test coverage

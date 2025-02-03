@@ -48,73 +48,101 @@ src/
 
 ### Tools
 
-The server provides several powerful tools for Jira interaction:
+The server provides several powerful tools for Jira interaction, following a consistent [verb]_jira_[noun] naming pattern:
 
-- `list_jira_projects` - Get a list of all projects in Jira
-  - Parameters: None
-  - Returns list of projects with their IDs, keys, names, descriptions, leads, and URLs
+1. Board and Project Management
+   - `list_jira_boards` - Get all boards
+     * Parameters: None
+     * Returns list of all boards with their IDs, names, and types
 
-- `get_issue` - Retrieve basic information about a Jira issue
-  - Parameters:
-    - `issueKey` (required): The Jira issue key (e.g., "PROJ-123")
-  - Returns basic issue data including summary, description, assignee, and status
+   - `list_jira_sprints` - Get sprints for a board
+     * Parameters:
+       - `boardId` (required): The ID of the board
+     * Returns list of sprints with details
 
-- `get_issue_details` - Retrieve comprehensive information about a Jira issue including comments
-  - Parameters:
-    - `issueKey` (required): The Jira issue key (e.g., "PROJ-123")
-  - Returns detailed issue data including all fields, comments, and history
+   - `list_jira_projects` - Get all projects
+     * Parameters: None
+     * Returns list of projects with their IDs, keys, names, descriptions, leads, and URLs
 
-- `get_issue_attachments` - Retrieve attachments for a Jira issue
-  - Parameters:
-    - `issueKey` (required): The Jira issue key (e.g., "PROJ-123")
-  - Returns list of attachments with metadata and download URLs
+   - `list_jira_filters` - List saved filters
+     * Parameters:
+       - `expand` (optional): Include additional filter details
+     * Returns list of filters with basic info and optionally expanded details
 
-- `search_jira_issues` - Search for issues using JQL (Jira Query Language)
-  - Parameters:
-    - `jql` (required): JQL query string
-    - `startAt` (optional): Pagination start index
-    - `maxResults` (optional): Maximum results to return (default: 25, max: 100)
-  - Returns paginated search results with issue details
+2. Issue Operations
+   - `create_jira_issue` - Create a new issue
+     * Parameters:
+       - `projectKey` (required): Project key (e.g., PROJ)
+       - `summary` (required): Issue summary/title
+       - `issueType` (required): Type of issue (e.g., Story, Bug, Task)
+       - `description` (optional): Detailed description
+       - `priority` (optional): Issue priority
+       - `assignee` (optional): Username of assignee
+       - `labels` (optional): Array of labels
+       - `customFields` (optional): Custom field values
 
-- `update_jira_issue` - Update issue fields
-  - Parameters:
-    - `issueKey` (required): The Jira issue key
-    - `summary` (optional): New issue summary
-    - `description` (optional): New issue description
-  - Updates the specified fields of the issue
+   - `get_jira_issue` - Get basic issue info
+     * Parameters:
+       - `issueKey` (required): The Jira issue key (e.g., "PROJ-123")
+     * Returns basic issue data
 
-- `add_jira_comment` - Add a comment to an issue
-  - Parameters:
-    - `issueKey` (required): The Jira issue key
-    - `body` (required): The comment text
-  - Adds the comment to the specified issue
+   - `get_jira_issue_details` - Get comprehensive issue info
+     * Parameters:
+       - `issueKey` (required): The Jira issue key
+     * Returns detailed issue data including comments
 
-- `get_jira_transitions` - Get available status transitions for an issue
-  - Parameters:
-    - `issueKey` (required): The Jira issue key
-  - Returns list of available status transitions
+   - `get_jira_issue_attachments` - Get issue attachments
+     * Parameters:
+       - `issueKey` (required): The Jira issue key
+     * Returns list of attachments with metadata and URLs
 
-- `get_jira_populated_fields` - Get all populated fields for an issue
-  - Parameters:
-    - `issueKey` (required): The Jira issue key
-  - Returns all non-empty fields and their values
+   - `update_jira_issue` - Update issue fields
+     * Parameters:
+       - `issueKey` (required): The Jira issue key
+       - `summary` (optional): New summary
+       - `description` (optional): New description
+       - `parent` (optional): Parent issue key or null
 
-- `get_jira_filter_issues` - Get issues from a saved Jira filter
-  - Parameters:
-    - `filterId` (required): The ID of the saved filter
-  - Returns issues matching the filter criteria
+3. Issue Transitions and Comments
+   - `get_jira_transitions` - Get available transitions
+     * Parameters:
+       - `issueKey` (required): The Jira issue key
+     * Returns list of available status transitions
 
-- `list_my_jira_filters` - List all Jira filters owned by the authenticated user
-  - Parameters:
-    - `expand` (optional): Boolean to include additional filter details like description and JQL
-  - Returns list of filters with basic info (ID, name, owner, favorite status) and optionally expanded details
+   - `transition_jira_issue` - Change issue status
+     * Parameters:
+       - `issueKey` (required): The Jira issue key
+       - `transitionId` (required): The transition ID
+       - `comment` (optional): Transition comment
 
-- `transition_jira_issue` - Transition a Jira issue to a new status
-  - Parameters:
-    - `issueKey` (required): The Jira issue key
-    - `transitionId` (required): The ID of the transition to perform
-    - `comment` (optional): Comment to add with the transition
-  - Transitions the issue to a new status and optionally adds a comment
+   - `add_jira_comment` - Add a comment
+     * Parameters:
+       - `issueKey` (required): The Jira issue key
+       - `body` (required): The comment text
+
+4. Search and Filtering
+   - `search_jira_issues` - Search using JQL
+     * Parameters:
+       - `jql` (required): JQL query string
+       - `startAt` (optional): Pagination start (default: 0)
+       - `maxResults` (optional): Results per page (default: 25, max: 100)
+     * Supports advanced JQL patterns:
+       - Portfolio/Plans: `issue in portfolioChildIssuesOf("PROJ-123")`
+       - Assignments: `assignee = currentUser()` or `assignee IS EMPTY`
+       - Recent changes: `status CHANGED AFTER -1w`
+       - Multiple values: `status IN ("In Progress", "Review")`
+       - Team filters: `assignee IN MEMBERSOF("developers")`
+       - Complex logic: Supports AND, OR, NOT operators
+
+   - `get_jira_filter_issues` - Get filter results
+     * Parameters:
+       - `filterId` (required): The saved filter ID
+     * Returns issues matching filter criteria
+
+   - `get_jira_fields` - Get populated fields
+     * Parameters:
+       - `issueKey` (required): The Jira issue key
+     * Returns all non-empty fields and values
 
 ## Extending the Server
 

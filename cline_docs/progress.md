@@ -30,13 +30,19 @@
 
 ## Recently Completed
 
-1. Parent Issue Support (merged to main)
-   - ✅ Add parent field to issue responses
-   - ✅ Support setting/removing parent
-   - ✅ Integration with existing tools
-   - ✅ Testing with real issues
+1. Documentation Updates (merged to main)
+   - ✅ Comprehensive tool documentation in systemPatterns.md
+   - ✅ Detailed schema information for all tools
+   - ✅ Updated tool categorization
+   - ✅ Improved parameter documentation
 
-2. Tool Redesign (merged to main)
+2. Issue Creation Implementation (merged to main)
+   - ✅ Add create_jira_issue tool
+   - ✅ Support for required and optional fields
+   - ✅ Custom fields handling
+   - ✅ Integration testing
+
+3. Tool Redesign (merged to main)
    - ✅ Split issue retrieval into basic/detailed
    - ✅ Add attachment handling
    - ✅ Testing new functionality
@@ -49,7 +55,6 @@ No active development work in progress.
 
 1. Issue Operations
    - ⏳ Bulk operations
-   - ⏳ Issue creation
    - ⏳ Worklog management
 
 2. Sprint Management

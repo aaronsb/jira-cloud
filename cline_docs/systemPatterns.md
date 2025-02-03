@@ -72,6 +72,36 @@ src/
    - Async operation management
    - Resource cleanup
 
+## Available Tools
+
+1. Board and Project Management
+   - list_jira_boards: Get all boards
+   - list_jira_sprints: Get sprints for a board (requires boardId)
+   - list_jira_projects: Get all projects
+   - list_jira_filters: List saved filters with optional details
+
+2. Issue Operations
+   - create_jira_issue: Create new issues (requires projectKey, summary, issueType)
+   - get_jira_issue: Get basic issue info (requires issueKey)
+   - get_jira_issue_details: Get comprehensive issue info with comments (requires issueKey)
+   - update_jira_issue: Update issue summary/description/parent (requires issueKey)
+   - get_jira_issue_attachments: Get issue attachments (requires issueKey)
+
+3. Issue Transitions and Comments
+   - get_jira_transitions: Get allowed transitions (requires issueKey)
+   - transition_jira_issue: Change issue status (requires issueKey, transitionId)
+   - add_jira_comment: Add issue comment (requires issueKey, body)
+
+4. Search and Filtering
+   - search_jira_issues: Advanced JQL search with pagination
+     * Supports portfolio queries
+     * Common search patterns (assignee, status, priority)
+     * Advanced functions (sorting, change tracking)
+   - get_jira_filter_issues: Get issues from saved filter
+   - get_jira_fields: Get populated issue fields
+
+Each tool enforces strict input validation through JSON schemas, supports snake_case alternatives for parameters, and provides clear error messages for invalid inputs.
+
 ## Best Practices
 
 1. Code Organization
