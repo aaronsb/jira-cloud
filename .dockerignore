@@ -1,0 +1,32 @@
+# Version control
+.git
+.gitignore
+
+# Dependencies
+node_modules
+
+# Development files
+.vscode
+.idea
+*.log
+logs
+*.md
+!README.md
+
+# Test files
+__tests__
+__fixtures__
+__helpers__
+*.test.*
+jest.config.*
+jest.setup.*
+
+# Configuration
+config/*
+
+# Documentation
+docs
+cline_docs
+
+# Build artifacts
+build
