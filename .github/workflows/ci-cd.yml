@@ -1,0 +1,138 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Type check
+        run: npm run type-check
+        
+      - name: Lint
+        run: npm run lint
+      
+      - name: Run tests
+        run: npm test
+        env:
+          JIRA_API_TOKEN: ${{ secrets.TEST_JIRA_API_TOKEN }}
+          JIRA_EMAIL: ${{ secrets.TEST_JIRA_EMAIL }}
+          JIRA_HOST: ${{ secrets.TEST_JIRA_HOST }}
+
+  build-and-push:
+    name: Build and Push Container
+    needs: test
+    runs-on: ubuntu-latest
+    # Only run on main branch or tags
+    if: github.event_name != 'pull_request'
+    
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,format=long
+      
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            DOCKER_HASH=${{ github.sha }}
+
+  integration-test:
+    name: Integration Test
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Pull container
+        run: |
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+      
+      - name: Run integration tests
+        run: |
+          docker run -i \
+            -e JIRA_API_TOKEN=${{ secrets.TEST_JIRA_API_TOKEN }} \
+            -e JIRA_EMAIL=${{ secrets.TEST_JIRA_EMAIL }} \
+            -e JIRA_HOST=${{ secrets.TEST_JIRA_HOST }} \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }} \
+            npm run test:integration
+      
+      - name: Verify container health
+        run: |
+          docker run -i \
+            -e JIRA_API_TOKEN=${{ secrets.TEST_JIRA_API_TOKEN }} \
+            -e JIRA_EMAIL=${{ secrets.TEST_JIRA_EMAIL }} \
+            -e JIRA_HOST=${{ secrets.TEST_JIRA_HOST }} \
+            --health-cmd="node /app/build/health-check.js" \
+            --health-interval=10s \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+
+  cleanup:
+    name: Cleanup
+    needs: [build-and-push, integration-test]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Remove old packages
+        uses: actions/delete-package-versions@v4
+        with:
+          package-name: ${{ env.IMAGE_NAME }}
+          package-type: container
+          min-versions-to-keep: 10
+          delete-only-untagged-versions: true
