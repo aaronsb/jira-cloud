@@ -10,7 +10,7 @@ import axios from 'axios';
  * 3. Required directories exist and are writable
  */
 
-async function checkEnvironmentVariables(): Promise<boolean> {
+export async function checkEnvironmentVariables(): Promise<boolean> {
   const required = ['JIRA_API_TOKEN', 'JIRA_EMAIL', 'JIRA_HOST'];
   const missing = required.filter(v => !process.env[v]);
   
@@ -22,7 +22,7 @@ async function checkEnvironmentVariables(): Promise<boolean> {
   return true;
 }
 
-async function checkJiraAccess(): Promise<boolean> {
+export async function checkJiraAccess(): Promise<boolean> {
   const baseURL = `https://${process.env.JIRA_HOST}/rest/api/3`;
   const auth = {
     username: process.env.JIRA_EMAIL!,
@@ -38,7 +38,7 @@ async function checkJiraAccess(): Promise<boolean> {
   }
 }
 
-async function checkDirectories(): Promise<boolean> {
+export async function checkDirectories(): Promise<boolean> {
   const fs = await import('fs/promises');
   const directories = ['/app/config', '/app/logs'];
   
@@ -53,7 +53,7 @@ async function checkDirectories(): Promise<boolean> {
   }
 }
 
-async function main() {
+export async function main() {
   try {
     const envCheck = await checkEnvironmentVariables();
     const jiraCheck = await checkJiraAccess();

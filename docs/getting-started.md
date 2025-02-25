@@ -3,7 +3,7 @@
 ## Installation
 
 ### Prerequisites
-- Node.js 18 or higher
+- Node.js 20 or higher
 - npm 8 or higher
 - Docker (optional, for container deployment)
 

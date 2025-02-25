@@ -1,5 +1,6 @@
 import { Version3Client, AgileClient } from 'jira.js';
 import type { Project } from 'jira.js/out/version3/models';
+
 import { JiraConfig, JiraIssueDetails, FilterResponse, TransitionDetails, SearchResponse, BoardResponse, SprintResponse, JiraAttachment } from '../types/index.js';
 import { TextProcessor } from '../utils/text-processing.js';
 

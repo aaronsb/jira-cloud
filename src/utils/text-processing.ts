@@ -1,5 +1,6 @@
-import { AdfNode } from '../types/index.js';
 import MarkdownIt from 'markdown-it';
+
+import { AdfNode } from '../types/index.js';
 
 export class TextProcessor {
   private static md = new MarkdownIt();
@@ -298,7 +299,7 @@ export class TextProcessor {
               .replace(/^[\s\S]*?From:[\s\S]*?Sent:[\s\S]*?To:[\s\S]*?Subject:[\s\S]*?\n/gm, '')
               .replace(/^>.*$/gm, '')
               .replace(/_{3,}|-{3,}|={3,}/g, '')
-              .replace(/(?:(?:https?|ftp):\/\/|\b(?:[a-z\d]+\.))(?:(?:[^\s()<>]+|\((?:[^\s()<>]+|(?:\([^\s()<>]+\)))?\))+(?:\((?:[^\s()<>]+|(?:\(?:[^\s()<>]+\)))?\)|[^\s`!()\[\]{};:'".,<>?«»""'']))?/g, '')
+              .replace(/(?:(?:https?|ftp):\/\/|\b(?:[a-z\d]+\.))(?:(?:[^\s()<>]+|\((?:[^\s()<>]+|(?:\([^\s()<>]+\)))?\))+(?:\((?:[^\s()<>]+|(?:\(?:[^\s()<>]+\)))?\)|[^\s`!()[\]{};:'".,<>?«»""'']))?/g, '')
               .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '')
               .replace(/(?:^|\s)(?:Best regards|Kind regards|Regards|Best|Thanks|Thank you|Cheers),.*/gs, '')
               .replace(/(?:Mobile|Tel|Phone|Office|Direct):\s*[\d\s.+-]+/g, '')

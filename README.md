@@ -158,6 +158,8 @@ To add new capabilities to the server:
 
 ### Local Development
 
+This project requires Node.js 20 or higher.
+
 Install dependencies:
 ```bash
 npm install
@@ -168,10 +170,41 @@ Build the server:
 npm run build
 ```
 
+Run linting:
+```bash
+npm run lint
+```
+
+Run tests:
+```bash
+npm test
+```
+
 For development with auto-rebuild:
 ```bash
 npm run watch
 ```
+
+### Development Workflow
+
+We follow a test-driven development approach with these key components:
+
+1. **Linting**: ESLint with TypeScript support ensures code quality and consistency
+   - Run `npm run lint` to check for issues
+   - Run `npm run lint:fix` to automatically fix many common issues
+   - The linting configuration is designed to be pragmatic, allowing certain patterns (like non-null assertions and any types) where appropriate
+
+2. **Testing**: Jest with TypeScript support for unit testing
+   - Run `npm test` to execute all tests
+   - Run `npm run test:watch` for continuous testing during development
+   - Tests are located in `__tests__` directories alongside the code they test
+
+3. **Local Build**: The `build-local.sh` script provides a comprehensive local build pipeline
+   - Installs dependencies
+   - Runs linting
+   - Executes tests
+   - Builds TypeScript
+   - Creates a Docker image
 
 ### Docker Build
 

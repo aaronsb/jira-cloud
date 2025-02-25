@@ -80,6 +80,9 @@ run_step() {
 # Install dependencies
 run_step "Installing dependencies" "npm-install" "npm install" || exit 1
 
+# Run linting
+run_step "Linting" "lint" "npm run lint" || exit 1
+
 # Run tests (allowing failure for now since they're placeholder)
 run_step "Testing" "test" "npm run test || true"
 

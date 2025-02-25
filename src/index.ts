@@ -10,11 +10,12 @@ import {
   McpError,
   ReadResourceRequestSchema
 } from '@modelcontextprotocol/sdk/types.js';
+
 import { JiraClient } from './client/jira-client.js';
-import { setupIssueHandlers } from './handlers/issue-handlers.js';
-import { setupSearchHandlers } from './handlers/search-handlers.js';
-import { setupProjectHandlers } from './handlers/project-handlers.js';
 import { handleListBoards, handleListJiraSprints } from './handlers/board-handlers.js';
+import { setupIssueHandlers } from './handlers/issue-handlers.js';
+import { setupProjectHandlers } from './handlers/project-handlers.js';
+import { setupSearchHandlers } from './handlers/search-handlers.js';
 import { toolSchemas } from './schemas/tool-schemas.js';
 
 // Jira credentials from environment variables
