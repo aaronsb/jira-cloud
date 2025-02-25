@@ -102,6 +102,7 @@ jobs:
             type=ref,event=branch
             type=semver,pattern={{version}}
             type=sha,format=long
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
       
       - name: Build and push
         uses: docker/build-push-action@v5
@@ -124,6 +125,30 @@ jobs:
           min-versions-to-keep: 10
           delete-only-untagged-versions: true
 ```
+
+## Docker Image Tagging Strategy
+
+Our Docker image tagging strategy provides clear identification of image versions while supporting both development and production use cases:
+
+### Local Development
+- **jira-cloud:local**: Created by the `build-local.sh` script for local development and testing
+  - This tag is only available locally and is not pushed to the GitHub Container Registry
+  - Provides a clear distinction between local development builds and CI/CD builds
+
+### CI/CD Builds (GitHub Container Registry)
+- **ghcr.io/aaronsb/jira-cloud:latest**: Points to the most recent stable build from the main branch
+  - Automatically updated when changes are pushed to the main branch
+  - Recommended for production use when you want to always use the most recent stable version
+- **ghcr.io/aaronsb/jira-cloud:main**: Also points to the most recent build from the main branch
+  - Functionally equivalent to the latest tag
+- **ghcr.io/aaronsb/jira-cloud:sha-[commit-hash]**: Points to a specific commit
+  - Provides immutable references to exact versions
+  - Recommended when you need version stability and want to control when updates occur
+- **ghcr.io/aaronsb/jira-cloud:v[version]**: Points to a specific semantic version release
+  - Created when a version tag is pushed to the repository
+  - Follows semantic versioning conventions (e.g., v1.0.0)
+
+This strategy allows users to choose between stability (using specific SHA or version tags) and receiving automatic updates (using the latest tag).
 
 ## Future Enhancements
 

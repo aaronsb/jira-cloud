@@ -44,6 +44,7 @@ check_log_size() {
             echo "  • tail -n 20 $log_file     (view last 20 lines)"
             echo "  • less $log_file           (scroll through file)"
             echo "  • grep 'error' $log_file   (search for specific terms)"
+            echo "  • use pageless mode with tools when viewing files"
         fi
     fi
 }
