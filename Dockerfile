@@ -34,7 +34,7 @@ COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/docker-entrypoint.sh ./
 
 # Install production dependencies only
-RUN npm ci --only=production && \
+RUN npm ci --only=production --ignore-scripts && \
     npm cache clean --force && \
     chmod +x build/index.js && \
     chmod +x docker-entrypoint.sh
