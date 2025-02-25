@@ -1,6 +1,7 @@
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+
 import { JiraClient } from '../client/jira-client.js';
 import { BoardResponse, SprintResponse } from '../types/index.js';
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 type ListJiraSprintsArgs = {
   boardId?: number;

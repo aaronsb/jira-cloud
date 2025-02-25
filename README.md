@@ -156,6 +156,10 @@ To add new capabilities to the server:
 
 ## Development
 
+### Local Development
+
+This project requires Node.js 20 or higher.
+
 Install dependencies:
 ```bash
 npm install
@@ -166,10 +170,65 @@ Build the server:
 npm run build
 ```
 
+Run linting:
+```bash
+npm run lint
+```
+
+Run tests:
+```bash
+npm test
+```
+
 For development with auto-rebuild:
 ```bash
 npm run watch
 ```
+
+### Development Workflow
+
+We follow a test-driven development approach with these key components:
+
+1. **Linting**: ESLint with TypeScript support ensures code quality and consistency
+   - Run `npm run lint` to check for issues
+   - Run `npm run lint:fix` to automatically fix many common issues
+   - The linting configuration is designed to be pragmatic, allowing certain patterns (like non-null assertions and any types) where appropriate
+
+2. **Testing**: Jest with TypeScript support for unit testing
+   - Run `npm test` to execute all tests
+   - Run `npm run test:watch` for continuous testing during development
+   - Tests are located in `__tests__` directories alongside the code they test
+
+3. **Local Build**: The `build-local.sh` script provides a comprehensive local build pipeline
+   - Installs dependencies
+   - Runs linting
+   - Executes tests
+   - Builds TypeScript
+   - Creates a Docker image
+
+### Docker Build
+
+We provide a dual path build approach for both local development and CI/CD:
+
+#### Local Docker Build
+
+Use the provided scripts to build and run the Docker container locally:
+
+```bash
+# Build the Docker image
+./scripts/build-local.sh
+
+# Run the Docker container
+JIRA_API_TOKEN=your_token JIRA_EMAIL=your_email ./scripts/run-local.sh
+```
+
+The `build-local.sh` script provides a lightweight local development build pipeline that mirrors our CI approach but optimized for speed and local iteration. It performs all build steps from installing dependencies through Docker image creation.
+
+#### CI/CD
+
+For CI/CD, we use GitHub Actions to build and publish the Docker image to GitHub Container Registry. The workflow is defined in `.github/workflows/build-and-publish.yml`.
+
+Our approach focuses on Continuous Delivery rather than full CI/CD, as we're not running actual tests against the Atlassian API. See `docs/ci-cd-plan.md` for more details on our CI/CD strategy and future plans.
 
 ## Installation
 

@@ -7,14 +7,13 @@ LABEL org.opencontainers.image.source="https://github.com/aaronsb/jira-cloud"
 LABEL org.opencontainers.image.description="Jira Cloud MCP Server"
 LABEL org.opencontainers.image.licenses="MIT"
 
-# Install dependencies
-COPY package*.json ./
-RUN npm ci && \
-    npm cache clean --force
-
-# Copy source and build
+# Copy source files
 COPY . .
-RUN npm run build
+
+# Install dependencies and build
+RUN npm ci && \
+    npm cache clean --force && \
+    npm run build
 
 # Production stage
 FROM node:20-slim
@@ -35,7 +34,7 @@ COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/docker-entrypoint.sh ./
 
 # Install production dependencies only
-RUN npm ci --only=production && \
+RUN npm ci --only=production --ignore-scripts && \
     npm cache clean --force && \
     chmod +x build/index.js && \
     chmod +x docker-entrypoint.sh
