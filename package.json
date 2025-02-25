@@ -21,7 +21,7 @@
     "inspector": "npx @modelcontextprotocol/inspector build/index.js"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^0.6.0",
+    "@modelcontextprotocol/sdk": "^1.6.0",
     "jira.js": "^4.0.5",
     "jsdom": "^26.0.0",
     "markdown-it": "^14.1.0"

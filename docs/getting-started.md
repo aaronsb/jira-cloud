@@ -27,9 +27,28 @@ npm run build
 
 ### Docker Installation
 
-Pull the container:
+You can use either the locally built Docker image or the one from GitHub Container Registry (ghcr.io):
+
+#### Local Development Image
+Build and use the local development image:
 ```bash
+# Build the local image
+./scripts/build-local.sh
+
+# This creates jira-cloud:local tag
+```
+
+#### GitHub Container Registry Image
+Pull the container from GitHub Container Registry:
+```bash
+# Pull the latest stable version (from main branch)
 docker pull ghcr.io/aaronsb/jira-cloud:latest
+
+# Or pull a specific version by commit SHA
+docker pull ghcr.io/aaronsb/jira-cloud:sha-<commit-hash>
+
+# Or pull by branch name
+docker pull ghcr.io/aaronsb/jira-cloud:main
 ```
 
 ## Configuration
@@ -76,7 +95,20 @@ npm run dev
 
 ### Docker Usage
 
-Run with environment variables:
+Run with environment variables (using either local or ghcr.io image):
+
+#### Using Local Development Image:
+```bash
+docker run -i \
+  -e JIRA_API_TOKEN=your_api_token \
+  -e JIRA_EMAIL=your_email \
+  -e JIRA_HOST=your-instance.atlassian.net \
+  -v /path/to/config:/app/config \
+  -v /path/to/logs:/app/logs \
+  jira-cloud:local
+```
+
+#### Using GitHub Container Registry Image:
 ```bash
 docker run -i \
   -e JIRA_API_TOKEN=your_api_token \
