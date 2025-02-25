@@ -2,53 +2,80 @@
 
 ## Current Status
 
-We've implemented a dual path build approach:
+We've implemented a streamlined build approach:
 1. **Local Development**: Scripts for building and running locally
    - `scripts/build-local.sh`: Builds the project and Docker image locally
    - `scripts/run-local.sh`: Runs the Docker container with necessary environment variables
 
-2. **GitHub Actions**: Workflow for CI/CD
-   - Currently tries to run tests, build and push Docker images, and perform integration tests
+2. **GitHub Actions**: Simplified workflow for CI/CD
+   - Focuses on essential steps: lint, test, build code, build container
+   - Mirrors the local build script approach for consistency
 
-## Observations
+## Implemented Changes
 
-- We're not running actual tests against the Atlassian API, just mocks
-- Full CI/CD might be overkill for this project at its current stage
-- The current workflow is complex and might be more than what's needed
+We've simplified the CI/CD workflow to focus on the essential steps:
 
-## Simplified Approach
+1. **Build and Test Job**:
+   - Install dependencies
+   - Run linting
+   - Run unit tests
+   - Build TypeScript code
 
-### 1. Continuous Delivery Focus
+2. **Build Container Job**:
+   - Build and push Docker container
+   - Tag appropriately based on branch/tag
+   - Clean up old container versions
 
-Instead of full CI/CD, we could focus on Continuous Delivery:
-- Build and package the MCP server
-- Push to container registry when changes are merged to main
-- Skip extensive testing until we have meaningful tests
+The workflow now closely resembles our local build script, providing consistency between local and CI environments.
 
-### 2. Testing Strategy
-
-Develop a testing strategy that makes sense for an MCP server:
-- **Unit Tests**: Test individual handlers and utility functions
-- **Mock Tests**: Test against mock Jira API responses
-- **Integration Tests**: Optional tests against a real Jira instance (could be run manually or on a schedule)
-
-### 3. Simplified GitHub Actions Workflow
+## Current GitHub Actions Workflow
 
 ```yaml
-name: Build and Publish
+name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, ci-improvements ]
     tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build-and-push:
+  build-and-test:
+    name: Build and Test
     runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Lint
+        run: npm run lint
+      
+      - name: Run tests
+        run: npm test
+      
+      - name: Build
+        run: npm run build
+
+  build-container:
+    name: Build and Push Container
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    
     permissions:
       contents: read
       packages: write
@@ -86,6 +113,16 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64,linux/arm64
+          build-args: |
+            DOCKER_HASH=${{ github.sha }}
+      
+      - name: Cleanup old packages
+        uses: actions/delete-package-versions@v4
+        with:
+          package-name: ${{ env.IMAGE_NAME }}
+          package-type: container
+          min-versions-to-keep: 10
+          delete-only-untagged-versions: true
 ```
 
 ## Future Enhancements
