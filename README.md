@@ -156,6 +156,8 @@ To add new capabilities to the server:
 
 ## Development
 
+### Local Development
+
 Install dependencies:
 ```bash
 npm install
@@ -170,6 +172,30 @@ For development with auto-rebuild:
 ```bash
 npm run watch
 ```
+
+### Docker Build
+
+We provide a dual path build approach for both local development and CI/CD:
+
+#### Local Docker Build
+
+Use the provided scripts to build and run the Docker container locally:
+
+```bash
+# Build the Docker image
+./scripts/build-local.sh
+
+# Run the Docker container
+JIRA_API_TOKEN=your_token JIRA_EMAIL=your_email ./scripts/run-local.sh
+```
+
+The `build-local.sh` script provides a lightweight local development build pipeline that mirrors our CI approach but optimized for speed and local iteration. It performs all build steps from installing dependencies through Docker image creation.
+
+#### CI/CD
+
+For CI/CD, we use GitHub Actions to build and publish the Docker image to GitHub Container Registry. The workflow is defined in `.github/workflows/build-and-publish.yml`.
+
+Our approach focuses on Continuous Delivery rather than full CI/CD, as we're not running actual tests against the Atlassian API. See `docs/ci-cd-plan.md` for more details on our CI/CD strategy and future plans.
 
 ## Installation
 
