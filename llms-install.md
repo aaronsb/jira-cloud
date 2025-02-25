@@ -17,12 +17,9 @@ The recommended way to install this MCP server is using the Docker container fro
         "run",
         "-i",
         "--rm",
-        "-e",
-        "JIRA_EMAIL",
-        "-e",
-        "JIRA_HOST",
-        "-e",
-        "JIRA_API_TOKEN",
+        "-e", "JIRA_EMAIL",
+        "-e", "JIRA_HOST",
+        "-e", "JIRA_API_TOKEN",
         "ghcr.io/aaronsb/jira-cloud:latest"
       ],
       "env": {
@@ -90,12 +87,9 @@ If the user needs to connect to multiple Jira instances, use a configuration lik
         "run",
         "-i",
         "--rm",
-        "-e",
-        "JIRA_EMAIL",
-        "-e",
-        "JIRA_HOST",
-        "-e",
-        "JIRA_API_TOKEN",
+        "-e", "JIRA_EMAIL",
+        "-e", "JIRA_HOST",
+        "-e", "JIRA_API_TOKEN",
         "ghcr.io/aaronsb/jira-cloud:latest"
       ],
       "env": {
@@ -112,12 +106,9 @@ If the user needs to connect to multiple Jira instances, use a configuration lik
         "run",
         "-i",
         "--rm",
-        "-e",
-        "JIRA_EMAIL",
-        "-e",
-        "JIRA_HOST",
-        "-e",
-        "JIRA_API_TOKEN",
+        "-e", "JIRA_EMAIL",
+        "-e", "JIRA_HOST",
+        "-e", "JIRA_API_TOKEN",
         "ghcr.io/aaronsb/jira-cloud:latest"
       ],
       "env": {

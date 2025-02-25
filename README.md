@@ -226,9 +226,21 @@ The `build-local.sh` script provides a lightweight local development build pipel
 
 #### CI/CD
 
-For CI/CD, we use GitHub Actions to build and publish the Docker image to GitHub Container Registry. The workflow is defined in `.github/workflows/build-and-publish.yml`.
+For CI/CD, we use GitHub Actions to build and publish the Docker image to GitHub Container Registry. The workflow is defined in `.github/workflows/ci-cd.yml`.
 
 Our approach focuses on Continuous Delivery rather than full CI/CD, as we're not running actual tests against the Atlassian API. See `docs/ci-cd-plan.md` for more details on our CI/CD strategy and future plans.
+
+#### Docker Image Tags
+
+We use a consistent tagging strategy for Docker images:
+
+- **jira-cloud:local**: Local development build (not pushed to registry)
+- **ghcr.io/aaronsb/jira-cloud:latest**: Most recent stable build from main branch
+- **ghcr.io/aaronsb/jira-cloud:main**: Same as latest
+- **ghcr.io/aaronsb/jira-cloud:sha-[commit-hash]**: Specific commit version
+- **ghcr.io/aaronsb/jira-cloud:v[version]**: Specific semantic version release
+
+For most users, the `:latest` tag is recommended for production use.
 
 ## Installation
 
@@ -241,11 +253,13 @@ For VSCode, the configuration goes in:
 - macOS: `~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
 - Linux: `~/.config/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
 
-Example configuration:
+Example configurations:
+
+#### Using Local Build
 ```json
 {
   "mcpServers": {
-    "team1": {
+    "jira-cloud": {
       "command": "node",
       "args": ["${userHome}/path/to/jira-cloud/build/index.js"],
       "env": {
@@ -253,14 +267,72 @@ Example configuration:
         "JIRA_EMAIL": "your-email",
         "JIRA_HOST": "your-team.atlassian.net"
       }
-    },
-    "team2": {
-      "command": "node",
-      "args": ["${userHome}/path/to/jira-cloud/build/index.js"],
+    }
+  }
+}
+```
+
+#### Using Docker Container (Recommended)
+```json
+{
+  "mcpServers": {
+    "jira-cloud": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e", "JIRA_EMAIL",
+        "-e", "JIRA_HOST",
+        "-e", "JIRA_API_TOKEN",
+        "ghcr.io/aaronsb/jira-cloud:latest"
+      ],
       "env": {
         "JIRA_API_TOKEN": "your-api-token",
         "JIRA_EMAIL": "your-email",
-        "JIRA_HOST": "another-team.atlassian.net"
+        "JIRA_HOST": "your-team.atlassian.net"
+      }
+    }
+  }
+}
+```
+
+#### Multiple Jira Instances
+```json
+{
+  "mcpServers": {
+    "team1-jira": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e", "JIRA_EMAIL",
+        "-e", "JIRA_HOST",
+        "-e", "JIRA_API_TOKEN",
+        "ghcr.io/aaronsb/jira-cloud:latest"
+      ],
+      "env": {
+        "JIRA_API_TOKEN": "your-api-token",
+        "JIRA_EMAIL": "your-email",
+        "JIRA_HOST": "team1.atlassian.net"
+      }
+    },
+    "team2-jira": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e", "JIRA_EMAIL",
+        "-e", "JIRA_HOST",
+        "-e", "JIRA_API_TOKEN",
+        "ghcr.io/aaronsb/jira-cloud:latest"
+      ],
+      "env": {
+        "JIRA_API_TOKEN": "your-api-token",
+        "JIRA_EMAIL": "your-email",
+        "JIRA_HOST": "team2.atlassian.net"
       }
     }
   }
