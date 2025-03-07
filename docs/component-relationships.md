@@ -142,12 +142,12 @@ flowchart TD
     I --> J
     J --> K[Jira Cloud API]
     
-    classDef client fill:#f9f,stroke:#333,stroke-width:2px
-    classDef server fill:#bbf,stroke:#333,stroke-width:2px
-    classDef router fill:#bfb,stroke:#333,stroke-width:2px
-    classDef handler fill:#fbb,stroke:#333,stroke-width:2px
-    classDef jiraClient fill:#bff,stroke:#333,stroke-width:2px
-    classDef jiraAPI fill:#ffb,stroke:#333,stroke-width:2px
+    classDef client fill:#f9e6ff,stroke:#000,stroke-width:2px,color:#000
+    classDef server fill:#e6f2ff,stroke:#000,stroke-width:2px,color:#000
+    classDef router fill:#e6ffe6,stroke:#000,stroke-width:2px,color:#000
+    classDef handler fill:#ffe6e6,stroke:#000,stroke-width:2px,color:#000
+    classDef jiraClient fill:#e6ffff,stroke:#000,stroke-width:2px,color:#000
+    classDef jiraAPI fill:#ffffd0,stroke:#000,stroke-width:2px,color:#000
     
     A:::client
     B:::server
@@ -183,9 +183,9 @@ flowchart TD
     H --> L[Add new client method]
     I --> M[Register new tool]
     
-    classDef extension fill:#f9f,stroke:#333,stroke-width:2px
-    classDef file fill:#bbf,stroke:#333,stroke-width:2px
-    classDef implementation fill:#bfb,stroke:#333,stroke-width:2px
+    classDef extension fill:#f9e6ff,stroke:#000,stroke-width:2px,color:#000
+    classDef file fill:#e6f2ff,stroke:#000,stroke-width:2px,color:#000
+    classDef implementation fill:#e6ffe6,stroke:#000,stroke-width:2px,color:#000
     
     A:::extension
     B:::extension
@@ -242,14 +242,14 @@ flowchart TD
     F --> G[Document Tool]
     G --> H[End]
     
-    classDef start fill:#f9f,stroke:#333,stroke-width:2px
-    classDef schema fill:#bbf,stroke:#333,stroke-width:2px
-    classDef handler fill:#bfb,stroke:#333,stroke-width:2px
-    classDef client fill:#fbb,stroke:#333,stroke-width:2px
-    classDef register fill:#bff,stroke:#333,stroke-width:2px
-    classDef test fill:#ffb,stroke:#333,stroke-width:2px
-    classDef document fill:#fbf,stroke:#333,stroke-width:2px
-    classDef end fill:#f9f,stroke:#333,stroke-width:2px
+    classDef start fill:#d0e0ff,stroke:#000,stroke-width:2px,color:#000
+    classDef schema fill:#e6f2ff,stroke:#000,stroke-width:2px,color:#000
+    classDef handler fill:#e6ffe6,stroke:#000,stroke-width:2px,color:#000
+    classDef client fill:#ffe6e6,stroke:#000,stroke-width:2px,color:#000
+    classDef register fill:#e6ffff,stroke:#000,stroke-width:2px,color:#000
+    classDef test fill:#ffffd0,stroke:#000,stroke-width:2px,color:#000
+    classDef document fill:#f9e6ff,stroke:#000,stroke-width:2px,color:#000
+    classDef endNode fill:#d0e0ff,stroke:#000,stroke-width:2px,color:#000
     
     A:::start
     B:::schema
@@ -258,7 +258,7 @@ flowchart TD
     E:::register
     F:::test
     G:::document
-    H:::end
+    H:::endNode
 ```
 
 Last updated: 2025-03-07 at 13:13:06
