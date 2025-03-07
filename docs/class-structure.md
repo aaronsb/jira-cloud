@@ -2,7 +2,7 @@
 
 This document provides detailed diagrams and descriptions of the class structure of the Jira Cloud MCP Server.
 
-> **Note**: The class diagrams for this project are automatically generated from the TypeScript source code using TsUML2. To update these diagrams, run `./scripts/build-diagrams.sh`.
+> **Note**: The class diagrams for this project are automatically generated from the TypeScript source code using typescript-graph, which produces Mermaid diagrams showing the relationships between files and classes. To update these diagrams, run `./scripts/build-diagrams.sh`.
 
 ## Table of Contents
 
@@ -20,7 +20,7 @@ The Jira Cloud MCP Server is built using a modular architecture with clearly def
 
 The core classes form the foundation of the Jira Cloud MCP Server. These classes handle server initialization, request processing, and communication with the Jira API.
 
-For detailed class diagrams, see the generated SVG file in `docs/generated/class-diagram.svg`.
+The class diagram is embedded below. For a standalone version, see the generated Mermaid file in `docs/generated/class-diagram.md`.
 
 ### Core Class Responsibilities
 
@@ -100,3 +100,43 @@ The utility classes provide helper functionality used throughout the Jira Cloud 
 2. **ErrorHandler**:
    - Converts different types of errors to McpError
    - Ensures consistent error reporting
+
+Last updated: 2025-03-07 at 11:17:45
+
+## Class Diagram
+
+```mermaid
+flowchart LR
+    classDef highlight fill:yellow,color:black
+    subgraph src["src"]
+        src/index.ts["index.ts"]
+        subgraph src/types["/types"]
+            src/types/index.ts["index.ts"]
+        end
+        subgraph src/client["/client"]
+            src/client/jira//client.ts["jira-client.ts"]:::highlight
+        end
+        subgraph src/handlers["/handlers"]
+            src/handlers/board//handlers.ts["board-handlers.ts"]:::highlight
+            src/handlers/issue//handlers.ts["issue-handlers.ts"]:::highlight
+            src/handlers/project//handlers.ts["project-handlers.ts"]
+            src/handlers/search//handlers.ts["search-handlers.ts"]:::highlight
+        end
+        subgraph src/utils["/utils"]
+            src/utils/text//processing.ts["text-processing.ts"]
+        end
+    end
+    src/utils/text//processing.ts-->src/types/index.ts
+    src/client/jira//client.ts-->src/types/index.ts
+    src/client/jira//client.ts-->src/utils/text//processing.ts
+    src/handlers/board//handlers.ts-->src/client/jira//client.ts
+    src/handlers/board//handlers.ts-->src/types/index.ts
+    src/handlers/issue//handlers.ts-->src/client/jira//client.ts
+    src/handlers/project//handlers.ts-->src/client/jira//client.ts
+    src/handlers/search//handlers.ts-->src/client/jira//client.ts
+    src/index.ts-->src/client/jira//client.ts
+    src/index.ts-->src/handlers/board//handlers.ts
+    src/index.ts-->src/handlers/issue//handlers.ts
+    src/index.ts-->src/handlers/project//handlers.ts
+    src/index.ts-->src/handlers/search//handlers.ts
+```

@@ -36,6 +36,26 @@ src/
 └── index.ts              # Server entry point and configuration
 ```
 
+### Visualizing the Architecture
+
+We use [typescript-graph](https://github.com/ysk8hori/typescript-graph) to generate visual diagrams of the codebase structure and dependencies. These diagrams help developers understand the relationships between different components of the system.
+
+To generate or update the diagrams:
+
+```bash
+# Using npm script
+npm run generate-diagrams
+
+# Or directly
+./scripts/build-diagrams.sh
+```
+
+The generated diagrams are saved to:
+- `docs/generated/class-diagram.md` - Contains the Mermaid diagram source
+- `docs/class-structure.md` - Includes the embedded diagram with explanations
+
+The diagrams show file dependencies and relationships, making it easier to understand the codebase structure and identify potential refactoring opportunities.
+
 ### Key Components
 
 - **JiraClient**: A TypeScript class that encapsulates all Jira API interactions, providing type-safe methods for each API operation.

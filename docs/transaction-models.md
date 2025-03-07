@@ -2,7 +2,7 @@
 
 This document provides detailed diagrams illustrating the transaction models for various request types in the Jira Cloud MCP Server.
 
-> **Note**: The transaction model diagrams for this project are automatically generated from the TypeScript source code using TsUML2. To update these diagrams, run `./scripts/build-diagrams.sh`.
+> **Note**: The transaction model diagrams for this project are automatically generated from the TypeScript source code using typescript-graph, which produces Mermaid diagrams showing the relationships between files and classes. To update these diagrams, run `./scripts/build-diagrams.sh`.
 
 ## Table of Contents
 
@@ -17,7 +17,7 @@ This document provides detailed diagrams illustrating the transaction models for
 
 The transaction models describe how different types of requests flow through the Jira Cloud MCP Server, from the initial request to the final response. These models help developers understand the processing path for each type of request and the components involved.
 
-For detailed transaction model diagrams, see the generated SVG file in `docs/generated/class-diagram.svg`.
+For detailed transaction model diagrams, see the generated Mermaid file in `docs/generated/class-diagram.md`.
 
 ## General Transaction Model
 
@@ -91,3 +91,6 @@ The error handling model illustrates how errors are handled at different stages 
 7. The JiraClient throws an McpError
 8. The handler forwards the McpError to the MCP Server
 9. The MCP Server returns an error response to the client
+
+
+Last updated: 2025-03-07 at 11:17:45

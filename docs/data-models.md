@@ -2,7 +2,7 @@
 
 This document provides detailed diagrams and descriptions of the data models used in the Jira Cloud MCP Server.
 
-> **Note**: The data model diagrams for this project are automatically generated from the TypeScript source code using TsUML2. To update these diagrams, run `./scripts/build-diagrams.sh`.
+> **Note**: The data model diagrams for this project are automatically generated from the TypeScript source code using typescript-graph, which produces Mermaid diagrams showing the relationships between files and classes. To update these diagrams, run `./scripts/build-diagrams.sh`.
 
 ## Table of Contents
 
@@ -15,7 +15,7 @@ This document provides detailed diagrams and descriptions of the data models use
 
 The Jira Cloud MCP Server uses a set of well-defined data models to represent the various entities and responses from the Jira API. This document provides a detailed overview of these data models and their relationships.
 
-For detailed data model diagrams, see the generated SVG file in `docs/generated/class-diagram.svg`.
+For detailed data model diagrams, see the generated Mermaid file in `docs/generated/class-diagram.md`.
 
 ## Core Data Models
 
@@ -103,3 +103,6 @@ The `SearchPagination` interface provides pagination information for search resu
 - **maxResults**: The maximum number of results per page
 - **total**: The total number of results
 - **hasMore**: Whether there are more results available
+
+
+Last updated: 2025-03-07 at 11:17:45
