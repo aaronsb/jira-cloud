@@ -1,0 +1,774 @@
+<svg version="1.1" baseProfile="full" width="8112.0" height="541.0" viewBox="0 0 8112 541" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:ev="http://www.w3.org/2001/xml-events">
+<desc >#.interface: fill=lightblue
+#.enumeration: fill=lightgreen
+#.type: fill=lightgray
+[JiraServer|-server: Server&lt;{ method: string; params?: { \[x: string\]: unknown; _meta?: { \[x: string\]: unknown; progressToken?: string \| number \| undefined; } \| undefined; } \| undefined; }, { method: string; params?: { \[x: string\]: unknown; _meta?: { \[x: string\]: unknown; } \| undefined; } \| undefined; }, { \[x: string\]: unknown; _meta?: { \[x: string\]: unknown; } \| undefined; }&gt;;-jiraClient: JiraClient|-setupHandlers(): void;+run(): Promise&lt;void&gt;]
+[JiraClient|-client: Version3Client;-agileClient: AgileClient;-customFields: { startDate: string; storyPoints: string; }|+getIssue(): Promise&lt;JiraIssueDetails&gt;;+getIssueAttachments(): Promise&lt;JiraAttachment\[\]&gt;;+getFilterIssues(): Promise&lt;JiraIssueDetails\[\]&gt;;+updateIssue(): Promise&lt;void&gt;;+addComment(): Promise&lt;void&gt;;+searchIssues(): Promise&lt;SearchResponse&gt;;+getTransitions(): Promise&lt;TransitionDetails\[\]&gt;;+transitionIssue(): Promise&lt;void&gt;;+getPopulatedFields(): Promise&lt;string&gt;;+listBoards(): Promise&lt;BoardResponse\[\]&gt;;+listBoardSprints(): Promise&lt;SprintResponse\[\]&gt;;+listProjects(): Promise&lt;{ id: string; key: string; name: string; description: string \| null; lead: string \| null; url: string; }\[\]&gt;;+createIssue(): Promise&lt;{ key: string; }&gt;;+listMyFilters(): Promise&lt;FilterResponse\[\]&gt;]
+[&lt;type&gt;ListJiraSprintsArgs|+boardId: number \| undefined;+board_id: number \| undefined|]
+[&lt;type&gt;GetIssueArgs|+issueKey: string|]
+[&lt;type&gt;GetIssueDetailsArgs|+issueKey: string|]
+[&lt;type&gt;GetIssueAttachmentsArgs|+issueKey: string|]
+[&lt;type&gt;BasicIssueResponse|+key: string;+summary: string;+status: string;+assignee: string \| null|]
+[&lt;type&gt;UpdateIssueArgs|+issueKey: string;+summary: string \| undefined;+description: string \| undefined;+parent: string \| null \| undefined|]
+[&lt;type&gt;AddCommentArgs|+issueKey: string;+body: string|]
+[&lt;type&gt;TransitionIssueArgs|+issueKey: string;+transitionId: string;+comment: string \| undefined|]
+[&lt;type&gt;CreateIssueArgs|+projectKey: string;+summary: string;+description: string \| undefined;+issueType: string;+priority: string \| undefined;+assignee: string \| undefined;+labels: string\[\] \| undefined;+customFields: Record&lt;string, any&gt; \| undefined|]
+[&lt;type&gt;SearchIssuesArgs|+jql: string;+startAt: number \| undefined;+maxResults: number \| undefined|]
+[&lt;type&gt;GetFilterIssuesArgs|+filterId: string|]
+[&lt;type&gt;ListMyFiltersArgs|+expand: boolean \| undefined|]
+[&lt;interface&gt;JiraAttachment|+id: string;+filename: string;+mimeType: string;+size: number;+created: string;+author: string;+url: string|]
+[&lt;interface&gt;JiraIssueDetails|+key: string;+summary: string;+description: string;+parent: string \| null;+assignee: string \| null;+reporter: string;+status: string;+resolution: string \| null;+dueDate: string \| null;+startDate: string \| null;+storyPoints: number \| null;+timeEstimate: number \| null;+issueLinks: { type: string; outward: string \| null; inward: string \| null; }\[\];+comments: { id: string; author: string; body: string; created: string; }\[\] \| undefined;+attachments: JiraAttachment\[\] \| undefined|]
+[&lt;interface&gt;AdfNode|+type: string;+text: string \| undefined;+content: AdfNode\[\] \| undefined;+attrs: Record&lt;string, any&gt; \| undefined|]
+[&lt;interface&gt;JiraConfig|+host: string;+email: string;+apiToken: string;+customFields: { startDate?: string \| undefined; storyPoints?: string \| undefined; } \| undefined|]
+[&lt;interface&gt;FilterResponse|+id: string;+name: string;+owner: string;+favourite: boolean;+viewUrl: string;+description: string \| undefined;+jql: string \| undefined;+sharePermissions: { type: string; group?: string \| undefined; project?: string \| undefined; }\[\] \| undefined|]
+[&lt;interface&gt;SearchPagination|+startAt: number;+maxResults: number;+total: number;+hasMore: boolean|]
+[&lt;interface&gt;SearchResponse|+issues: JiraIssueDetails\[\];+pagination: SearchPagination|]
+[&lt;interface&gt;TransitionDetails|+id: string;+name: string;+to: { id: string; name: string; description?: string \| undefined; }|]
+[&lt;interface&gt;BoardResponse|+id: number;+name: string;+type: string;+location: { projectId: number; projectName: string; } \| undefined;+self: string|]
+[&lt;interface&gt;SprintResponse|+id: number;+name: string;+state: string;+startDate: string \| undefined;+endDate: string \| undefined;+completeDate: string \| undefined;+goal: string \| undefined;+boardId: number|]
+[TextProcessor|-static md: import(&quot;/home/aaron/mcp/jira-cloud/node_modules/@types/markdown-it/dist/index.cjs&quot;)|+static markdownToAdf(): any;+static extractTextFromAdf(): string;+static isFieldPopulated(): boolean;+static shouldExcludeField(): boolean;+static formatFieldValue(): string]</desc>
+<g stroke-width="1.0" text-align="left" font="12pt Helvetica, Arial, sans-serif" font-size="12pt" font-family="Helvetica" font-weight="normal" font-style="normal">
+<g font-family="Helvetica" font-size="12pt" font-weight="bold" font-style="normal" stroke-width="3.0" stroke-linejoin="round" stroke-linecap="round" stroke="#33322E">
+<g stroke="transparent" fill="transparent">
+<rect x="0.0" y="0.0" height="541.0" width="8112.0" stroke="none"></rect>
+</g>
+<g transform="translate(8, 8)" fill="#33322E">
+<g transform="translate(20, 20)">
+<g data-name="JiraServer">
+<g fill="#eee8d5" stroke="#33322E" data-name="JiraServer">
+<rect x="0.0" y="65.0" height="355.0" width="368.0" data-name="JiraServer"></rect>
+<path d="M0.0 97.0 L368.0 97.0" fill="none" data-name="JiraServer"></path>
+<path d="M0.0 372.0 L368.0 372.0" fill="none" data-name="JiraServer"></path>
+</g>
+<g transform="translate(0, 65)" font-family="Helvetica" font-size="12pt" font-weight="bold" font-style="normal" data-name="JiraServer" data-compartment="0">
+<g transform="translate(8, 8)" fill="#33322E" text-align="center" data-name="JiraServer" data-compartment="0">
+<a id=".JiraServer" xlink:href=""><text x="176.0" y="14.1" stroke="none" text-anchor="middle" data-name="JiraServer" data-compartment="0">JiraServer</text></a>
+
+</g>
+</g>
+<g transform="translate(0, 97)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="JiraServer" data-compartment="1">
+<g transform="translate(8, 8)" fill="#33322E" text-align="left" data-name="JiraServer" data-compartment="1">
+<text x="0.0" y="14.1" stroke="none" data-name="JiraServer" data-compartment="1">-server: Server&lt;{ method: string</text>
+<text x="0.0" y="30.3" stroke="none" data-name="JiraServer" data-compartment="1">params?: { [x: string]: unknown</text>
+<text x="0.0" y="46.5" stroke="none" data-name="JiraServer" data-compartment="1">_meta?: { [x: string]: unknown</text>
+<text x="0.0" y="62.7" stroke="none" data-name="JiraServer" data-compartment="1">progressToken?: string | number | undefined</text>
+<text x="0.0" y="78.9" stroke="none" data-name="JiraServer" data-compartment="1">} | undefined</text>
+<text x="0.0" y="95.1" stroke="none" data-name="JiraServer" data-compartment="1">} | undefined</text>
+<text x="0.0" y="111.3" stroke="none" data-name="JiraServer" data-compartment="1">}, { method: string</text>
+<text x="0.0" y="127.5" stroke="none" data-name="JiraServer" data-compartment="1">params?: { [x: string]: unknown</text>
+<text x="0.0" y="143.7" stroke="none" data-name="JiraServer" data-compartment="1">_meta?: { [x: string]: unknown</text>
+<text x="0.0" y="159.9" stroke="none" data-name="JiraServer" data-compartment="1">} | undefined</text>
+<text x="0.0" y="176.1" stroke="none" data-name="JiraServer" data-compartment="1">} | undefined</text>
+<text x="0.0" y="192.3" stroke="none" data-name="JiraServer" data-compartment="1">}, { [x: string]: unknown</text>
+<text x="0.0" y="208.5" stroke="none" data-name="JiraServer" data-compartment="1">_meta?: { [x: string]: unknown</text>
+<text x="0.0" y="224.7" stroke="none" data-name="JiraServer" data-compartment="1">} | undefined</text>
+<text x="0.0" y="240.9" stroke="none" data-name="JiraServer" data-compartment="1">}&gt;</text>
+<text x="0.0" y="257.1" stroke="none" data-name="JiraServer" data-compartment="1">-jiraClient: JiraClient</text>
+
+</g>
+</g>
+<g transform="translate(0, 372)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="JiraServer" data-compartment="2">
+<g transform="translate(8, 8)" fill="#33322E" text-align="left" data-name="JiraServer" data-compartment="2">
+<text x="0.0" y="14.1" stroke="none" data-name="JiraServer" data-compartment="2">-setupHandlers(): void</text>
+<text x="0.0" y="30.3" stroke="none" data-name="JiraServer" data-compartment="2">+run(): Promise&lt;void&gt;</text>
+
+</g>
+</g>
+</g>
+<g data-name="JiraClient">
+<g fill="#eee8d5" stroke="#33322E" data-name="JiraClient">
+<rect x="408.0" y="0.0" height="485.0" width="426.0" data-name="JiraClient"></rect>
+<path d="M408.0 32.0 L834.0 32.0" fill="none" data-name="JiraClient"></path>
+<path d="M408.0 129.0 L834.0 129.0" fill="none" data-name="JiraClient"></path>
+</g>
+<g transform="translate(408, 0)" font-family="Helvetica" font-size="12pt" font-weight="bold" font-style="normal" data-name="JiraClient" data-compartment="0">
+<g transform="translate(8, 8)" fill="#33322E" text-align="center" data-name="JiraClient" data-compartment="0">
+<a id="src/client/jira-client.ts.JiraClient" xlink:href="src/client/jira-client.ts"><text x="205.0" y="14.1" stroke="none" text-anchor="middle" data-name="JiraClient" data-compartment="0">JiraClient</text></a>
+
+</g>
+</g>
+<g transform="translate(408, 32)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="JiraClient" data-compartment="1">
+<g transform="translate(8, 8)" fill="#33322E" text-align="left" data-name="JiraClient" data-compartment="1">
+<text x="0.0" y="14.1" stroke="none" data-name="JiraClient" data-compartment="1">-client: Version3Client</text>
+<text x="0.0" y="30.3" stroke="none" data-name="JiraClient" data-compartment="1">-agileClient: AgileClient</text>
+<text x="0.0" y="46.5" stroke="none" data-name="JiraClient" data-compartment="1">-customFields: { startDate: string</text>
+<text x="0.0" y="62.7" stroke="none" data-name="JiraClient" data-compartment="1">storyPoints: string</text>
+<text x="0.0" y="78.9" stroke="none" data-name="JiraClient" data-compartment="1">}</text>
+
+</g>
+</g>
+<g transform="translate(408, 129)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="JiraClient" data-compartment="2">
+<g transform="translate(8, 8)" fill="#33322E" text-align="left" data-name="JiraClient" data-compartment="2">
+<text x="0.0" y="14.1" stroke="none" data-name="JiraClient" data-compartment="2">+getIssue(): Promise&lt;JiraIssueDetails&gt;</text>
+<text x="0.0" y="30.3" stroke="none" data-name="JiraClient" data-compartment="2">+getIssueAttachments(): Promise&lt;JiraAttachment[]&gt;</text>
+<text x="0.0" y="46.5" stroke="none" data-name="JiraClient" data-compartment="2">+getFilterIssues(): Promise&lt;JiraIssueDetails[]&gt;</text>
+<text x="0.0" y="62.7" stroke="none" data-name="JiraClient" data-compartment="2">+updateIssue(): Promise&lt;void&gt;</text>
+<text x="0.0" y="78.9" stroke="none" data-name="JiraClient" data-compartment="2">+addComment(): Promise&lt;void&gt;</text>
+<text x="0.0" y="95.1" stroke="none" data-name="JiraClient" data-compartment="2">+searchIssues(): Promise&lt;SearchResponse&gt;</text>
+<text x="0.0" y="111.3" stroke="none" data-name="JiraClient" data-compartment="2">+getTransitions(): Promise&lt;TransitionDetails[]&gt;</text>
+<text x="0.0" y="127.5" stroke="none" data-name="JiraClient" data-compartment="2">+transitionIssue(): Promise&lt;void&gt;</text>
+<text x="0.0" y="143.7" stroke="none" data-name="JiraClient" data-compartment="2">+getPopulatedFields(): Promise&lt;string&gt;</text>
+<text x="0.0" y="159.9" stroke="none" data-name="JiraClient" data-compartment="2">+listBoards(): Promise&lt;BoardResponse[]&gt;</text>
+<text x="0.0" y="176.1" stroke="none" data-name="JiraClient" data-compartment="2">+listBoardSprints(): Promise&lt;SprintResponse[]&gt;</text>
+<text x="0.0" y="192.3" stroke="none" data-name="JiraClient" data-compartment="2">+listProjects(): Promise&lt;{ id: string</text>
+<text x="0.0" y="208.5" stroke="none" data-name="JiraClient" data-compartment="2">key: string</text>
+<text x="0.0" y="224.7" stroke="none" data-name="JiraClient" data-compartment="2">name: string</text>
+<text x="0.0" y="240.9" stroke="none" data-name="JiraClient" data-compartment="2">description: string | null</text>
+<text x="0.0" y="257.1" stroke="none" data-name="JiraClient" data-compartment="2">lead: string | null</text>
+<text x="0.0" y="273.3" stroke="none" data-name="JiraClient" data-compartment="2">url: string</text>
+<text x="0.0" y="289.5" stroke="none" data-name="JiraClient" data-compartment="2">}[]&gt;</text>
+<text x="0.0" y="305.7" stroke="none" data-name="JiraClient" data-compartment="2">+createIssue(): Promise&lt;{ key: string</text>
+<text x="0.0" y="321.9" stroke="none" data-name="JiraClient" data-compartment="2">}&gt;</text>
+<text x="0.0" y="338.1" stroke="none" data-name="JiraClient" data-compartment="2">+listMyFilters(): Promise&lt;FilterResponse[]&gt;</text>
+
+</g>
+</g>
+</g>
+<g data-name="ListJiraSprintsArgs">
+<g fill="lightgray" stroke="#33322E" data-name="ListJiraSprintsArgs">
+<rect x="874.0" y="198.5" height="88.0" width="260.0" data-name="ListJiraSprintsArgs"></rect>
+<path d="M874.0 230.5 L1134.0 230.5" fill="none" data-name="ListJiraSprintsArgs"></path>
+<path d="M874.0 278.5 L1134.0 278.5" fill="none" data-name="ListJiraSprintsArgs"></path>
+</g>
+<g transform="translate(874, 198.5)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="ListJiraSprintsArgs" data-compartment="0">
+<g transform="translate(8, 8)" fill="#33322E" text-align="center" data-name="ListJiraSprintsArgs" data-compartment="0">
+<a id=".ListJiraSprintsArgs" xlink:href=""><text x="122.0" y="14.1" stroke="none" text-anchor="middle" data-name="ListJiraSprintsArgs" data-compartment="0">ListJiraSprintsArgs</text></a>
+
+</g>
+</g>
+<g transform="translate(874, 230.5)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="ListJiraSprintsArgs" data-compartment="1">
+<g transform="translate(8, 8)" fill="#33322E" text-align="left" data-name="ListJiraSprintsArgs" data-compartment="1">
+<text x="0.0" y="14.1" stroke="none" data-name="ListJiraSprintsArgs" data-compartment="1">+boardId: number | undefined</text>
+<text x="0.0" y="30.3" stroke="none" data-name="ListJiraSprintsArgs" data-compartment="1">+board_id: number | undefined</text>
+
+</g>
+</g>
+<g transform="translate(874, 278.5)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="ListJiraSprintsArgs" data-compartment="2">
+<g transform="translate(8, 8)" fill="#33322E" data-name="ListJiraSprintsArgs" data-compartment="2">
+
+</g>
+</g>
+</g>
+<g data-name="GetIssueArgs">
+<g fill="lightgray" stroke="#33322E" data-name="GetIssueArgs">
+<rect x="1174.0" y="206.5" height="72.0" width="152.0" data-name="GetIssueArgs"></rect>
+<path d="M1174.0 238.5 L1326.0 238.5" fill="none" data-name="GetIssueArgs"></path>
+<path d="M1174.0 270.5 L1326.0 270.5" fill="none" data-name="GetIssueArgs"></path>
+</g>
+<g transform="translate(1174, 206.5)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="GetIssueArgs" data-compartment="0">
+<g transform="translate(8, 8)" fill="#33322E" text-align="center" data-name="GetIssueArgs" data-compartment="0">
+<a id=".GetIssueArgs" xlink:href=""><text x="68.0" y="14.1" stroke="none" text-anchor="middle" data-name="GetIssueArgs" data-compartment="0">GetIssueArgs</text></a>
+
+</g>
+</g>
+<g transform="translate(1174, 238.5)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="GetIssueArgs" data-compartment="1">
+<g transform="translate(8, 8)" fill="#33322E" text-align="left" data-name="GetIssueArgs" data-compartment="1">
+<text x="0.0" y="14.1" stroke="none" data-name="GetIssueArgs" data-compartment="1">+issueKey: string</text>
+
+</g>
+</g>
+<g transform="translate(1174, 270.5)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="GetIssueArgs" data-compartment="2">
+<g transform="translate(8, 8)" fill="#33322E" data-name="GetIssueArgs" data-compartment="2">
+
+</g>
+</g>
+</g>
+<g data-name="GetIssueDetailsArgs">
+<g fill="lightgray" stroke="#33322E" data-name="GetIssueDetailsArgs">
+<rect x="1366.0" y="206.5" height="72.0" width="177.0" data-name="GetIssueDetailsArgs"></rect>
+<path d="M1366.0 238.5 L1543.0 238.5" fill="none" data-name="GetIssueDetailsArgs"></path>
+<path d="M1366.0 270.5 L1543.0 270.5" fill="none" data-name="GetIssueDetailsArgs"></path>
+</g>
+<g transform="translate(1366, 206.5)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="GetIssueDetailsArgs" data-compartment="0">
+<g transform="translate(8, 8)" fill="#33322E" text-align="center" data-name="GetIssueDetailsArgs" data-compartment="0">
+<a id=".GetIssueDetailsArgs" xlink:href=""><text x="80.5" y="14.1" stroke="none" text-anchor="middle" data-name="GetIssueDetailsArgs" data-compartment="0">GetIssueDetailsArgs</text></a>
+
+</g>
+</g>
+<g transform="translate(1366, 238.5)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="GetIssueDetailsArgs" data-compartment="1">
+<g transform="translate(8, 8)" fill="#33322E" text-align="left" data-name="GetIssueDetailsArgs" data-compartment="1">
+<text x="0.0" y="14.1" stroke="none" data-name="GetIssueDetailsArgs" data-compartment="1">+issueKey: string</text>
+
+</g>
+</g>
+<g transform="translate(1366, 270.5)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="GetIssueDetailsArgs" data-compartment="2">
+<g transform="translate(8, 8)" fill="#33322E" data-name="GetIssueDetailsArgs" data-compartment="2">
+
+</g>
+</g>
+</g>
+<g data-name="GetIssueAttachmentsArgs">
+<g fill="lightgray" stroke="#33322E" data-name="GetIssueAttachmentsArgs">
+<rect x="1583.0" y="206.5" height="72.0" width="221.0" data-name="GetIssueAttachmentsArgs"></rect>
+<path d="M1583.0 238.5 L1804.0 238.5" fill="none" data-name="GetIssueAttachmentsArgs"></path>
+<path d="M1583.0 270.5 L1804.0 270.5" fill="none" data-name="GetIssueAttachmentsArgs"></path>
+</g>
+<g transform="translate(1583, 206.5)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="GetIssueAttachmentsArgs" data-compartment="0">
+<g transform="translate(8, 8)" fill="#33322E" text-align="center" data-name="GetIssueAttachmentsArgs" data-compartment="0">
+<a id=".GetIssueAttachmentsArgs" xlink:href=""><text x="102.5" y="14.1" stroke="none" text-anchor="middle" data-name="GetIssueAttachmentsArgs" data-compartment="0">GetIssueAttachmentsArgs</text></a>
+
+</g>
+</g>
+<g transform="translate(1583, 238.5)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="GetIssueAttachmentsArgs" data-compartment="1">
+<g transform="translate(8, 8)" fill="#33322E" text-align="left" data-name="GetIssueAttachmentsArgs" data-compartment="1">
+<text x="0.0" y="14.1" stroke="none" data-name="GetIssueAttachmentsArgs" data-compartment="1">+issueKey: string</text>
+
+</g>
+</g>
+<g transform="translate(1583, 270.5)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="GetIssueAttachmentsArgs" data-compartment="2">
+<g transform="translate(8, 8)" fill="#33322E" data-name="GetIssueAttachmentsArgs" data-compartment="2">
+
+</g>
+</g>
+</g>
+<g data-name="BasicIssueResponse">
+<g fill="lightgray" stroke="#33322E" data-name="BasicIssueResponse">
+<rect x="1844.0" y="182.0" height="121.0" width="195.0" data-name="BasicIssueResponse"></rect>
+<path d="M1844.0 214.0 L2039.0 214.0" fill="none" data-name="BasicIssueResponse"></path>
+<path d="M1844.0 295.0 L2039.0 295.0" fill="none" data-name="BasicIssueResponse"></path>
+</g>
+<g transform="translate(1844, 182)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="BasicIssueResponse" data-compartment="0">
+<g transform="translate(8, 8)" fill="#33322E" text-align="center" data-name="BasicIssueResponse" data-compartment="0">
+<a id=".BasicIssueResponse" xlink:href=""><text x="89.5" y="14.1" stroke="none" text-anchor="middle" data-name="BasicIssueResponse" data-compartment="0">BasicIssueResponse</text></a>
+
+</g>
+</g>
+<g transform="translate(1844, 214)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="BasicIssueResponse" data-compartment="1">
+<g transform="translate(8, 8)" fill="#33322E" text-align="left" data-name="BasicIssueResponse" data-compartment="1">
+<text x="0.0" y="14.1" stroke="none" data-name="BasicIssueResponse" data-compartment="1">+key: string</text>
+<text x="0.0" y="30.3" stroke="none" data-name="BasicIssueResponse" data-compartment="1">+summary: string</text>
+<text x="0.0" y="46.5" stroke="none" data-name="BasicIssueResponse" data-compartment="1">+status: string</text>
+<text x="0.0" y="62.7" stroke="none" data-name="BasicIssueResponse" data-compartment="1">+assignee: string | null</text>
+
+</g>
+</g>
+<g transform="translate(1844, 295)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="BasicIssueResponse" data-compartment="2">
+<g transform="translate(8, 8)" fill="#33322E" data-name="BasicIssueResponse" data-compartment="2">
+
+</g>
+</g>
+</g>
+<g data-name="UpdateIssueArgs">
+<g fill="lightgray" stroke="#33322E" data-name="UpdateIssueArgs">
+<rect x="2079.0" y="182.0" height="121.0" width="268.0" data-name="UpdateIssueArgs"></rect>
+<path d="M2079.0 214.0 L2347.0 214.0" fill="none" data-name="UpdateIssueArgs"></path>
+<path d="M2079.0 295.0 L2347.0 295.0" fill="none" data-name="UpdateIssueArgs"></path>
+</g>
+<g transform="translate(2079, 182)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="UpdateIssueArgs" data-compartment="0">
+<g transform="translate(8, 8)" fill="#33322E" text-align="center" data-name="UpdateIssueArgs" data-compartment="0">
+<a id=".UpdateIssueArgs" xlink:href=""><text x="126.0" y="14.1" stroke="none" text-anchor="middle" data-name="UpdateIssueArgs" data-compartment="0">UpdateIssueArgs</text></a>
+
+</g>
+</g>
+<g transform="translate(2079, 214)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="UpdateIssueArgs" data-compartment="1">
+<g transform="translate(8, 8)" fill="#33322E" text-align="left" data-name="UpdateIssueArgs" data-compartment="1">
+<text x="0.0" y="14.1" stroke="none" data-name="UpdateIssueArgs" data-compartment="1">+issueKey: string</text>
+<text x="0.0" y="30.3" stroke="none" data-name="UpdateIssueArgs" data-compartment="1">+summary: string | undefined</text>
+<text x="0.0" y="46.5" stroke="none" data-name="UpdateIssueArgs" data-compartment="1">+description: string | undefined</text>
+<text x="0.0" y="62.7" stroke="none" data-name="UpdateIssueArgs" data-compartment="1">+parent: string | null | undefined</text>
+
+</g>
+</g>
+<g transform="translate(2079, 295)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="UpdateIssueArgs" data-compartment="2">
+<g transform="translate(8, 8)" fill="#33322E" data-name="UpdateIssueArgs" data-compartment="2">
+
+</g>
+</g>
+</g>
+<g data-name="AddCommentArgs">
+<g fill="lightgray" stroke="#33322E" data-name="AddCommentArgs">
+<rect x="2387.0" y="198.5" height="88.0" width="158.0" data-name="AddCommentArgs"></rect>
+<path d="M2387.0 230.5 L2545.0 230.5" fill="none" data-name="AddCommentArgs"></path>
+<path d="M2387.0 278.5 L2545.0 278.5" fill="none" data-name="AddCommentArgs"></path>
+</g>
+<g transform="translate(2387, 198.5)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="AddCommentArgs" data-compartment="0">
+<g transform="translate(8, 8)" fill="#33322E" text-align="center" data-name="AddCommentArgs" data-compartment="0">
+<a id=".AddCommentArgs" xlink:href=""><text x="71.0" y="14.1" stroke="none" text-anchor="middle" data-name="AddCommentArgs" data-compartment="0">AddCommentArgs</text></a>
+
+</g>
+</g>
+<g transform="translate(2387, 230.5)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="AddCommentArgs" data-compartment="1">
+<g transform="translate(8, 8)" fill="#33322E" text-align="left" data-name="AddCommentArgs" data-compartment="1">
+<text x="0.0" y="14.1" stroke="none" data-name="AddCommentArgs" data-compartment="1">+issueKey: string</text>
+<text x="0.0" y="30.3" stroke="none" data-name="AddCommentArgs" data-compartment="1">+body: string</text>
+
+</g>
+</g>
+<g transform="translate(2387, 278.5)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="AddCommentArgs" data-compartment="2">
+<g transform="translate(8, 8)" fill="#33322E" data-name="AddCommentArgs" data-compartment="2">
+
+</g>
+</g>
+</g>
+<g data-name="TransitionIssueArgs">
+<g fill="lightgray" stroke="#33322E" data-name="TransitionIssueArgs">
+<rect x="2585.0" y="190.0" height="105.0" width="246.0" data-name="TransitionIssueArgs"></rect>
+<path d="M2585.0 222.0 L2831.0 222.0" fill="none" data-name="TransitionIssueArgs"></path>
+<path d="M2585.0 287.0 L2831.0 287.0" fill="none" data-name="TransitionIssueArgs"></path>
+</g>
+<g transform="translate(2585, 190)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="TransitionIssueArgs" data-compartment="0">
+<g transform="translate(8, 8)" fill="#33322E" text-align="center" data-name="TransitionIssueArgs" data-compartment="0">
+<a id=".TransitionIssueArgs" xlink:href=""><text x="115.0" y="14.1" stroke="none" text-anchor="middle" data-name="TransitionIssueArgs" data-compartment="0">TransitionIssueArgs</text></a>
+
+</g>
+</g>
+<g transform="translate(2585, 222)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="TransitionIssueArgs" data-compartment="1">
+<g transform="translate(8, 8)" fill="#33322E" text-align="left" data-name="TransitionIssueArgs" data-compartment="1">
+<text x="0.0" y="14.1" stroke="none" data-name="TransitionIssueArgs" data-compartment="1">+issueKey: string</text>
+<text x="0.0" y="30.3" stroke="none" data-name="TransitionIssueArgs" data-compartment="1">+transitionId: string</text>
+<text x="0.0" y="46.5" stroke="none" data-name="TransitionIssueArgs" data-compartment="1">+comment: string | undefined</text>
+
+</g>
+</g>
+<g transform="translate(2585, 287)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="TransitionIssueArgs" data-compartment="2">
+<g transform="translate(8, 8)" fill="#33322E" data-name="TransitionIssueArgs" data-compartment="2">
+
+</g>
+</g>
+</g>
+<g data-name="CreateIssueArgs">
+<g fill="lightgray" stroke="#33322E" data-name="CreateIssueArgs">
+<rect x="2871.0" y="149.5" height="186.0" width="394.0" data-name="CreateIssueArgs"></rect>
+<path d="M2871.0 181.5 L3265.0 181.5" fill="none" data-name="CreateIssueArgs"></path>
+<path d="M2871.0 327.5 L3265.0 327.5" fill="none" data-name="CreateIssueArgs"></path>
+</g>
+<g transform="translate(2871, 149.5)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="CreateIssueArgs" data-compartment="0">
+<g transform="translate(8, 8)" fill="#33322E" text-align="center" data-name="CreateIssueArgs" data-compartment="0">
+<a id=".CreateIssueArgs" xlink:href=""><text x="189.0" y="14.1" stroke="none" text-anchor="middle" data-name="CreateIssueArgs" data-compartment="0">CreateIssueArgs</text></a>
+
+</g>
+</g>
+<g transform="translate(2871, 181.5)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="CreateIssueArgs" data-compartment="1">
+<g transform="translate(8, 8)" fill="#33322E" text-align="left" data-name="CreateIssueArgs" data-compartment="1">
+<text x="0.0" y="14.1" stroke="none" data-name="CreateIssueArgs" data-compartment="1">+projectKey: string</text>
+<text x="0.0" y="30.3" stroke="none" data-name="CreateIssueArgs" data-compartment="1">+summary: string</text>
+<text x="0.0" y="46.5" stroke="none" data-name="CreateIssueArgs" data-compartment="1">+description: string | undefined</text>
+<text x="0.0" y="62.7" stroke="none" data-name="CreateIssueArgs" data-compartment="1">+issueType: string</text>
+<text x="0.0" y="78.9" stroke="none" data-name="CreateIssueArgs" data-compartment="1">+priority: string | undefined</text>
+<text x="0.0" y="95.1" stroke="none" data-name="CreateIssueArgs" data-compartment="1">+assignee: string | undefined</text>
+<text x="0.0" y="111.3" stroke="none" data-name="CreateIssueArgs" data-compartment="1">+labels: string[] | undefined</text>
+<text x="0.0" y="127.5" stroke="none" data-name="CreateIssueArgs" data-compartment="1">+customFields: Record&lt;string, any&gt; | undefined</text>
+
+</g>
+</g>
+<g transform="translate(2871, 327.5)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="CreateIssueArgs" data-compartment="2">
+<g transform="translate(8, 8)" fill="#33322E" data-name="CreateIssueArgs" data-compartment="2">
+
+</g>
+</g>
+</g>
+<g data-name="SearchIssuesArgs">
+<g fill="lightgray" stroke="#33322E" data-name="SearchIssuesArgs">
+<rect x="3305.0" y="190.0" height="105.0" width="282.0" data-name="SearchIssuesArgs"></rect>
+<path d="M3305.0 222.0 L3587.0 222.0" fill="none" data-name="SearchIssuesArgs"></path>
+<path d="M3305.0 287.0 L3587.0 287.0" fill="none" data-name="SearchIssuesArgs"></path>
+</g>
+<g transform="translate(3305, 190)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="SearchIssuesArgs" data-compartment="0">
+<g transform="translate(8, 8)" fill="#33322E" text-align="center" data-name="SearchIssuesArgs" data-compartment="0">
+<a id=".SearchIssuesArgs" xlink:href=""><text x="133.0" y="14.1" stroke="none" text-anchor="middle" data-name="SearchIssuesArgs" data-compartment="0">SearchIssuesArgs</text></a>
+
+</g>
+</g>
+<g transform="translate(3305, 222)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="SearchIssuesArgs" data-compartment="1">
+<g transform="translate(8, 8)" fill="#33322E" text-align="left" data-name="SearchIssuesArgs" data-compartment="1">
+<text x="0.0" y="14.1" stroke="none" data-name="SearchIssuesArgs" data-compartment="1">+jql: string</text>
+<text x="0.0" y="30.3" stroke="none" data-name="SearchIssuesArgs" data-compartment="1">+startAt: number | undefined</text>
+<text x="0.0" y="46.5" stroke="none" data-name="SearchIssuesArgs" data-compartment="1">+maxResults: number | undefined</text>
+
+</g>
+</g>
+<g transform="translate(3305, 287)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="SearchIssuesArgs" data-compartment="2">
+<g transform="translate(8, 8)" fill="#33322E" data-name="SearchIssuesArgs" data-compartment="2">
+
+</g>
+</g>
+</g>
+<g data-name="GetFilterIssuesArgs">
+<g fill="lightgray" stroke="#33322E" data-name="GetFilterIssuesArgs">
+<rect x="3627.0" y="206.5" height="72.0" width="171.0" data-name="GetFilterIssuesArgs"></rect>
+<path d="M3627.0 238.5 L3798.0 238.5" fill="none" data-name="GetFilterIssuesArgs"></path>
+<path d="M3627.0 270.5 L3798.0 270.5" fill="none" data-name="GetFilterIssuesArgs"></path>
+</g>
+<g transform="translate(3627, 206.5)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="GetFilterIssuesArgs" data-compartment="0">
+<g transform="translate(8, 8)" fill="#33322E" text-align="center" data-name="GetFilterIssuesArgs" data-compartment="0">
+<a id=".GetFilterIssuesArgs" xlink:href=""><text x="77.5" y="14.1" stroke="none" text-anchor="middle" data-name="GetFilterIssuesArgs" data-compartment="0">GetFilterIssuesArgs</text></a>
+
+</g>
+</g>
+<g transform="translate(3627, 238.5)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="GetFilterIssuesArgs" data-compartment="1">
+<g transform="translate(8, 8)" fill="#33322E" text-align="left" data-name="GetFilterIssuesArgs" data-compartment="1">
+<text x="0.0" y="14.1" stroke="none" data-name="GetFilterIssuesArgs" data-compartment="1">+filterId: string</text>
+
+</g>
+</g>
+<g transform="translate(3627, 270.5)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="GetFilterIssuesArgs" data-compartment="2">
+<g transform="translate(8, 8)" fill="#33322E" data-name="GetFilterIssuesArgs" data-compartment="2">
+
+</g>
+</g>
+</g>
+<g data-name="ListMyFiltersArgs">
+<g fill="lightgray" stroke="#33322E" data-name="ListMyFiltersArgs">
+<rect x="3838.0" y="206.5" height="72.0" width="253.0" data-name="ListMyFiltersArgs"></rect>
+<path d="M3838.0 238.5 L4091.0 238.5" fill="none" data-name="ListMyFiltersArgs"></path>
+<path d="M3838.0 270.5 L4091.0 270.5" fill="none" data-name="ListMyFiltersArgs"></path>
+</g>
+<g transform="translate(3838, 206.5)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="ListMyFiltersArgs" data-compartment="0">
+<g transform="translate(8, 8)" fill="#33322E" text-align="center" data-name="ListMyFiltersArgs" data-compartment="0">
+<a id=".ListMyFiltersArgs" xlink:href=""><text x="118.5" y="14.1" stroke="none" text-anchor="middle" data-name="ListMyFiltersArgs" data-compartment="0">ListMyFiltersArgs</text></a>
+
+</g>
+</g>
+<g transform="translate(3838, 238.5)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="ListMyFiltersArgs" data-compartment="1">
+<g transform="translate(8, 8)" fill="#33322E" text-align="left" data-name="ListMyFiltersArgs" data-compartment="1">
+<text x="0.0" y="14.1" stroke="none" data-name="ListMyFiltersArgs" data-compartment="1">+expand: boolean | undefined</text>
+
+</g>
+</g>
+<g transform="translate(3838, 270.5)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="ListMyFiltersArgs" data-compartment="2">
+<g transform="translate(8, 8)" fill="#33322E" data-name="ListMyFiltersArgs" data-compartment="2">
+
+</g>
+</g>
+</g>
+<g data-name="JiraAttachment">
+<g fill="lightblue" stroke="#33322E" data-name="JiraAttachment">
+<rect x="4131.0" y="158.0" height="169.0" width="161.0" data-name="JiraAttachment"></rect>
+<path d="M4131.0 190.0 L4292.0 190.0" fill="none" data-name="JiraAttachment"></path>
+<path d="M4131.0 319.0 L4292.0 319.0" fill="none" data-name="JiraAttachment"></path>
+</g>
+<g transform="translate(4131, 158)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="JiraAttachment" data-compartment="0">
+<g transform="translate(8, 8)" fill="#33322E" text-align="center" data-name="JiraAttachment" data-compartment="0">
+<a id="src/types/index.ts.JiraAttachment" xlink:href="src/types/index.ts"><text x="72.5" y="14.1" stroke="none" text-anchor="middle" data-name="JiraAttachment" data-compartment="0">JiraAttachment</text></a>
+
+</g>
+</g>
+<g transform="translate(4131, 190)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="JiraAttachment" data-compartment="1">
+<g transform="translate(8, 8)" fill="#33322E" text-align="left" data-name="JiraAttachment" data-compartment="1">
+<text x="0.0" y="14.1" stroke="none" data-name="JiraAttachment" data-compartment="1">+id: string</text>
+<text x="0.0" y="30.3" stroke="none" data-name="JiraAttachment" data-compartment="1">+filename: string</text>
+<text x="0.0" y="46.5" stroke="none" data-name="JiraAttachment" data-compartment="1">+mimeType: string</text>
+<text x="0.0" y="62.7" stroke="none" data-name="JiraAttachment" data-compartment="1">+size: number</text>
+<text x="0.0" y="78.9" stroke="none" data-name="JiraAttachment" data-compartment="1">+created: string</text>
+<text x="0.0" y="95.1" stroke="none" data-name="JiraAttachment" data-compartment="1">+author: string</text>
+<text x="0.0" y="111.3" stroke="none" data-name="JiraAttachment" data-compartment="1">+url: string</text>
+
+</g>
+</g>
+<g transform="translate(4131, 319)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="JiraAttachment" data-compartment="2">
+<g transform="translate(8, 8)" fill="#33322E" data-name="JiraAttachment" data-compartment="2">
+
+</g>
+</g>
+</g>
+<g data-name="JiraIssueDetails">
+<g fill="lightblue" stroke="#33322E" data-name="JiraIssueDetails">
+<rect x="4332.0" y="36.5" height="412.0" width="355.0" data-name="JiraIssueDetails"></rect>
+<path d="M4332.0 68.5 L4687.0 68.5" fill="none" data-name="JiraIssueDetails"></path>
+<path d="M4332.0 440.5 L4687.0 440.5" fill="none" data-name="JiraIssueDetails"></path>
+</g>
+<g transform="translate(4332, 36.5)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="JiraIssueDetails" data-compartment="0">
+<g transform="translate(8, 8)" fill="#33322E" text-align="center" data-name="JiraIssueDetails" data-compartment="0">
+<a id="src/types/index.ts.JiraIssueDetails" xlink:href="src/types/index.ts"><text x="169.5" y="14.1" stroke="none" text-anchor="middle" data-name="JiraIssueDetails" data-compartment="0">JiraIssueDetails</text></a>
+
+</g>
+</g>
+<g transform="translate(4332, 68.5)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="JiraIssueDetails" data-compartment="1">
+<g transform="translate(8, 8)" fill="#33322E" text-align="left" data-name="JiraIssueDetails" data-compartment="1">
+<text x="0.0" y="14.1" stroke="none" data-name="JiraIssueDetails" data-compartment="1">+key: string</text>
+<text x="0.0" y="30.3" stroke="none" data-name="JiraIssueDetails" data-compartment="1">+summary: string</text>
+<text x="0.0" y="46.5" stroke="none" data-name="JiraIssueDetails" data-compartment="1">+description: string</text>
+<text x="0.0" y="62.7" stroke="none" data-name="JiraIssueDetails" data-compartment="1">+parent: string | null</text>
+<text x="0.0" y="78.9" stroke="none" data-name="JiraIssueDetails" data-compartment="1">+assignee: string | null</text>
+<text x="0.0" y="95.1" stroke="none" data-name="JiraIssueDetails" data-compartment="1">+reporter: string</text>
+<text x="0.0" y="111.3" stroke="none" data-name="JiraIssueDetails" data-compartment="1">+status: string</text>
+<text x="0.0" y="127.5" stroke="none" data-name="JiraIssueDetails" data-compartment="1">+resolution: string | null</text>
+<text x="0.0" y="143.7" stroke="none" data-name="JiraIssueDetails" data-compartment="1">+dueDate: string | null</text>
+<text x="0.0" y="159.9" stroke="none" data-name="JiraIssueDetails" data-compartment="1">+startDate: string | null</text>
+<text x="0.0" y="176.1" stroke="none" data-name="JiraIssueDetails" data-compartment="1">+storyPoints: number | null</text>
+<text x="0.0" y="192.3" stroke="none" data-name="JiraIssueDetails" data-compartment="1">+timeEstimate: number | null</text>
+<text x="0.0" y="208.5" stroke="none" data-name="JiraIssueDetails" data-compartment="1">+issueLinks: { type: string</text>
+<text x="0.0" y="224.7" stroke="none" data-name="JiraIssueDetails" data-compartment="1">outward: string | null</text>
+<text x="0.0" y="240.9" stroke="none" data-name="JiraIssueDetails" data-compartment="1">inward: string | null</text>
+<text x="0.0" y="257.1" stroke="none" data-name="JiraIssueDetails" data-compartment="1">}[]</text>
+<text x="0.0" y="273.3" stroke="none" data-name="JiraIssueDetails" data-compartment="1">+comments: { id: string</text>
+<text x="0.0" y="289.5" stroke="none" data-name="JiraIssueDetails" data-compartment="1">author: string</text>
+<text x="0.0" y="305.7" stroke="none" data-name="JiraIssueDetails" data-compartment="1">body: string</text>
+<text x="0.0" y="321.9" stroke="none" data-name="JiraIssueDetails" data-compartment="1">created: string</text>
+<text x="0.0" y="338.1" stroke="none" data-name="JiraIssueDetails" data-compartment="1">}[] | undefined</text>
+<text x="0.0" y="354.3" stroke="none" data-name="JiraIssueDetails" data-compartment="1">+attachments: JiraAttachment[] | undefined</text>
+
+</g>
+</g>
+<g transform="translate(4332, 440.5)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="JiraIssueDetails" data-compartment="2">
+<g transform="translate(8, 8)" fill="#33322E" data-name="JiraIssueDetails" data-compartment="2">
+
+</g>
+</g>
+</g>
+<g data-name="AdfNode">
+<g fill="lightblue" stroke="#33322E" data-name="AdfNode">
+<rect x="4727.0" y="182.0" height="121.0" width="325.0" data-name="AdfNode"></rect>
+<path d="M4727.0 214.0 L5052.0 214.0" fill="none" data-name="AdfNode"></path>
+<path d="M4727.0 295.0 L5052.0 295.0" fill="none" data-name="AdfNode"></path>
+</g>
+<g transform="translate(4727, 182)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="AdfNode" data-compartment="0">
+<g transform="translate(8, 8)" fill="#33322E" text-align="center" data-name="AdfNode" data-compartment="0">
+<a id="src/types/index.ts.AdfNode" xlink:href="src/types/index.ts"><text x="154.5" y="14.1" stroke="none" text-anchor="middle" data-name="AdfNode" data-compartment="0">AdfNode</text></a>
+
+</g>
+</g>
+<g transform="translate(4727, 214)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="AdfNode" data-compartment="1">
+<g transform="translate(8, 8)" fill="#33322E" text-align="left" data-name="AdfNode" data-compartment="1">
+<text x="0.0" y="14.1" stroke="none" data-name="AdfNode" data-compartment="1">+type: string</text>
+<text x="0.0" y="30.3" stroke="none" data-name="AdfNode" data-compartment="1">+text: string | undefined</text>
+<text x="0.0" y="46.5" stroke="none" data-name="AdfNode" data-compartment="1">+content: AdfNode[] | undefined</text>
+<text x="0.0" y="62.7" stroke="none" data-name="AdfNode" data-compartment="1">+attrs: Record&lt;string, any&gt; | undefined</text>
+
+</g>
+</g>
+<g transform="translate(4727, 295)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="AdfNode" data-compartment="2">
+<g transform="translate(8, 8)" fill="#33322E" data-name="AdfNode" data-compartment="2">
+
+</g>
+</g>
+</g>
+<g data-name="JiraConfig">
+<g fill="lightblue" stroke="#33322E" data-name="JiraConfig">
+<rect x="5092.0" y="166.0" height="153.0" width="381.0" data-name="JiraConfig"></rect>
+<path d="M5092.0 198.0 L5473.0 198.0" fill="none" data-name="JiraConfig"></path>
+<path d="M5092.0 311.0 L5473.0 311.0" fill="none" data-name="JiraConfig"></path>
+</g>
+<g transform="translate(5092, 166)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="JiraConfig" data-compartment="0">
+<g transform="translate(8, 8)" fill="#33322E" text-align="center" data-name="JiraConfig" data-compartment="0">
+<a id="src/types/index.ts.JiraConfig" xlink:href="src/types/index.ts"><text x="182.5" y="14.1" stroke="none" text-anchor="middle" data-name="JiraConfig" data-compartment="0">JiraConfig</text></a>
+
+</g>
+</g>
+<g transform="translate(5092, 198)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="JiraConfig" data-compartment="1">
+<g transform="translate(8, 8)" fill="#33322E" text-align="left" data-name="JiraConfig" data-compartment="1">
+<text x="0.0" y="14.1" stroke="none" data-name="JiraConfig" data-compartment="1">+host: string</text>
+<text x="0.0" y="30.3" stroke="none" data-name="JiraConfig" data-compartment="1">+email: string</text>
+<text x="0.0" y="46.5" stroke="none" data-name="JiraConfig" data-compartment="1">+apiToken: string</text>
+<text x="0.0" y="62.7" stroke="none" data-name="JiraConfig" data-compartment="1">+customFields: { startDate?: string | undefined</text>
+<text x="0.0" y="78.9" stroke="none" data-name="JiraConfig" data-compartment="1">storyPoints?: string | undefined</text>
+<text x="0.0" y="95.1" stroke="none" data-name="JiraConfig" data-compartment="1">} | undefined</text>
+
+</g>
+</g>
+<g transform="translate(5092, 311)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="JiraConfig" data-compartment="2">
+<g transform="translate(8, 8)" fill="#33322E" data-name="JiraConfig" data-compartment="2">
+
+</g>
+</g>
+</g>
+<g data-name="FilterResponse">
+<g fill="lightblue" stroke="#33322E" data-name="FilterResponse">
+<rect x="5513.0" y="125.5" height="234.0" width="276.0" data-name="FilterResponse"></rect>
+<path d="M5513.0 157.5 L5789.0 157.5" fill="none" data-name="FilterResponse"></path>
+<path d="M5513.0 351.5 L5789.0 351.5" fill="none" data-name="FilterResponse"></path>
+</g>
+<g transform="translate(5513, 125.5)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="FilterResponse" data-compartment="0">
+<g transform="translate(8, 8)" fill="#33322E" text-align="center" data-name="FilterResponse" data-compartment="0">
+<a id="src/types/index.ts.FilterResponse" xlink:href="src/types/index.ts"><text x="130.0" y="14.1" stroke="none" text-anchor="middle" data-name="FilterResponse" data-compartment="0">FilterResponse</text></a>
+
+</g>
+</g>
+<g transform="translate(5513, 157.5)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="FilterResponse" data-compartment="1">
+<g transform="translate(8, 8)" fill="#33322E" text-align="left" data-name="FilterResponse" data-compartment="1">
+<text x="0.0" y="14.1" stroke="none" data-name="FilterResponse" data-compartment="1">+id: string</text>
+<text x="0.0" y="30.3" stroke="none" data-name="FilterResponse" data-compartment="1">+name: string</text>
+<text x="0.0" y="46.5" stroke="none" data-name="FilterResponse" data-compartment="1">+owner: string</text>
+<text x="0.0" y="62.7" stroke="none" data-name="FilterResponse" data-compartment="1">+favourite: boolean</text>
+<text x="0.0" y="78.9" stroke="none" data-name="FilterResponse" data-compartment="1">+viewUrl: string</text>
+<text x="0.0" y="95.1" stroke="none" data-name="FilterResponse" data-compartment="1">+description: string | undefined</text>
+<text x="0.0" y="111.3" stroke="none" data-name="FilterResponse" data-compartment="1">+jql: string | undefined</text>
+<text x="0.0" y="127.5" stroke="none" data-name="FilterResponse" data-compartment="1">+sharePermissions: { type: string</text>
+<text x="0.0" y="143.7" stroke="none" data-name="FilterResponse" data-compartment="1">group?: string | undefined</text>
+<text x="0.0" y="159.9" stroke="none" data-name="FilterResponse" data-compartment="1">project?: string | undefined</text>
+<text x="0.0" y="176.1" stroke="none" data-name="FilterResponse" data-compartment="1">}[] | undefined</text>
+
+</g>
+</g>
+<g transform="translate(5513, 351.5)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="FilterResponse" data-compartment="2">
+<g transform="translate(8, 8)" fill="#33322E" data-name="FilterResponse" data-compartment="2">
+
+</g>
+</g>
+</g>
+<g data-name="SearchPagination">
+<g fill="lightblue" stroke="#33322E" data-name="SearchPagination">
+<rect x="5829.0" y="182.0" height="121.0" width="188.0" data-name="SearchPagination"></rect>
+<path d="M5829.0 214.0 L6017.0 214.0" fill="none" data-name="SearchPagination"></path>
+<path d="M5829.0 295.0 L6017.0 295.0" fill="none" data-name="SearchPagination"></path>
+</g>
+<g transform="translate(5829, 182)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="SearchPagination" data-compartment="0">
+<g transform="translate(8, 8)" fill="#33322E" text-align="center" data-name="SearchPagination" data-compartment="0">
+<a id="src/types/index.ts.SearchPagination" xlink:href="src/types/index.ts"><text x="86.0" y="14.1" stroke="none" text-anchor="middle" data-name="SearchPagination" data-compartment="0">SearchPagination</text></a>
+
+</g>
+</g>
+<g transform="translate(5829, 214)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="SearchPagination" data-compartment="1">
+<g transform="translate(8, 8)" fill="#33322E" text-align="left" data-name="SearchPagination" data-compartment="1">
+<text x="0.0" y="14.1" stroke="none" data-name="SearchPagination" data-compartment="1">+startAt: number</text>
+<text x="0.0" y="30.3" stroke="none" data-name="SearchPagination" data-compartment="1">+maxResults: number</text>
+<text x="0.0" y="46.5" stroke="none" data-name="SearchPagination" data-compartment="1">+total: number</text>
+<text x="0.0" y="62.7" stroke="none" data-name="SearchPagination" data-compartment="1">+hasMore: boolean</text>
+
+</g>
+</g>
+<g transform="translate(5829, 295)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="SearchPagination" data-compartment="2">
+<g transform="translate(8, 8)" fill="#33322E" data-name="SearchPagination" data-compartment="2">
+
+</g>
+</g>
+</g>
+<g data-name="SearchResponse">
+<g fill="lightblue" stroke="#33322E" data-name="SearchResponse">
+<rect x="6057.0" y="198.5" height="88.0" width="259.0" data-name="SearchResponse"></rect>
+<path d="M6057.0 230.5 L6316.0 230.5" fill="none" data-name="SearchResponse"></path>
+<path d="M6057.0 278.5 L6316.0 278.5" fill="none" data-name="SearchResponse"></path>
+</g>
+<g transform="translate(6057, 198.5)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="SearchResponse" data-compartment="0">
+<g transform="translate(8, 8)" fill="#33322E" text-align="center" data-name="SearchResponse" data-compartment="0">
+<a id="src/types/index.ts.SearchResponse" xlink:href="src/types/index.ts"><text x="121.5" y="14.1" stroke="none" text-anchor="middle" data-name="SearchResponse" data-compartment="0">SearchResponse</text></a>
+
+</g>
+</g>
+<g transform="translate(6057, 230.5)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="SearchResponse" data-compartment="1">
+<g transform="translate(8, 8)" fill="#33322E" text-align="left" data-name="SearchResponse" data-compartment="1">
+<text x="0.0" y="14.1" stroke="none" data-name="SearchResponse" data-compartment="1">+issues: JiraIssueDetails[]</text>
+<text x="0.0" y="30.3" stroke="none" data-name="SearchResponse" data-compartment="1">+pagination: SearchPagination</text>
+
+</g>
+</g>
+<g transform="translate(6057, 278.5)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="SearchResponse" data-compartment="2">
+<g transform="translate(8, 8)" fill="#33322E" data-name="SearchResponse" data-compartment="2">
+
+</g>
+</g>
+</g>
+<g data-name="TransitionDetails">
+<g fill="lightblue" stroke="#33322E" data-name="TransitionDetails">
+<rect x="6356.0" y="166.0" height="153.0" width="261.0" data-name="TransitionDetails"></rect>
+<path d="M6356.0 198.0 L6617.0 198.0" fill="none" data-name="TransitionDetails"></path>
+<path d="M6356.0 311.0 L6617.0 311.0" fill="none" data-name="TransitionDetails"></path>
+</g>
+<g transform="translate(6356, 166)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="TransitionDetails" data-compartment="0">
+<g transform="translate(8, 8)" fill="#33322E" text-align="center" data-name="TransitionDetails" data-compartment="0">
+<a id="src/types/index.ts.TransitionDetails" xlink:href="src/types/index.ts"><text x="122.5" y="14.1" stroke="none" text-anchor="middle" data-name="TransitionDetails" data-compartment="0">TransitionDetails</text></a>
+
+</g>
+</g>
+<g transform="translate(6356, 198)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="TransitionDetails" data-compartment="1">
+<g transform="translate(8, 8)" fill="#33322E" text-align="left" data-name="TransitionDetails" data-compartment="1">
+<text x="0.0" y="14.1" stroke="none" data-name="TransitionDetails" data-compartment="1">+id: string</text>
+<text x="0.0" y="30.3" stroke="none" data-name="TransitionDetails" data-compartment="1">+name: string</text>
+<text x="0.0" y="46.5" stroke="none" data-name="TransitionDetails" data-compartment="1">+to: { id: string</text>
+<text x="0.0" y="62.7" stroke="none" data-name="TransitionDetails" data-compartment="1">name: string</text>
+<text x="0.0" y="78.9" stroke="none" data-name="TransitionDetails" data-compartment="1">description?: string | undefined</text>
+<text x="0.0" y="95.1" stroke="none" data-name="TransitionDetails" data-compartment="1">}</text>
+
+</g>
+</g>
+<g transform="translate(6356, 311)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="TransitionDetails" data-compartment="2">
+<g transform="translate(8, 8)" fill="#33322E" data-name="TransitionDetails" data-compartment="2">
+
+</g>
+</g>
+</g>
+<g data-name="BoardResponse">
+<g fill="lightblue" stroke="#33322E" data-name="BoardResponse">
+<rect x="6657.0" y="158.0" height="169.0" width="248.0" data-name="BoardResponse"></rect>
+<path d="M6657.0 190.0 L6905.0 190.0" fill="none" data-name="BoardResponse"></path>
+<path d="M6657.0 319.0 L6905.0 319.0" fill="none" data-name="BoardResponse"></path>
+</g>
+<g transform="translate(6657, 158)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="BoardResponse" data-compartment="0">
+<g transform="translate(8, 8)" fill="#33322E" text-align="center" data-name="BoardResponse" data-compartment="0">
+<a id="src/types/index.ts.BoardResponse" xlink:href="src/types/index.ts"><text x="116.0" y="14.1" stroke="none" text-anchor="middle" data-name="BoardResponse" data-compartment="0">BoardResponse</text></a>
+
+</g>
+</g>
+<g transform="translate(6657, 190)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="BoardResponse" data-compartment="1">
+<g transform="translate(8, 8)" fill="#33322E" text-align="left" data-name="BoardResponse" data-compartment="1">
+<text x="0.0" y="14.1" stroke="none" data-name="BoardResponse" data-compartment="1">+id: number</text>
+<text x="0.0" y="30.3" stroke="none" data-name="BoardResponse" data-compartment="1">+name: string</text>
+<text x="0.0" y="46.5" stroke="none" data-name="BoardResponse" data-compartment="1">+type: string</text>
+<text x="0.0" y="62.7" stroke="none" data-name="BoardResponse" data-compartment="1">+location: { projectId: number</text>
+<text x="0.0" y="78.9" stroke="none" data-name="BoardResponse" data-compartment="1">projectName: string</text>
+<text x="0.0" y="95.1" stroke="none" data-name="BoardResponse" data-compartment="1">} | undefined</text>
+<text x="0.0" y="111.3" stroke="none" data-name="BoardResponse" data-compartment="1">+self: string</text>
+
+</g>
+</g>
+<g transform="translate(6657, 319)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="BoardResponse" data-compartment="2">
+<g transform="translate(8, 8)" fill="#33322E" data-name="BoardResponse" data-compartment="2">
+
+</g>
+</g>
+</g>
+<g data-name="SprintResponse">
+<g fill="lightblue" stroke="#33322E" data-name="SprintResponse">
+<rect x="6945.0" y="149.5" height="186.0" width="283.0" data-name="SprintResponse"></rect>
+<path d="M6945.0 181.5 L7228.0 181.5" fill="none" data-name="SprintResponse"></path>
+<path d="M6945.0 327.5 L7228.0 327.5" fill="none" data-name="SprintResponse"></path>
+</g>
+<g transform="translate(6945, 149.5)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="SprintResponse" data-compartment="0">
+<g transform="translate(8, 8)" fill="#33322E" text-align="center" data-name="SprintResponse" data-compartment="0">
+<a id="src/types/index.ts.SprintResponse" xlink:href="src/types/index.ts"><text x="133.5" y="14.1" stroke="none" text-anchor="middle" data-name="SprintResponse" data-compartment="0">SprintResponse</text></a>
+
+</g>
+</g>
+<g transform="translate(6945, 181.5)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="SprintResponse" data-compartment="1">
+<g transform="translate(8, 8)" fill="#33322E" text-align="left" data-name="SprintResponse" data-compartment="1">
+<text x="0.0" y="14.1" stroke="none" data-name="SprintResponse" data-compartment="1">+id: number</text>
+<text x="0.0" y="30.3" stroke="none" data-name="SprintResponse" data-compartment="1">+name: string</text>
+<text x="0.0" y="46.5" stroke="none" data-name="SprintResponse" data-compartment="1">+state: string</text>
+<text x="0.0" y="62.7" stroke="none" data-name="SprintResponse" data-compartment="1">+startDate: string | undefined</text>
+<text x="0.0" y="78.9" stroke="none" data-name="SprintResponse" data-compartment="1">+endDate: string | undefined</text>
+<text x="0.0" y="95.1" stroke="none" data-name="SprintResponse" data-compartment="1">+completeDate: string | undefined</text>
+<text x="0.0" y="111.3" stroke="none" data-name="SprintResponse" data-compartment="1">+goal: string | undefined</text>
+<text x="0.0" y="127.5" stroke="none" data-name="SprintResponse" data-compartment="1">+boardId: number</text>
+
+</g>
+</g>
+<g transform="translate(6945, 327.5)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="SprintResponse" data-compartment="2">
+<g transform="translate(8, 8)" fill="#33322E" data-name="SprintResponse" data-compartment="2">
+
+</g>
+</g>
+</g>
+<g data-name="TextProcessor">
+<g fill="#eee8d5" stroke="#33322E" data-name="TextProcessor">
+<rect x="7268.0" y="162.0" height="161.0" width="788.0" data-name="TextProcessor"></rect>
+<path d="M7268.0 194.0 L8056.0 194.0" fill="none" data-name="TextProcessor"></path>
+<path d="M7268.0 226.0 L8056.0 226.0" fill="none" data-name="TextProcessor"></path>
+</g>
+<g transform="translate(7268, 162)" font-family="Helvetica" font-size="12pt" font-weight="bold" font-style="normal" data-name="TextProcessor" data-compartment="0">
+<g transform="translate(8, 8)" fill="#33322E" text-align="center" data-name="TextProcessor" data-compartment="0">
+<a id="src/utils/text-processing.ts.TextProcessor" xlink:href="src/utils/text-processing.ts"><text x="386.0" y="14.1" stroke="none" text-anchor="middle" data-name="TextProcessor" data-compartment="0">TextProcessor</text></a>
+
+</g>
+</g>
+<g transform="translate(7268, 194)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="TextProcessor" data-compartment="1">
+<g transform="translate(8, 8)" fill="#33322E" text-align="left" data-name="TextProcessor" data-compartment="1">
+<text x="0.0" y="14.1" stroke="none" data-name="TextProcessor" data-compartment="1">-static md: import(&quot;/home/aaron/mcp/jira-cloud/node_modules/@types/markdown-it/dist/index.cjs&quot;)</text>
+
+</g>
+</g>
+<g transform="translate(7268, 226)" font-family="Helvetica" font-size="12pt" font-weight="normal" font-style="normal" data-name="TextProcessor" data-compartment="2">
+<g transform="translate(8, 8)" fill="#33322E" text-align="left" data-name="TextProcessor" data-compartment="2">
+<text x="0.0" y="14.1" stroke="none" data-name="TextProcessor" data-compartment="2">+static markdownToAdf(): any</text>
+<text x="0.0" y="30.3" stroke="none" data-name="TextProcessor" data-compartment="2">+static extractTextFromAdf(): string</text>
+<text x="0.0" y="46.5" stroke="none" data-name="TextProcessor" data-compartment="2">+static isFieldPopulated(): boolean</text>
+<text x="0.0" y="62.7" stroke="none" data-name="TextProcessor" data-compartment="2">+static shouldExcludeField(): boolean</text>
+<text x="0.0" y="78.9" stroke="none" data-name="TextProcessor" data-compartment="2">+static formatFieldValue(): string</text>
+
+</g>
+</g>
+</g>
+</g>
+</g>
+</g>
+</g>
+</svg>
