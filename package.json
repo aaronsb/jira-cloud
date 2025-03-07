@@ -19,7 +19,7 @@
     "lint:fix": "eslint --ext .ts src/ --fix",
     "watch": "tsc --watch",
     "inspector": "npx @modelcontextprotocol/inspector build/index.js",
-    "generate-diagrams": "npx tsuml2 --glob \"./src/**/*.ts\" --output docs/generated/class-diagram && mv -f out.svg docs/generated/class-diagram.svg"
+    "generate-diagrams": "./scripts/build-diagrams.sh"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.6.0",
@@ -33,9 +33,9 @@
     "@types/node": "^20.11.24",
     "@typescript-eslint/eslint-plugin": "^5.62.0",
     "@typescript-eslint/parser": "^5.62.0",
+    "@ysk8hori/typescript-graph": "^0.24.0",
     "eslint": "^8.57.0",
     "eslint-plugin-import": "^2.31.0",
-    "tsuml2": "^0.6.2",
     "typescript": "^5.3.3"
   }
 }

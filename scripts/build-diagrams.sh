@@ -18,13 +18,13 @@ INFO_MARK="ℹ"
 # Create output directory if it doesn't exist
 mkdir -p "docs/generated"
 
-echo -e "${BLUE}${INFO_MARK} Generating class diagrams from TypeScript source...${NC}"
+echo -e "${BLUE}${INFO_MARK} Generating Mermaid class diagrams from TypeScript source...${NC}"
 
-# Run the diagram generation using tsuml2
-if npm run generate-diagrams; then
-    echo -e "${GREEN}${CHECK_MARK} Class diagrams generated successfully${NC}"
+# Run the typescript-graph diagram generation script
+if node scripts/generate-typescript-graph.js; then
+    echo -e "${GREEN}${CHECK_MARK} Mermaid class diagrams generated successfully${NC}"
 else
-    echo -e "${RED}${X_MARK} Failed to generate class diagrams${NC}"
+    echo -e "${RED}${X_MARK} Failed to generate Mermaid class diagrams${NC}"
     exit 1
 fi
 
@@ -44,7 +44,7 @@ done
 
 echo -e "\n${GREEN}Documentation build complete!${NC}"
 echo -e "${BLUE}${INFO_MARK} Generated documentation files:${NC}"
-echo -e "  - docs/generated/class-diagram.svg (Class diagram)"
-echo -e "  - docs/class-structure.md (Updated timestamp)"
+echo -e "  - docs/generated/class-diagram.md (Mermaid class diagram)"
+echo -e "  - docs/class-structure.md (Updated with Mermaid diagram and timestamp)"
 echo -e "  - docs/data-models.md (Updated timestamp)"
 echo -e "  - docs/transaction-models.md (Updated timestamp)"
