@@ -49,10 +49,16 @@
 - [ ] Optimize memory usage
 
 ### Documentation
+- [x] Create documentation restructuring plan (see docs/documentation-restructuring-plan.md)
+- [x] Update README.md according to restructuring plan
+- [ ] Fix all inconsistent references (e.g., "cline_docs/" vs "docs/")
+- [ ] Consolidate duplicated content in docs/ folder
+- [ ] Add missing documentation (troubleshooting, API reference)
+- [ ] Implement consistent formatting across all documentation
+- [ ] Integrate documentation maintenance into development workflow
 - [ ] Add API documentation
 - [ ] Create usage examples
 - [ ] Document best practices
-- [ ] Add troubleshooting guide
 
 ## Future Considerations
 

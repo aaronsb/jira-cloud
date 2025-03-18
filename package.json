@@ -19,7 +19,8 @@
     "lint:fix": "eslint --ext .ts src/ --fix",
     "watch": "tsc --watch",
     "inspector": "npx @modelcontextprotocol/inspector build/index.js",
-    "generate-diagrams": "./scripts/build-diagrams.sh"
+    "generate-diagrams": "./scripts/build-diagrams.sh",
+    "update-doc-timestamps": "node scripts/update-doc-timestamps.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.6.0",
