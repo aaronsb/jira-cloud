@@ -93,16 +93,6 @@ export async function handleListBoards(client: JiraClient): Promise<BoardRespons
   return client.listBoards();
 }
 
-export async function handleListJiraSprints(client: JiraClient, args: unknown): Promise<SprintResponse[]> {
-  const normalizedArgs = normalizeArgs(args as Record<string, unknown>);
-  const boardId = normalizedArgs.boardId as number;
-  
-  if (typeof boardId !== 'number') {
-    throw new McpError(ErrorCode.InvalidParams, 'Invalid sprint arguments. Board ID must be a number.');
-  }
-  
-  return client.listBoardSprints(boardId);
-}
 
 export async function setupBoardHandlers(
   server: Server,
@@ -242,26 +232,6 @@ export async function setupBoardHandlers(
       }
     }
 
-    case 'list_jira_sprints': {
-      console.error('Processing list_jira_sprints request');
-      try {
-        const sprints = await handleListJiraSprints(jiraClient, normalizedArgs);
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(sprints, null, 2),
-            },
-          ],
-        };
-      } catch (error) {
-        console.error('Error in list_jira_sprints:', error);
-        if (error instanceof Error) {
-          throw new McpError(ErrorCode.InvalidRequest, `Jira API error: ${error.message}`);
-        }
-        throw new McpError(ErrorCode.InvalidRequest, 'Failed to list sprints');
-      }
-    }
 
     default: {
       console.error(`Unknown tool requested: ${name}`);

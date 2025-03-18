@@ -11,13 +11,6 @@ type SearchIssuesArgs = {
   expand?: string[];
 };
 
-type GetFilterIssuesArgs = {
-  filterId: string;
-};
-
-type ListMyFiltersArgs = {
-  expand?: boolean;
-};
 
 // Helper function to normalize parameter names (support both snake_case and camelCase)
 function normalizeArgs(args: Record<string, unknown>): Record<string, unknown> {
@@ -93,42 +86,6 @@ function isSearchIssuesArgs(args: unknown): args is SearchIssuesArgs {
   return true;
 }
 
-function isGetFilterIssuesArgs(args: unknown): args is GetFilterIssuesArgs {
-  if (typeof args !== 'object' || args === null) {
-    throw new McpError(
-      ErrorCode.InvalidParams,
-      `Invalid get_jira_filter_issues arguments: Expected an object with a filterId parameter. Example: { "filterId": "12345" } or { "filter_id": "12345" }`
-    );
-  }
-
-  const normalizedArgs = normalizeArgs(args as Record<string, unknown>);
-  
-  if (typeof normalizedArgs.filterId !== 'string') {
-    throw new McpError(
-      ErrorCode.InvalidParams,
-      `Missing or invalid filterId parameter. Please provide a valid filter ID using either "filterId" or "filter_id". Example: { "filterId": "12345" }`
-    );
-  }
-  
-  return true;
-}
-
-function isListMyFiltersArgs(args: unknown): args is ListMyFiltersArgs {
-  if (typeof args !== 'object' || args === null) {
-    return false;
-  }
-  
-  const typedArgs = args as ListMyFiltersArgs;
-  
-  if (typedArgs.expand !== undefined && typeof typedArgs.expand !== 'boolean') {
-    throw new McpError(
-      ErrorCode.InvalidParams,
-      'Invalid expand parameter. Expected a boolean value.'
-    );
-  }
-  
-  return true;
-}
 
 export async function setupSearchHandlers(
   server: Server,
@@ -196,73 +153,6 @@ export async function setupSearchHandlers(
         }
       }
 
-      case 'get_jira_filter_issues': {
-        console.error('Processing get_jira_filter_issues request');
-        if (!isGetFilterIssuesArgs(normalizedArgs)) {
-          throw new McpError(ErrorCode.InvalidParams, 'Invalid get_jira_filter_issues arguments');
-        }
-
-        try {
-          console.error(`Executing filter issues with args:`, JSON.stringify(normalizedArgs, null, 2));
-          const issues = await jiraClient.getFilterIssues(normalizedArgs.filterId as string);
-          
-          // Create a search result data structure
-          const searchResultData: SearchResultData = {
-            issues,
-            pagination: {
-              startAt: 0,
-              maxResults: issues.length,
-              total: issues.length,
-              hasMore: false
-            }
-          };
-          
-          // Format the response using the SearchFormatter
-          const formattedResponse = SearchFormatter.formatSearchResult(searchResultData);
-
-          return {
-            content: [
-              {
-                type: 'text',
-                text: JSON.stringify(formattedResponse, null, 2),
-              },
-            ],
-          };
-        } catch (error) {
-          console.error('Error in get_jira_filter_issues:', error);
-          if (error instanceof Error) {
-            throw new McpError(ErrorCode.InvalidRequest, `Jira API error: ${error.message}`);
-          }
-          throw new McpError(ErrorCode.InvalidRequest, 'Failed to get filter issues');
-        }
-      }
-
-      case 'list_jira_filters': {
-        console.error('Processing list_jira_filters request');
-        if (!isListMyFiltersArgs(normalizedArgs)) {
-          throw new McpError(ErrorCode.InvalidParams, 'Invalid list_jira_filters arguments');
-        }
-
-        try {
-          console.error(`Executing list filters with args:`, JSON.stringify(normalizedArgs, null, 2));
-          const filters = await jiraClient.listMyFilters(normalizedArgs.expand || false);
-
-          return {
-            content: [
-              {
-                type: 'text',
-                text: JSON.stringify(filters, null, 2),
-              },
-            ],
-          };
-        } catch (error) {
-          console.error('Error in list_jira_filters:', error);
-          if (error instanceof Error) {
-            throw new McpError(ErrorCode.InvalidRequest, `Jira API error: ${error.message}`);
-          }
-          throw new McpError(ErrorCode.InvalidRequest, 'Failed to list filters');
-        }
-      }
 
       default: {
         console.error(`Unknown tool requested: ${name}`);

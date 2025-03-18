@@ -23,8 +23,8 @@ export interface ResponseSummary {
 
 export interface FormattedResponse<T> {
   data: T;
-  metadata?: ResponseMetadata;
-  summary?: ResponseSummary;
+  _metadata?: ResponseMetadata;
+  _summary?: ResponseSummary;
 }
 
 export class BaseFormatter {
@@ -42,8 +42,8 @@ export class BaseFormatter {
   ): FormattedResponse<T> {
     return {
       data,
-      ...(metadata && { metadata }),
-      ...(summary && { summary }),
+      ...(metadata && { _metadata: metadata }),
+      ...(summary && { _summary: summary }),
     };
   }
 

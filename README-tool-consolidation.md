@@ -20,7 +20,7 @@ All responses now follow this consistent structure:
   "data": {
     // Primary requested data
   },
-  "metadata": {
+  "_metadata": {
     "expansions": ["field1", "field2", ...],
     "related": {
       "parent": "PROJ-123",
@@ -28,7 +28,7 @@ All responses now follow this consistent structure:
     },
     "pagination": { ... }
   },
-  "summary": {
+  "_summary": {
     "status_counts": { ... },
     "suggested_actions": [ ... ]
   }
@@ -153,14 +153,14 @@ Response:
       }
     ]
   },
-  "metadata": {
+  "_metadata": {
     "expansions": ["attachments", "related_issues", "history"],
     "related": {
       "parent": "PROJ-100",
       "linked_issues": ["PROJ-124", "PROJ-125"]
     }
   },
-  "summary": {
+  "_summary": {
     "suggested_actions": [
       {
         "text": "Move to Done",
@@ -213,10 +213,10 @@ Response:
       }
     ]
   },
-  "metadata": {
+  "_metadata": {
     "expansions": ["components", "versions", "recent_issues"]
   },
-  "summary": {
+  "_summary": {
     "status_counts": {
       "To Do": 5,
       "In Progress": 3,
@@ -233,16 +233,3 @@ Response:
   }
 }
 ```
-
-## Migration Guide
-
-If you're using the previous API, here's how to migrate to the new consolidated API:
-
-| Old API | New API |
-|---------|---------|
-| `get_jira_issue` | `get_jira_issue` with no expansions |
-| `get_jira_issue_details` | `get_jira_issue` with `expand: ["comments"]` |
-| `get_jira_issue_attachments` | `get_jira_issue` with `expand: ["attachments"]` |
-| `get_jira_transitions` | `get_jira_issue` with `expand: ["transitions"]` |
-| `list_jira_boards` | `list_jira_boards` with no options |
-| `list_jira_sprints` | `get_jira_board` with `expand: ["sprints"]` |

@@ -129,12 +129,12 @@ class JiraServer {
 
       try {
         // Issue-related tools
-        if (['get_jira_issue', 'get_jira_issue_details', 'get_jira_issue_attachments', 'update_jira_issue', 'add_jira_comment', 'get_jira_transitions', 'get_jira_fields', 'transition_jira_issue', 'create_jira_issue'].includes(name)) {
+        if (['get_jira_issue', 'update_jira_issue', 'add_jira_comment', 'transition_jira_issue', 'create_jira_issue'].includes(name)) {
           return await setupIssueHandlers(this.server, this.jiraClient, request);
         }
         
         // Search-related tools
-        if (['search_jira_issues', 'get_jira_filter_issues', 'list_jira_filters'].includes(name)) {
+        if (['search_jira_issues'].includes(name)) {
           return await setupSearchHandlers(this.server, this.jiraClient, request);
         }
 
@@ -144,7 +144,7 @@ class JiraServer {
         }
 
         // Board-related tools
-        if (['list_jira_boards', 'get_jira_board', 'list_jira_sprints'].includes(name)) {
+        if (['list_jira_boards', 'get_jira_board'].includes(name)) {
           return await setupBoardHandlers(this.server, this.jiraClient, request);
         }
 

@@ -13,6 +13,7 @@ This document tracks the remaining work for the Jira Cloud MCP tool consolidatio
 - [x] Implement enhanced Search API
 - [x] Update main server routing
 - [x] Create documentation for the new API
+- [x] Clean up old tool references from routing logic
 
 ## Remaining Work
 

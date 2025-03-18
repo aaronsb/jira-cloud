@@ -1,52 +1,123 @@
 import { z } from 'zod';
 
-export const GetIssueSchema = z.object({
+// Consolidated API request schemas
+export const GetJiraIssueSchema = z.object({
   method: z.literal('tools/call'),
   params: z.object({
     name: z.literal('get_jira_issue'),
     arguments: z.object({
       issueKey: z.string(),
-      includeComments: z.boolean().optional(),
+      expand: z.array(z.string()).optional(),
     }),
   }),
 });
 
-export const GetPopulatedFieldsSchema = z.object({
+export const GetJiraProjectSchema = z.object({
   method: z.literal('tools/call'),
   params: z.object({
-    name: z.literal('get_populated_fields'),
+    name: z.literal('get_jira_project'),
     arguments: z.object({
-      issueKey: z.string(),
+      projectKey: z.string(),
+      expand: z.array(z.string()).optional(),
+      include_status_counts: z.boolean().optional(),
     }),
   }),
 });
 
-export const GetTransitionsSchema = z.object({
+export const GetJiraBoardSchema = z.object({
   method: z.literal('tools/call'),
   params: z.object({
-    name: z.literal('get_transitions'),
+    name: z.literal('get_jira_board'),
     arguments: z.object({
-      issueKey: z.string(),
+      boardId: z.number(),
+      expand: z.array(z.string()).optional(),
     }),
   }),
 });
 
-export const UpdateIssueSchema = z.object({
+export const SearchJiraIssuesSchema = z.object({
   method: z.literal('tools/call'),
   params: z.object({
-    name: z.literal('update_issue'),
+    name: z.literal('search_jira_issues'),
+    arguments: z.object({
+      jql: z.string(),
+      startAt: z.number().optional(),
+      maxResults: z.number().optional(),
+      expand: z.array(z.string()).optional(),
+    }),
+  }),
+});
+
+export const ListJiraProjectsSchema = z.object({
+  method: z.literal('tools/call'),
+  params: z.object({
+    name: z.literal('list_jira_projects'),
+    arguments: z.object({
+      include_status_counts: z.boolean().optional(),
+    }),
+  }),
+});
+
+export const ListJiraBoardsSchema = z.object({
+  method: z.literal('tools/call'),
+  params: z.object({
+    name: z.literal('list_jira_boards'),
+    arguments: z.object({
+      include_sprints: z.boolean().optional(),
+    }),
+  }),
+});
+
+export const CreateJiraIssueSchema = z.object({
+  method: z.literal('tools/call'),
+  params: z.object({
+    name: z.literal('create_jira_issue'),
+    arguments: z.object({
+      projectKey: z.string(),
+      summary: z.string(),
+      description: z.string().optional(),
+      issueType: z.string(),
+      priority: z.string().optional(),
+      assignee: z.string().optional(),
+      labels: z.array(z.string()).optional(),
+      customFields: z.record(z.any()).optional(),
+    }),
+  }),
+});
+
+export const UpdateJiraIssueSchema = z.object({
+  method: z.literal('tools/call'),
+  params: z.object({
+    name: z.literal('update_jira_issue'),
     arguments: z.object({
       issueKey: z.string(),
       summary: z.string().optional(),
       description: z.string().optional(),
+      parent: z.union([z.string(), z.null()]).optional(),
+      assignee: z.string().optional(),
+      priority: z.string().optional(),
+      labels: z.array(z.string()).optional(),
+      customFields: z.record(z.any()).optional(),
     }),
   }),
 });
 
-export const AddCommentSchema = z.object({
+export const TransitionJiraIssueSchema = z.object({
   method: z.literal('tools/call'),
   params: z.object({
-    name: z.literal('add_comment'),
+    name: z.literal('transition_jira_issue'),
+    arguments: z.object({
+      issueKey: z.string(),
+      transitionId: z.string(),
+      comment: z.string().optional(),
+    }),
+  }),
+});
+
+export const AddJiraCommentSchema = z.object({
+  method: z.literal('tools/call'),
+  params: z.object({
+    name: z.literal('add_jira_comment'),
     arguments: z.object({
       issueKey: z.string(),
       body: z.string(),
@@ -54,43 +125,14 @@ export const AddCommentSchema = z.object({
   }),
 });
 
-export const SearchIssuesSchema = z.object({
-  method: z.literal('tools/call'),
-  params: z.object({
-    name: z.literal('search_issues'),
-    arguments: z.object({
-      jql: z.string(),
-      startAt: z.number().optional(),
-      maxResults: z.number().optional(),
-    }),
-  }),
-});
-
-export const GetFilterIssuesSchema = z.object({
-  method: z.literal('tools/call'),
-  params: z.object({
-    name: z.literal('get_filter_issues'),
-    arguments: z.object({
-      filterId: z.string(),
-    }),
-  }),
-});
-
-export const ListMyFiltersSchema = z.object({
-  method: z.literal('tools/call'),
-  params: z.object({
-    name: z.literal('list_my_filters'),
-    arguments: z.object({
-      expand: z.boolean().optional(),
-    }),
-  }),
-});
-
-export type GetIssueRequest = z.infer<typeof GetIssueSchema>;
-export type GetPopulatedFieldsRequest = z.infer<typeof GetPopulatedFieldsSchema>;
-export type GetTransitionsRequest = z.infer<typeof GetTransitionsSchema>;
-export type UpdateIssueRequest = z.infer<typeof UpdateIssueSchema>;
-export type AddCommentRequest = z.infer<typeof AddCommentSchema>;
-export type SearchIssuesRequest = z.infer<typeof SearchIssuesSchema>;
-export type GetFilterIssuesRequest = z.infer<typeof GetFilterIssuesSchema>;
-export type ListMyFiltersRequest = z.infer<typeof ListMyFiltersSchema>;
+// Export types
+export type GetJiraIssueRequest = z.infer<typeof GetJiraIssueSchema>;
+export type GetJiraProjectRequest = z.infer<typeof GetJiraProjectSchema>;
+export type GetJiraBoardRequest = z.infer<typeof GetJiraBoardSchema>;
+export type SearchJiraIssuesRequest = z.infer<typeof SearchJiraIssuesSchema>;
+export type ListJiraProjectsRequest = z.infer<typeof ListJiraProjectsSchema>;
+export type ListJiraBoardsRequest = z.infer<typeof ListJiraBoardsSchema>;
+export type CreateJiraIssueRequest = z.infer<typeof CreateJiraIssueSchema>;
+export type UpdateJiraIssueRequest = z.infer<typeof UpdateJiraIssueSchema>;
+export type TransitionJiraIssueRequest = z.infer<typeof TransitionJiraIssueSchema>;
+export type AddJiraCommentRequest = z.infer<typeof AddJiraCommentSchema>;
