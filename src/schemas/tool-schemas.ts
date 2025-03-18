@@ -1,4 +1,88 @@
 export const toolSchemas = {
+  // Consolidated Sprint Management API
+  manage_jira_sprint: {
+    name: 'manage_jira_sprint',
+    description: 'Comprehensive sprint management with CRUD operations and issue management',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        operation: {
+          type: 'string',
+          enum: ['get', 'create', 'update', 'delete', 'list', 'manage_issues'],
+          description: 'Operation to perform on the sprint',
+        },
+        // Parameters for get operation
+        sprintId: {
+          type: 'integer',
+          description: 'The ID of the sprint. Required for get, update, delete, and manage_issues operations. Can also use snake_case "sprint_id".',
+        },
+        // Parameters for create operation
+        boardId: {
+          type: 'integer',
+          description: 'The ID of the board. Required for create and list operations. Can also use snake_case "board_id".',
+        },
+        name: {
+          type: 'string',
+          description: 'Name of the sprint. Required for create operation, optional for update.',
+        },
+        // Common parameters for create and update
+        startDate: {
+          type: 'string',
+          description: 'Start date for the sprint in ISO format (e.g., "2025-03-20T00:00:00.000Z"). Can also use snake_case "start_date".',
+        },
+        endDate: {
+          type: 'string',
+          description: 'End date for the sprint in ISO format (e.g., "2025-04-03T00:00:00.000Z"). Can also use snake_case "end_date".',
+        },
+        goal: {
+          type: 'string',
+          description: 'Goal or objective for the sprint',
+        },
+        state: {
+          type: 'string',
+          enum: ['future', 'active', 'closed'],
+          description: 'Sprint state. Used for filtering in list operation or changing state in update operation.',
+        },
+        // Parameters for list operation
+        startAt: {
+          type: 'integer',
+          description: 'Index of the first sprint to return (0-based). Used for list operation. Can also use snake_case "start_at".',
+          default: 0,
+        },
+        maxResults: {
+          type: 'integer',
+          description: 'Maximum number of sprints to return. Used for list operation. Can also use snake_case "max_results".',
+          default: 50,
+        },
+        // Parameters for manage_issues operation
+        add: {
+          type: 'array',
+          items: {
+            type: 'string',
+          },
+          description: 'Array of issue keys to add to the sprint. Used for manage_issues operation.',
+        },
+        remove: {
+          type: 'array',
+          items: {
+            type: 'string',
+          },
+          description: 'Array of issue keys to remove from the sprint. Used for manage_issues operation.',
+        },
+        // Common expansion options
+        expand: {
+          type: 'array',
+          items: {
+            type: 'string',
+            enum: ['issues', 'report', 'board'],
+          },
+          description: 'Optional fields to include in the response',
+        },
+      },
+      required: ['operation'],
+    },
+  },
+
   // Enhanced Issue API
   get_jira_issue: {
     name: 'get_jira_issue',

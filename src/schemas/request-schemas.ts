@@ -1,5 +1,82 @@
 import { z } from 'zod';
 
+// Sprint Management Schemas
+export const CreateJiraSprintSchema = z.object({
+  method: z.literal('tools/call'),
+  params: z.object({
+    name: z.literal('create_jira_sprint'),
+    arguments: z.object({
+      boardId: z.number(),
+      name: z.string(),
+      startDate: z.string().optional(),
+      endDate: z.string().optional(),
+      goal: z.string().optional(),
+    }),
+  }),
+});
+
+export const GetJiraSprintSchema = z.object({
+  method: z.literal('tools/call'),
+  params: z.object({
+    name: z.literal('get_jira_sprint'),
+    arguments: z.object({
+      sprintId: z.number(),
+      expand: z.array(z.string()).optional(),
+    }),
+  }),
+});
+
+export const ListJiraSprintsSchema = z.object({
+  method: z.literal('tools/call'),
+  params: z.object({
+    name: z.literal('list_jira_sprints'),
+    arguments: z.object({
+      boardId: z.number(),
+      state: z.enum(['future', 'active', 'closed']).optional(),
+      startAt: z.number().optional(),
+      maxResults: z.number().optional(),
+      expand: z.array(z.string()).optional(),
+    }),
+  }),
+});
+
+export const UpdateJiraSprintSchema = z.object({
+  method: z.literal('tools/call'),
+  params: z.object({
+    name: z.literal('update_jira_sprint'),
+    arguments: z.object({
+      sprintId: z.number(),
+      name: z.string().optional(),
+      goal: z.string().optional(),
+      startDate: z.string().optional(),
+      endDate: z.string().optional(),
+      state: z.enum(['future', 'active', 'closed']).optional(),
+    }),
+  }),
+});
+
+export const DeleteJiraSprintSchema = z.object({
+  method: z.literal('tools/call'),
+  params: z.object({
+    name: z.literal('delete_jira_sprint'),
+    arguments: z.object({
+      sprintId: z.number(),
+    }),
+  }),
+});
+
+export const UpdateSprintIssuesSchema = z.object({
+  method: z.literal('tools/call'),
+  params: z.object({
+    name: z.literal('update_sprint_issues'),
+    arguments: z.object({
+      sprintId: z.number(),
+      add: z.array(z.string()).optional(),
+      remove: z.array(z.string()).optional(),
+    }),
+  }),
+});
+
 // Consolidated API request schemas
 export const GetJiraIssueSchema = z.object({
   method: z.literal('tools/call'),
@@ -136,3 +213,11 @@ export type CreateJiraIssueRequest = z.infer<typeof CreateJiraIssueSchema>;
 export type UpdateJiraIssueRequest = z.infer<typeof UpdateJiraIssueSchema>;
 export type TransitionJiraIssueRequest = z.infer<typeof TransitionJiraIssueSchema>;
 export type AddJiraCommentRequest = z.infer<typeof AddJiraCommentSchema>;
+
+// Sprint types
+export type CreateJiraSprintRequest = z.infer<typeof CreateJiraSprintSchema>;
+export type GetJiraSprintRequest = z.infer<typeof GetJiraSprintSchema>;
+export type ListJiraSprintsRequest = z.infer<typeof ListJiraSprintsSchema>;
+export type UpdateJiraSprintRequest = z.infer<typeof UpdateJiraSprintSchema>;
+export type DeleteJiraSprintRequest = z.infer<typeof DeleteJiraSprintSchema>;
+export type UpdateSprintIssuesRequest = z.infer<typeof UpdateSprintIssuesSchema>;

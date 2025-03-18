@@ -16,6 +16,7 @@ import { setupBoardHandlers } from './handlers/board-handlers.js';
 import { setupIssueHandlers } from './handlers/issue-handlers.js';
 import { setupProjectHandlers } from './handlers/project-handlers.js';
 import { setupSearchHandlers } from './handlers/search-handlers.js';
+import { setupSprintHandlers } from './handlers/sprint-handlers.js';
 import { toolSchemas } from './schemas/tool-schemas.js';
 
 // Jira credentials from environment variables
@@ -146,6 +147,19 @@ class JiraServer {
         // Board-related tools
         if (['list_jira_boards', 'get_jira_board'].includes(name)) {
           return await setupBoardHandlers(this.server, this.jiraClient, request);
+        }
+
+        // Sprint-related tools
+        if ([
+          'create_jira_sprint', 
+          'get_jira_sprint', 
+          'list_jira_sprints', 
+          'update_jira_sprint', 
+          'delete_jira_sprint', 
+          'update_sprint_issues',
+          'manage_jira_sprint' // Add the new consolidated tool
+        ].includes(name)) {
+          return await setupSprintHandlers(this.server, this.jiraClient, request);
         }
 
         console.error(`Unknown tool requested: ${name}`);
