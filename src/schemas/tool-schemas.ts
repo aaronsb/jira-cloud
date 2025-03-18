@@ -1,137 +1,85 @@
 export const toolSchemas = {
-  list_jira_boards: {
-    name: 'list_jira_boards',
-    description: 'Get a list of all boards in Jira',
+  // Enhanced Issue API
+  get_jira_issue: {
+    name: 'get_jira_issue',
+    description: 'Get comprehensive information about a Jira issue with optional expansions',
     inputSchema: {
       type: 'object',
-      properties: {},
+      properties: {
+        issueKey: {
+          type: 'string',
+          description: 'The Jira issue key (e.g., WORK-123). Can also use snake_case "issue_key".',
+        },
+        expand: {
+          type: 'array',
+          items: {
+            type: 'string',
+            enum: ['comments', 'transitions', 'attachments', 'related_issues', 'history'],
+          },
+          description: 'Optional fields to include in the response',
+        },
+      },
+      required: ['issueKey'],
     },
   },
-  list_jira_sprints: {
-    name: 'list_jira_sprints',
-    description: 'Get a list of all sprints in a Jira board',
+
+  // Enhanced Project API
+  get_jira_project: {
+    name: 'get_jira_project',
+    description: 'Get comprehensive information about a Jira project with optional expansions',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        projectKey: {
+          type: 'string',
+          description: 'The Jira project key (e.g., PROJ). Can also use snake_case "project_key".',
+        },
+        expand: {
+          type: 'array',
+          items: {
+            type: 'string',
+            enum: ['boards', 'components', 'versions', 'recent_issues'],
+          },
+          description: 'Optional fields to include in the response',
+        },
+        include_status_counts: {
+          type: 'boolean',
+          description: 'Whether to include issue counts by status',
+          default: true,
+        },
+      },
+      required: ['projectKey'],
+    },
+  },
+
+  // Enhanced Board API
+  get_jira_board: {
+    name: 'get_jira_board',
+    description: 'Get comprehensive information about a Jira board with optional expansions',
     inputSchema: {
       type: 'object',
       properties: {
         boardId: {
           type: 'integer',
-          description: 'The ID of the board to get sprints from. Can also use snake_case "board_id".',
+          description: 'The ID of the board. Can also use snake_case "board_id".',
+        },
+        expand: {
+          type: 'array',
+          items: {
+            type: 'string',
+            enum: ['sprints', 'issues', 'configuration'],
+          },
+          description: 'Optional fields to include in the response',
         },
       },
       required: ['boardId'],
     },
   },
-  list_jira_projects: {
-    name: 'list_jira_projects',
-    description: 'Get a list of all projects in Jira',
-    inputSchema: {
-      type: 'object',
-      properties: {},
-    },
-  },
-  get_jira_issue: {
-    name: 'get_jira_issue',
-    description: 'Get basic information about a Jira issue',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        issueKey: {
-          type: 'string',
-          description: 'The Jira issue key (e.g., WORK-123). Can also use snake_case "issue_key".',
-        },
-      },
-      required: ['issueKey'],
-    },
-  },
-  get_jira_issue_details: {
-    name: 'get_jira_issue_details',
-    description: 'Get comprehensive information about a Jira issue including comments',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        issueKey: {
-          type: 'string',
-          description: 'The Jira issue key (e.g., WORK-123). Can also use snake_case "issue_key".',
-        },
-      },
-      required: ['issueKey'],
-    },
-  },
-  get_jira_issue_attachments: {
-    name: 'get_jira_issue_attachments',
-    description: 'Get all attachments for a Jira issue with metadata and download URLs',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        issueKey: {
-          type: 'string',
-          description: 'The Jira issue key (e.g., WORK-123). Can also use snake_case "issue_key".',
-        },
-      },
-      required: ['issueKey'],
-    },
-  },
-  get_jira_filter_issues: {
-    name: 'get_jira_filter_issues',
-    description: 'Get all issues from a saved Jira filter',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        filterId: {
-          type: 'string',
-          description: 'The ID of the saved Jira filter. Can also use snake_case "filter_id".',
-        },
-      },
-      required: ['filterId'],
-    },
-  },
-  update_jira_issue: {
-    name: 'update_jira_issue',
-    description: 'Update the summary, description, and/or parent of a Jira issue',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        issueKey: {
-          type: 'string',
-          description: 'The Jira issue key (e.g., WORK-123). Can also use snake_case "issue_key".',
-        },
-        summary: {
-          type: 'string',
-          description: 'The new summary for the issue',
-        },
-        description: {
-          type: 'string',
-          description: 'The new description for the issue',
-        },
-        parent: {
-          type: ['string', 'null'],
-          description: 'The key of the parent issue (e.g., PROJ-123) or null to remove parent',
-        },
-      },
-      required: ['issueKey'],
-    },
-  },
-  add_jira_comment: {
-    name: 'add_jira_comment',
-    description: 'Add a comment to a Jira issue',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        issueKey: {
-          type: 'string',
-          description: 'The Jira issue key (e.g., WORK-123). Can also use snake_case "issue_key".',
-        },
-        body: {
-          type: 'string',
-          description: 'The comment text',
-        },
-      },
-      required: ['issueKey', 'body'],
-    },
-  },
+
+  // Enhanced Search API
   search_jira_issues: {
     name: 'search_jira_issues',
-    description: 'Search for issues using JQL with pagination support',
+    description: 'Search for issues using JQL with enhanced results and optional expansions',
     inputSchema: {
       type: 'object',
       properties: {
@@ -167,74 +115,52 @@ export const toolSchemas = {
           default: 25,
           maximum: 100,
         },
+        expand: {
+          type: 'array',
+          items: {
+            type: 'string',
+            enum: ['issue_details', 'transitions', 'comments_preview'],
+          },
+          description: 'Optional fields to include in the response',
+        },
       },
       required: ['jql'],
     },
   },
-  get_jira_transitions: {
-    name: 'get_jira_transitions',
-    description: 'Get all allowed transitions for a Jira issue',
+
+  // List Projects (simplified)
+  list_jira_projects: {
+    name: 'list_jira_projects',
+    description: 'Get a list of all projects in Jira',
     inputSchema: {
       type: 'object',
       properties: {
-        issueKey: {
-          type: 'string',
-          description: 'The Jira issue key (e.g., WORK-123). Can also use snake_case "issue_key".',
-        },
-      },
-      required: ['issueKey'],
-    },
-  },
-  get_jira_fields: {
-    name: 'get_jira_fields',
-    description: 'Get all populated fields for a Jira issue, excluding empty fields and system metadata',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        issueKey: {
-          type: 'string',
-          description: 'The Jira issue key (e.g., WORK-123). Can also use snake_case "issue_key".',
-        },
-      },
-      required: ['issueKey'],
-    },
-  },
-  list_jira_filters: {
-    name: 'list_jira_filters',
-    description: 'List all Jira filters owned by the authenticated user',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        expand: {
+        include_status_counts: {
           type: 'boolean',
-          description: 'Whether to include additional filter details like description and JQL',
+          description: 'Whether to include issue counts by status',
           default: false,
         },
       },
     },
   },
-  transition_jira_issue: {
-    name: 'transition_jira_issue',
-    description: 'Transition a Jira issue to a new status with an optional comment',
+
+  // List Boards (simplified)
+  list_jira_boards: {
+    name: 'list_jira_boards',
+    description: 'Get a list of all boards in Jira',
     inputSchema: {
       type: 'object',
       properties: {
-        issueKey: {
-          type: 'string',
-          description: 'The Jira issue key (e.g., WORK-123). Can also use snake_case "issue_key".',
-        },
-        transitionId: {
-          type: 'string',
-          description: 'The ID of the transition to perform. Can also use snake_case "transition_id".',
-        },
-        comment: {
-          type: 'string',
-          description: 'Optional comment to add with the transition',
+        include_sprints: {
+          type: 'boolean',
+          description: 'Whether to include active sprints for each board',
+          default: false,
         },
       },
-      required: ['issueKey', 'transitionId'],
     },
   },
+
+  // Retained for compatibility - Create, Update, Transition
   create_jira_issue: {
     name: 'create_jira_issue',
     description: 'Create a new Jira issue',
@@ -278,6 +204,94 @@ export const toolSchemas = {
         },
       },
       required: ['projectKey', 'summary', 'issueType'],
+    },
+  },
+
+  update_jira_issue: {
+    name: 'update_jira_issue',
+    description: 'Update a Jira issue',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        issueKey: {
+          type: 'string',
+          description: 'The Jira issue key (e.g., WORK-123). Can also use snake_case "issue_key".',
+        },
+        summary: {
+          type: 'string',
+          description: 'The new summary for the issue',
+        },
+        description: {
+          type: 'string',
+          description: 'The new description for the issue',
+        },
+        parent: {
+          type: ['string', 'null'],
+          description: 'The key of the parent issue (e.g., PROJ-123) or null to remove parent',
+        },
+        assignee: {
+          type: 'string',
+          description: 'Username of the assignee',
+        },
+        priority: {
+          type: 'string',
+          description: 'Issue priority (e.g., High, Medium, Low)',
+        },
+        labels: {
+          type: 'array',
+          items: {
+            type: 'string'
+          },
+          description: 'Array of labels to apply to the issue',
+        },
+        customFields: {
+          type: 'object',
+          description: 'Custom field values as key-value pairs',
+        },
+      },
+      required: ['issueKey'],
+    },
+  },
+
+  transition_jira_issue: {
+    name: 'transition_jira_issue',
+    description: 'Transition a Jira issue to a new status with an optional comment',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        issueKey: {
+          type: 'string',
+          description: 'The Jira issue key (e.g., WORK-123). Can also use snake_case "issue_key".',
+        },
+        transitionId: {
+          type: 'string',
+          description: 'The ID of the transition to perform. Can also use snake_case "transition_id".',
+        },
+        comment: {
+          type: 'string',
+          description: 'Optional comment to add with the transition',
+        },
+      },
+      required: ['issueKey', 'transitionId'],
+    },
+  },
+
+  add_jira_comment: {
+    name: 'add_jira_comment',
+    description: 'Add a comment to a Jira issue',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        issueKey: {
+          type: 'string',
+          description: 'The Jira issue key (e.g., WORK-123). Can also use snake_case "issue_key".',
+        },
+        body: {
+          type: 'string',
+          description: 'The comment text',
+        },
+      },
+      required: ['issueKey', 'body'],
     },
   },
 };

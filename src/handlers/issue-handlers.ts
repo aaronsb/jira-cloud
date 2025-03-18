@@ -2,25 +2,11 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema, ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import { JiraClient } from '../client/jira-client.js';
+import { IssueExpansionOptions, IssueFormatter } from '../utils/formatters/index.js';
 
 type GetIssueArgs = {
   issueKey: string;
-};
-
-type GetIssueDetailsArgs = {
-  issueKey: string;
-};
-
-type GetIssueAttachmentsArgs = {
-  issueKey: string;
-};
-
-// Basic issue response type for get_issue
-type BasicIssueResponse = {
-  key: string;
-  summary: string;
-  status: string;
-  assignee: string | null;
+  expand?: string[];
 };
 
 type UpdateIssueArgs = {
@@ -28,6 +14,10 @@ type UpdateIssueArgs = {
   summary?: string;
   description?: string;
   parent?: string | null;
+  assignee?: string;
+  priority?: string;
+  labels?: string[];
+  customFields?: Record<string, any>;
 };
 
 type AddCommentArgs = {
@@ -59,6 +49,10 @@ function normalizeArgs(args: Record<string, unknown>): Record<string, unknown> {
     // Convert snake_case to camelCase
     if (key === 'issue_key') {
       normalized['issueKey'] = value;
+    } else if (key === 'project_key') {
+      normalized['projectKey'] = value;
+    } else if (key === 'transition_id') {
+      normalized['transitionId'] = value;
     } else {
       normalized[key] = value;
     }
@@ -95,16 +89,28 @@ function validateIssueKey(args: unknown, toolName: string): void {
 
 function isGetIssueArgs(args: unknown): args is GetIssueArgs {
   validateIssueKey(args, 'get_jira_issue');
-  return true;
-}
-
-function isGetIssueDetailsArgs(args: unknown): args is GetIssueDetailsArgs {
-  validateIssueKey(args, 'get_jira_issue_details');
-  return true;
-}
-
-function isGetIssueAttachmentsArgs(args: unknown): args is GetIssueAttachmentsArgs {
-  validateIssueKey(args, 'get_jira_issue_attachments');
+  
+  // Validate expand parameter if present
+  const typedArgs = args as GetIssueArgs;
+  if (typedArgs.expand !== undefined) {
+    if (!Array.isArray(typedArgs.expand)) {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        'Invalid expand parameter. Expected an array of strings.'
+      );
+    }
+    
+    const validExpansions = ['comments', 'transitions', 'attachments', 'related_issues', 'history'];
+    for (const expansion of typedArgs.expand) {
+      if (typeof expansion !== 'string' || !validExpansions.includes(expansion)) {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          `Invalid expansion: ${expansion}. Valid expansions are: ${validExpansions.join(', ')}`
+        );
+      }
+    }
+  }
+  
   return true;
 }
 
@@ -153,11 +159,6 @@ function isTransitionIssueArgs(args: unknown): args is TransitionIssueArgs {
   return true;
 }
 
-function hasIssueKey(args: unknown): args is { issueKey: string } {
-  validateIssueKey(args, 'get_jira_populated_fields');
-  return true;
-}
-
 export async function setupIssueHandlers(
   server: Server,
   jiraClient: JiraClient,
@@ -189,94 +190,37 @@ export async function setupIssueHandlers(
           throw new McpError(ErrorCode.InvalidParams, 'Invalid get_issue arguments');
         }
 
-        const issue = await jiraClient.getIssue(normalizedArgs.issueKey as string, false);
+        // Parse expansion options
+        const expansionOptions: IssueExpansionOptions = {};
+        if (normalizedArgs.expand) {
+          for (const expansion of normalizedArgs.expand as string[]) {
+            expansionOptions[expansion as keyof IssueExpansionOptions] = true;
+          }
+        }
+
+        // Get issue with requested expansions
+        const includeComments = expansionOptions.comments || false;
+        const includeAttachments = expansionOptions.attachments || false;
+        const issue = await jiraClient.getIssue(
+          normalizedArgs.issueKey as string, 
+          includeComments, 
+          includeAttachments
+        );
         
-        // Return only basic information
-        const basicResponse: BasicIssueResponse = {
-          key: issue.key,
-          summary: issue.summary,
-          status: issue.status,
-          assignee: issue.assignee,
-        };
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(basicResponse, null, 2),
-            },
-          ],
-        };
-      }
-
-      case 'get_jira_issue_details': {
-        console.error('Processing get_jira_issue_details request');
-        if (!isGetIssueDetailsArgs(normalizedArgs)) {
-          throw new McpError(ErrorCode.InvalidParams, 'Invalid get_issue_details arguments');
+        // Get transitions if requested
+        let transitions = undefined;
+        if (expansionOptions.transitions) {
+          transitions = await jiraClient.getTransitions(normalizedArgs.issueKey as string);
         }
-
-        // Get full issue details including comments but not attachments
-        const issue = await jiraClient.getIssue(normalizedArgs.issueKey as string, true, false);
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(issue, null, 2),
-            },
-          ],
-        };
-      }
-
-      case 'get_jira_issue_attachments': {
-        console.error('Processing get_jira_issue_attachments request');
-        if (!isGetIssueAttachmentsArgs(normalizedArgs)) {
-          throw new McpError(ErrorCode.InvalidParams, 'Invalid get_issue_attachments arguments');
-        }
-
-        const attachments = await jiraClient.getIssueAttachments(normalizedArgs.issueKey as string);
+        
+        // Format the response using the IssueFormatter
+        const formattedResponse = IssueFormatter.formatIssue(issue, expansionOptions, transitions);
 
         return {
           content: [
             {
               type: 'text',
-              text: JSON.stringify(attachments, null, 2),
-            },
-          ],
-        };
-      }
-
-      case 'get_jira_fields': {
-        console.error('Processing get_jira_fields request');
-        if (!hasIssueKey(normalizedArgs)) {
-          throw new McpError(ErrorCode.InvalidParams, 'Invalid get_jira_fields arguments');
-        }
-
-        const fields = await jiraClient.getPopulatedFields(normalizedArgs.issueKey as string);
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: fields,
-            },
-          ],
-        };
-      }
-
-      case 'get_jira_transitions': {
-        console.error('Processing get_jira_transitions request');
-        if (!hasIssueKey(normalizedArgs)) {
-          throw new McpError(ErrorCode.InvalidParams, 'Invalid get_jira_transitions arguments');
-        }
-
-        const transitions = await jiraClient.getTransitions(normalizedArgs.issueKey as string);
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(transitions, null, 2),
+              text: JSON.stringify(formattedResponse, null, 2),
             },
           ],
         };
@@ -302,11 +246,15 @@ export async function setupIssueHandlers(
           normalizedArgs.parent as string | null | undefined
         );
 
+        // Get the updated issue to return
+        const updatedIssue = await jiraClient.getIssue(normalizedArgs.issueKey as string, false, false);
+        const formattedResponse = IssueFormatter.formatIssue(updatedIssue);
+
         return {
           content: [
             {
               type: 'text',
-              text: JSON.stringify({ message: 'Issue updated successfully' }, null, 2),
+              text: JSON.stringify(formattedResponse, null, 2),
             },
           ],
         };
@@ -320,18 +268,15 @@ export async function setupIssueHandlers(
 
         await jiraClient.addComment(normalizedArgs.issueKey as string, normalizedArgs.body as string);
 
+        // Get the updated issue with comments to return
+        const updatedIssue = await jiraClient.getIssue(normalizedArgs.issueKey as string, true, false);
+        const formattedResponse = IssueFormatter.formatIssue(updatedIssue, { comments: true });
+
         return {
           content: [
             {
               type: 'text',
-              text: JSON.stringify(
-                {
-                  message: 'Comment added successfully',
-                  body: normalizedArgs.body,
-                },
-                null,
-                2
-              ),
+              text: JSON.stringify(formattedResponse, null, 2),
             },
           ],
         };
@@ -349,19 +294,15 @@ export async function setupIssueHandlers(
           normalizedArgs.comment as string | undefined
         );
 
+        // Get the updated issue to return
+        const updatedIssue = await jiraClient.getIssue(normalizedArgs.issueKey as string, false, false);
+        const formattedResponse = IssueFormatter.formatIssue(updatedIssue);
+
         return {
           content: [
             {
               type: 'text',
-              text: JSON.stringify(
-                {
-                  message: 'Issue transitioned successfully',
-                  transitionId: normalizedArgs.transitionId,
-                  comment: normalizedArgs.comment || 'No comment provided',
-                },
-                null,
-                2
-              ),
+              text: JSON.stringify(formattedResponse, null, 2),
             },
           ],
         };
@@ -378,18 +319,15 @@ export async function setupIssueHandlers(
 
         const result = await jiraClient.createIssue(normalizedArgs);
         
+        // Get the created issue to return
+        const createdIssue = await jiraClient.getIssue(result.key, false, false);
+        const formattedResponse = IssueFormatter.formatIssue(createdIssue);
+
         return {
           content: [
             {
               type: 'text',
-              text: JSON.stringify(
-                {
-                  message: 'Issue created successfully',
-                  key: result.key
-                },
-                null,
-                2
-              ),
+              text: JSON.stringify(formattedResponse, null, 2),
             },
           ],
         };

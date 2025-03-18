@@ -12,7 +12,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 
 import { JiraClient } from './client/jira-client.js';
-import { handleListBoards, handleListJiraSprints } from './handlers/board-handlers.js';
+import { setupBoardHandlers } from './handlers/board-handlers.js';
 import { setupIssueHandlers } from './handlers/issue-handlers.js';
 import { setupProjectHandlers } from './handlers/project-handlers.js';
 import { setupSearchHandlers } from './handlers/search-handlers.js';
@@ -139,33 +139,13 @@ class JiraServer {
         }
 
         // Project-related tools
-        if (['list_jira_projects'].includes(name)) {
+        if (['list_jira_projects', 'get_jira_project'].includes(name)) {
           return await setupProjectHandlers(this.server, this.jiraClient, request);
         }
 
         // Board-related tools
-        if (name === 'list_jira_boards') {
-          const boards = await handleListBoards(this.jiraClient);
-          return {
-            content: [
-              {
-                type: 'text',
-                text: JSON.stringify(boards, null, 2)
-              }
-            ]
-          };
-        }
-
-        if (name === 'list_jira_sprints') {
-          const sprints = await handleListJiraSprints(this.jiraClient, request.params.arguments);
-          return {
-            content: [
-              {
-                type: 'text',
-                text: JSON.stringify(sprints, null, 2)
-              }
-            ]
-          };
+        if (['list_jira_boards', 'get_jira_board', 'list_jira_sprints'].includes(name)) {
+          return await setupBoardHandlers(this.server, this.jiraClient, request);
         }
 
         console.error(`Unknown tool requested: ${name}`);
