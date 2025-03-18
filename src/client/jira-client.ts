@@ -1,7 +1,39 @@
 import { Version3Client, AgileClient } from 'jira.js';
-import type { Project } from 'jira.js/out/version3/models';
+
+// Define our own Project interface to match what we need
+interface Project {
+  id: string;
+  key: string;
+  name: string;
+  description?: string;
+  lead?: {
+    displayName?: string;
+  };
+  self?: string;
+}
 
 import { JiraConfig, JiraIssueDetails, FilterResponse, TransitionDetails, SearchResponse, BoardResponse, SprintResponse, JiraAttachment } from '../types/index.js';
+
+// Define additional types for sprint operations
+interface SprintIssue {
+  key: string;
+  summary: string;
+  status: string;
+  assignee?: string;
+}
+
+interface SprintListResponse {
+  sprints: SprintResponse[];
+  total: number;
+}
+
+interface SprintReportResponse {
+  completedIssues: number;
+  incompletedIssues: number;
+  puntedIssues: number;
+  addedIssues: number;
+  velocityPoints?: number;
+}
 import { TextProcessor } from '../utils/text-processing.js';
 
 export class JiraClient {
@@ -476,6 +508,253 @@ export class JiraClient {
       }));
   }
 
+  // Sprint CRUD operations
+
+  /**
+   * Create a new sprint
+   */
+  async createSprint(
+    boardId: number,
+    name: string,
+    startDate?: string,
+    endDate?: string,
+    goal?: string
+  ): Promise<SprintResponse> {
+    console.error(`Creating sprint "${name}" for board ${boardId}...`);
+    
+    const response = await this.agileClient.sprint.createSprint({
+      originBoardId: boardId,
+      name,
+      startDate,
+      endDate,
+      goal
+    });
+
+    return {
+      id: response.id!,
+      name: response.name!,
+      state: response.state || 'future',
+      startDate: response.startDate,
+      endDate: response.endDate,
+      completeDate: response.completeDate,
+      goal: response.goal,
+      boardId
+    };
+  }
+
+  /**
+   * Get a sprint by ID
+   */
+  async getSprint(sprintId: number): Promise<SprintResponse> {
+    console.error(`Fetching sprint ${sprintId}...`);
+    
+    const response = await this.agileClient.sprint.getSprint({
+      sprintId
+    });
+
+    return {
+      id: response.id!,
+      name: response.name!,
+      state: response.state || 'unknown',
+      startDate: response.startDate,
+      endDate: response.endDate,
+      completeDate: response.completeDate,
+      goal: response.goal,
+      boardId: response.originBoardId!
+    };
+  }
+
+  /**
+   * List sprints for a board with pagination and filtering
+   */
+  async listSprints(
+    boardId: number,
+    state?: string,
+    startAt = 0,
+    maxResults = 50
+  ): Promise<SprintListResponse> {
+    console.error(`Listing sprints for board ${boardId}...`);
+    
+    const stateParam = state || 'future,active,closed';
+    
+    const response = await this.agileClient.board.getAllSprints({
+      boardId,
+      state: stateParam,
+      startAt,
+      maxResults
+    });
+
+    const sprints = (response.values || [])
+      .filter(sprint => sprint.id && sprint.name)
+      .map(sprint => ({
+        id: sprint.id!,
+        name: sprint.name!,
+        state: sprint.state || 'unknown',
+        startDate: sprint.startDate,
+        endDate: sprint.endDate,
+        completeDate: sprint.completeDate,
+        goal: sprint.goal,
+        boardId
+      }));
+
+    return {
+      sprints,
+      total: response.total || sprints.length
+    };
+  }
+
+  /**
+   * Update a sprint
+   */
+  async updateSprint(
+    sprintId: number,
+    name?: string,
+    goal?: string,
+    startDate?: string,
+    endDate?: string,
+    state?: string
+  ): Promise<void> {
+    console.error(`Updating sprint ${sprintId}...`);
+    
+    try {
+      // First get the current sprint to get its state
+      const currentSprint = await this.getSprint(sprintId);
+      
+      // Prepare update parameters
+      const updateParams: any = {
+        // Always include the current state unless a new state is provided
+        state: state || currentSprint.state
+      };
+      
+      // Add other parameters if provided
+      if (name !== undefined) updateParams.name = name;
+      if (goal !== undefined) updateParams.goal = goal;
+      if (startDate !== undefined) updateParams.startDate = startDate;
+      if (endDate !== undefined) updateParams.endDate = endDate;
+      
+      // If changing to closed state, add completeDate
+      if (state === 'closed') {
+        updateParams.completeDate = new Date().toISOString();
+      }
+      
+      // Update the sprint with all parameters in a single call
+      await this.agileClient.sprint.updateSprint({
+        sprintId,
+        ...updateParams
+      });
+    } catch (error) {
+      console.error(`Error updating sprint ${sprintId}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete a sprint
+   */
+  async deleteSprint(sprintId: number): Promise<void> {
+    console.error(`Deleting sprint ${sprintId}...`);
+    
+    await this.agileClient.sprint.deleteSprint({
+      sprintId
+    });
+  }
+
+  /**
+   * Get issues in a sprint
+   */
+  async getSprintIssues(sprintId: number): Promise<SprintIssue[]> {
+    console.error(`Fetching issues for sprint ${sprintId}...`);
+    
+    const response = await this.agileClient.sprint.getIssuesForSprint({
+      sprintId,
+      fields: ['summary', 'status', 'assignee']
+    });
+
+    return (response.issues || [])
+      .filter(issue => issue.key && issue.fields) // Filter out issues with missing key or fields
+      .map(issue => ({
+        key: issue.key!, // Non-null assertion since we filtered
+        summary: issue.fields!.summary || '',
+        status: issue.fields!.status?.name || 'Unknown',
+        assignee: issue.fields!.assignee?.displayName
+      }));
+  }
+
+  /**
+   * Update issues in a sprint (add/remove)
+   */
+  async updateSprintIssues(
+    sprintId: number,
+    add?: string[],
+    remove?: string[]
+  ): Promise<void> {
+    console.error(`Updating issues for sprint ${sprintId}...`);
+    
+    try {
+      // Add issues to sprint
+      if (add && add.length > 0) {
+        console.error(`Adding ${add.length} issues to sprint ${sprintId}: ${add.join(', ')}`);
+        
+        // Use the correct method from jira.js v4.0.5
+        await this.agileClient.sprint.moveIssuesToSprintAndRank({
+          sprintId,
+          issues: add
+        });
+      }
+
+      // Remove issues from sprint
+      if (remove && remove.length > 0) {
+        console.error(`Removing ${remove.length} issues from sprint ${sprintId}: ${remove.join(', ')}`);
+        
+        // To remove issues, we move them to the backlog
+        await this.agileClient.backlog.moveIssuesToBacklog({
+          issues: remove
+        });
+      }
+    } catch (error) {
+      console.error(`Error updating sprint issues for sprint ${sprintId}:`, error);
+      throw new Error(`Failed to update sprint issues: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Get sprint report
+   */
+  async getSprintReport(
+    boardId: number,
+    sprintId: number
+  ): Promise<SprintReportResponse> {
+    console.error(`Fetching sprint report for sprint ${sprintId} on board ${boardId}...`);
+    
+    try {
+      // Use type assertion since getSprintReport might not be in the type definitions
+      const response = await (this.agileClient.board as any).getSprintReport({
+        boardId,
+        sprintId
+      });
+
+      // Safely extract data from the response
+      return {
+        completedIssues: response?.contents?.completedIssues?.length || 0,
+        incompletedIssues: response?.contents?.incompletedIssues?.length || 0,
+        puntedIssues: response?.contents?.puntedIssues?.length || 0,
+        addedIssues: response?.contents?.issuesAddedDuringSprint?.length || 0,
+        velocityPoints: response?.contents?.completedIssuesEstimateSum?.value || 0
+      };
+    } catch (error) {
+      console.error(`Error fetching sprint report for sprint ${sprintId} on board ${boardId}:`, error);
+      
+      // Return a default response with zeros to avoid breaking the client
+      return {
+        completedIssues: 0,
+        incompletedIssues: 0,
+        puntedIssues: 0,
+        addedIssues: 0,
+        velocityPoints: 0
+      };
+    }
+  }
+
   async listProjects(): Promise<Array<{
     id: string;
     key: string;
@@ -487,8 +766,7 @@ export class JiraClient {
     const { values: projects } = await this.client.projects.searchProjects();
     
     return projects
-      .filter((project): project is Project => 
-        Boolean(project?.id && project?.key && project?.name))
+      .filter(project => Boolean(project?.id && project?.key && project?.name))
       .map(project => ({
         id: project.id!,
         key: project.key!,
