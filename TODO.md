@@ -1,5 +1,39 @@
 # TODO List
 
+## Next Development Phase (feature/jira-api-extensions)
+
+### Priority 1: Sprint Management
+- [ ] Create schema for sprint operations (create, update, get, list)
+- [ ] Implement formatter for sprint entities
+- [ ] Add endpoint for creating new sprints
+- [ ] Add endpoint for moving issues to/from sprints
+- [ ] Implement sprint start/complete functionality
+- [ ] Add sprint report retrieval capability
+
+### Priority 2: Issue Relations
+- [ ] Create schema for issue link operations
+- [ ] Implement link type discovery endpoint
+- [ ] Add functionality for creating parent-child relationships
+- [ ] Add support for issue links (blocks, is blocked by, relates to)
+- [ ] Enhance issue responses to include relationship data
+- [ ] Add endpoint for retrieving issue link types
+
+### Priority 3: Attachments
+- [ ] Create schema for attachment operations
+- [ ] Implement file upload functionality for issues
+- [ ] Add attachment download capability
+- [ ] Implement listing attachments on an issue
+- [ ] Add attachment removal functionality
+- [ ] Enhance issue responses to include attachment metadata
+
+### Priority 4: Worklog & Time Tracking
+- [ ] Create schema for worklog operations
+- [ ] Implement adding work logs to issues
+- [ ] Add support for updating existing work logs
+- [ ] Create endpoint for retrieving time tracking information
+- [ ] Implement time estimate updates
+- [ ] Enhance issue responses to include time tracking data
+
 ## Current Branch (feature/docker-containerization)
 
 1. Container Implementation
