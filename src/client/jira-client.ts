@@ -1,18 +1,7 @@
 import { Version3Client, AgileClient } from 'jira.js';
 
-// Define our own Project interface to match what we need
-interface Project {
-  id: string;
-  key: string;
-  name: string;
-  description?: string;
-  lead?: {
-    displayName?: string;
-  };
-  self?: string;
-}
-
 import { JiraConfig, JiraIssueDetails, FilterResponse, TransitionDetails, SearchResponse, BoardResponse, SprintResponse, JiraAttachment } from '../types/index.js';
+import { TextProcessor } from '../utils/text-processing.js';
 
 // Define additional types for sprint operations
 interface SprintIssue {
@@ -34,7 +23,6 @@ interface SprintReportResponse {
   addedIssues: number;
   velocityPoints?: number;
 }
-import { TextProcessor } from '../utils/text-processing.js';
 
 export class JiraClient {
   private client: Version3Client;

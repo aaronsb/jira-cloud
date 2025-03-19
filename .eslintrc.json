@@ -21,9 +21,9 @@
     "@typescript-eslint/explicit-function-return-type": "off",
     "@typescript-eslint/no-explicit-any": "off",
     "@typescript-eslint/no-non-null-assertion": "off",
-    "@typescript-eslint/no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
+    "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
     "import/order": [
-      "warn",
+      "error",
       {
         "groups": ["builtin", "external", "internal", ["parent", "sibling"], "index"],
         "newlines-between": "always",
@@ -32,7 +32,11 @@
     ],
     "import/no-unresolved": "off",
     "no-console": ["warn", { "allow": ["error", "warn", "info"] }],
-    "no-case-declarations": "warn"
+    "no-case-declarations": "warn",
+    "import/no-empty-named-blocks": "error",
+    "import/first": "error",
+    "import/newline-after-import": "error",
+    "import/no-duplicates": "error"
   },
   "env": {
     "node": true,
