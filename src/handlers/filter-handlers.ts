@@ -354,7 +354,7 @@ async function handleListFilters(jiraClient: JiraClient, args: ManageJiraFilterA
   };
 }
 
-async function handleCreateFilter(_jiraClient: JiraClient, args: ManageJiraFilterArgs) {
+async function handleCreateFilter(_jiraClient: JiraClient, _args: ManageJiraFilterArgs) {
   // Note: This is a placeholder. The current JiraClient doesn't have a createFilter method.
   // You would need to implement this in the JiraClient class.
   throw new McpError(
@@ -365,11 +365,11 @@ async function handleCreateFilter(_jiraClient: JiraClient, args: ManageJiraFilte
   // When implemented, it would look something like this:
   /*
   const result = await _jiraClient.createFilter({
-    name: args.name!,
-    jql: args.jql!,
-    description: args.description,
-    favourite: args.favourite,
-    sharePermissions: args.sharePermissions
+    name: _args.name!,
+    jql: _args.jql!,
+    description: _args.description,
+    favourite: _args.favourite,
+    sharePermissions: _args.sharePermissions
   });
   
   // Get the created filter to return
@@ -387,7 +387,7 @@ async function handleCreateFilter(_jiraClient: JiraClient, args: ManageJiraFilte
   */
 }
 
-async function handleUpdateFilter(_jiraClient: JiraClient, args: ManageJiraFilterArgs) {
+async function handleUpdateFilter(_jiraClient: JiraClient, _args: ManageJiraFilterArgs) {
   // Note: This is a placeholder. The current JiraClient doesn't have an updateFilter method.
   // You would need to implement this in the JiraClient class.
   throw new McpError(
@@ -398,18 +398,18 @@ async function handleUpdateFilter(_jiraClient: JiraClient, args: ManageJiraFilte
   // When implemented, it would look something like this:
   /*
   await _jiraClient.updateFilter(
-    args.filterId!,
+    _args.filterId!,
     {
-      name: args.name,
-      jql: args.jql,
-      description: args.description,
-      favourite: args.favourite,
-      sharePermissions: args.sharePermissions
+      name: _args.name,
+      jql: _args.jql,
+      description: _args.description,
+      favourite: _args.favourite,
+      sharePermissions: _args.sharePermissions
     }
   );
 
   // Get the updated filter to return
-  const updatedFilter = await _jiraClient.getFilter(args.filterId!);
+  const updatedFilter = await _jiraClient.getFilter(_args.filterId!);
   const formattedResponse = FilterFormatter.formatFilter(updatedFilter);
 
   return {
@@ -423,7 +423,7 @@ async function handleUpdateFilter(_jiraClient: JiraClient, args: ManageJiraFilte
   */
 }
 
-async function handleDeleteFilter(_jiraClient: JiraClient, args: ManageJiraFilterArgs) {
+async function handleDeleteFilter(_jiraClient: JiraClient, _args: ManageJiraFilterArgs) {
   // Note: This is a placeholder. The current JiraClient doesn't have a deleteFilter method.
   // You would need to implement this in the JiraClient class.
   throw new McpError(
@@ -433,7 +433,7 @@ async function handleDeleteFilter(_jiraClient: JiraClient, args: ManageJiraFilte
 
   // When implemented, it would look something like this:
   /*
-  await _jiraClient.deleteFilter(args.filterId!);
+  await _jiraClient.deleteFilter(_args.filterId!);
 
   return {
     content: [
@@ -441,7 +441,7 @@ async function handleDeleteFilter(_jiraClient: JiraClient, args: ManageJiraFilte
         type: 'text',
         text: JSON.stringify({
           success: true,
-          message: `Filter ${args.filterId} has been deleted successfully.`,
+          message: `Filter ${_args.filterId} has been deleted successfully.`,
         }, null, 2),
       },
     ],

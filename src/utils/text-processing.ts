@@ -360,7 +360,7 @@ export class TextProcessor {
           v !== null && 
           v !== undefined && 
           !_k.startsWith('_'))
-        .map(([k, v]) => TextProcessor.formatFieldValue(v))
+        .map(([_k, v]) => TextProcessor.formatFieldValue(v))
         .filter(v => v)
         .join(' ');
       
