@@ -25,9 +25,9 @@ This document tracks the remaining work for the Jira Cloud MCP tool consolidatio
 
 ### Enhancements
 
-- [x] Consolidate Issue API into a single `manage_jira_issue` tool
-- [x] Consolidate Sprint API into a single `manage_jira_sprint` tool
-- [ ] Consolidate Project API into a single `manage_jira_project` tool
+  - [x] Consolidate Issue API into a single `manage_jira_issue` tool
+  - [x] Consolidate Sprint API into a single `manage_jira_sprint` tool
+  - [x] Consolidate Project API into a single `manage_jira_project` tool
 - [ ] Consolidate Board API into a single `manage_jira_board` tool
 - [ ] Implement and consolidate Filter API into a `manage_jira_filter` tool
 - [ ] Add caching for frequently accessed data

@@ -122,47 +122,50 @@ class JiraServer {
     });
 
     // Set up tool handlers
-    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    this.server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
       console.error('Received request:', JSON.stringify(request, null, 2));
 
       const { name } = request.params;
       console.error(`Handling tool request: ${name}`);
 
       try {
-        let result;
+        let response;
         
         // Issue-related tools
         if (['manage_jira_issue'].includes(name)) {
-          result = await setupIssueHandlers(this.server, this.jiraClient, request);
-          if (result) return result;
+          response = await setupIssueHandlers(this.server, this.jiraClient, request);
         }
         
         // Search-related tools
         else if (['search_jira_issues'].includes(name)) {
-          result = await setupSearchHandlers(this.server, this.jiraClient, request);
-          if (result) return result;
+          response = await setupSearchHandlers(this.server, this.jiraClient, request);
         }
 
         // Project-related tools
-        else if (['list_jira_projects', 'get_jira_project'].includes(name)) {
-          result = await setupProjectHandlers(this.server, this.jiraClient, request);
-          if (result) return result;
+        else if (['manage_jira_project'].includes(name)) {
+          response = await setupProjectHandlers(this.server, this.jiraClient, request);
         }
 
         // Board-related tools
         else if (['list_jira_boards', 'get_jira_board'].includes(name)) {
-          result = await setupBoardHandlers(this.server, this.jiraClient, request);
-          if (result) return result;
+          response = await setupBoardHandlers(this.server, this.jiraClient, request);
         }
 
         // Sprint-related tools
         else if (['manage_jira_sprint'].includes(name)) {
-          result = await setupSprintHandlers(this.server, this.jiraClient, request);
-          if (result) return result;
+          response = await setupSprintHandlers(this.server, this.jiraClient, request);
         }
-
-        console.error(`Unknown tool requested: ${name}`);
-        throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
+        else {
+          console.error(`Unknown tool requested: ${name}`);
+          throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
+        }
+        
+        // Ensure we always return a valid response
+        if (!response) {
+          throw new McpError(ErrorCode.InternalError, `No response from handler for tool: ${name}`);
+        }
+        
+        return response;
       } catch (error) {
         console.error('Error handling request:', error);
         if (error instanceof McpError) {

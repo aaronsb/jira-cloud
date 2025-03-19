@@ -175,17 +175,53 @@ export const toolSchemas = {
     },
   },
 
-  // Enhanced Project API
-  get_jira_project: {
-    name: 'get_jira_project',
-    description: 'Get comprehensive information about a Jira project with optional expansions',
+  // Consolidated Project Management API
+  manage_jira_project: {
+    name: 'manage_jira_project',
+    description: 'Comprehensive project management with CRUD operations and related data',
     inputSchema: {
       type: 'object',
       properties: {
+        operation: {
+          type: 'string',
+          enum: ['get', 'create', 'update', 'delete', 'list'],
+          description: 'Operation to perform on the project',
+        },
+        // Parameters for get, update, delete operations
         projectKey: {
           type: 'string',
-          description: 'The Jira project key (e.g., PROJ). Can also use snake_case "project_key".',
+          description: 'The Jira project key (e.g., PROJ). Required for get, update, and delete operations. Can also use snake_case "project_key".',
         },
+        // Parameters for create operation
+        name: {
+          type: 'string',
+          description: 'Name of the project. Required for create operation, optional for update.',
+        },
+        key: {
+          type: 'string',
+          description: 'Project key. Required for create operation.',
+        },
+        // Common parameters for create and update
+        description: {
+          type: 'string',
+          description: 'Description of the project. Optional for create/update.',
+        },
+        lead: {
+          type: 'string',
+          description: 'Username of the project lead. Optional for create/update.',
+        },
+        // Parameters for list operation
+        startAt: {
+          type: 'integer',
+          description: 'Index of the first project to return (0-based). Used for list operation. Can also use snake_case "start_at".',
+          default: 0,
+        },
+        maxResults: {
+          type: 'integer',
+          description: 'Maximum number of projects to return. Used for list operation. Can also use snake_case "max_results".',
+          default: 50,
+        },
+        // Common expansion options
         expand: {
           type: 'array',
           items: {
@@ -200,9 +236,10 @@ export const toolSchemas = {
           default: true,
         },
       },
-      required: ['projectKey'],
+      required: ['operation'],
     },
   },
+
 
   // Enhanced Board API
   get_jira_board: {
@@ -280,21 +317,6 @@ export const toolSchemas = {
     },
   },
 
-  // List Projects (simplified)
-  list_jira_projects: {
-    name: 'list_jira_projects',
-    description: 'Get a list of all projects in Jira',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        include_status_counts: {
-          type: 'boolean',
-          description: 'Whether to include issue counts by status',
-          default: false,
-        },
-      },
-    },
-  },
 
   // List Boards (simplified)
   list_jira_boards: {
