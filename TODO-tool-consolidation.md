@@ -14,6 +14,7 @@ This document tracks the remaining work for the Jira Cloud MCP tool consolidatio
 - [x] Update main server routing
 - [x] Create documentation for the new API
 - [x] Clean up old tool references from routing logic
+- [x] Implement 'get' operation for Filter API
 
 ## Remaining Work
 
@@ -29,7 +30,7 @@ This document tracks the remaining work for the Jira Cloud MCP tool consolidatio
   - [x] Consolidate Sprint API into a single `manage_jira_sprint` tool
   - [x] Consolidate Project API into a single `manage_jira_project` tool
   - [x] Consolidate Board API into a single `manage_jira_board` tool
-- [ ] Implement and consolidate Filter API into a `manage_jira_filter` tool
+- [x] Implement and consolidate Filter API into a `manage_jira_filter` tool
 - [ ] Add caching for frequently accessed data
 - [ ] Optimize batch requests for related data
 - [ ] Implement more advanced contextual insights
