@@ -298,7 +298,7 @@ async function handleGetProject(jiraClient: JiraClient, args: ManageJiraProjectA
   };
 }
 
-async function handleCreateProject(_jiraClient: JiraClient, args: ManageJiraProjectArgs) {
+async function handleCreateProject(_jiraClient: JiraClient, _args: ManageJiraProjectArgs) {
   // Note: This is a placeholder. The current JiraClient doesn't have a createProject method.
   // You would need to implement this in the JiraClient class.
   throw new McpError(
@@ -309,10 +309,10 @@ async function handleCreateProject(_jiraClient: JiraClient, args: ManageJiraProj
   // When implemented, it would look something like this:
   /*
   const result = await _jiraClient.createProject({
-    key: args.key!,
-    name: args.name!,
-    description: args.description,
-    lead: args.lead
+    key: _args.key!,
+    name: _args.name!,
+    description: _args.description,
+    lead: _args.lead
   });
   
   // Get the created project to return
@@ -330,7 +330,7 @@ async function handleCreateProject(_jiraClient: JiraClient, args: ManageJiraProj
   */
 }
 
-async function handleUpdateProject(_jiraClient: JiraClient, args: ManageJiraProjectArgs) {
+async function handleUpdateProject(_jiraClient: JiraClient, _args: ManageJiraProjectArgs) {
   // Note: This is a placeholder. The current JiraClient doesn't have an updateProject method.
   // You would need to implement this in the JiraClient class.
   throw new McpError(
@@ -341,14 +341,14 @@ async function handleUpdateProject(_jiraClient: JiraClient, args: ManageJiraProj
   // When implemented, it would look something like this:
   /*
   await _jiraClient.updateProject(
-    args.projectKey!,
-    args.name,
-    args.description,
-    args.lead
+    _args.projectKey!,
+    _args.name,
+    _args.description,
+    _args.lead
   );
 
   // Get the updated project to return
-  const updatedProject = await _jiraClient.getProject(args.projectKey!);
+  const updatedProject = await _jiraClient.getProject(_args.projectKey!);
   const formattedResponse = ProjectFormatter.formatProject(updatedProject);
 
   return {
@@ -362,7 +362,7 @@ async function handleUpdateProject(_jiraClient: JiraClient, args: ManageJiraProj
   */
 }
 
-async function handleDeleteProject(_jiraClient: JiraClient, args: ManageJiraProjectArgs) {
+async function handleDeleteProject(_jiraClient: JiraClient, _args: ManageJiraProjectArgs) {
   // Note: This is a placeholder. The current JiraClient doesn't have a deleteProject method.
   // You would need to implement this in the JiraClient class.
   throw new McpError(
@@ -372,7 +372,7 @@ async function handleDeleteProject(_jiraClient: JiraClient, args: ManageJiraProj
 
   // When implemented, it would look something like this:
   /*
-  await _jiraClient.deleteProject(args.projectKey!);
+  await _jiraClient.deleteProject(_args.projectKey!);
 
   return {
     content: [
@@ -380,7 +380,7 @@ async function handleDeleteProject(_jiraClient: JiraClient, args: ManageJiraProj
         type: 'text',
         text: JSON.stringify({
           success: true,
-          message: `Project ${args.projectKey} has been deleted successfully.`,
+          message: `Project ${_args.projectKey} has been deleted successfully.`,
         }, null, 2),
       },
     ],

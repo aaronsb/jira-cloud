@@ -2,7 +2,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import { JiraClient } from '../client/jira-client.js';
-import { SearchExpansionOptions, SearchFormatter, SearchResultData } from '../utils/formatters/index.js';
+import { SearchExpansionOptions, SearchFormatter } from '../utils/formatters/index.js';
 
 /**
  * Search Handlers

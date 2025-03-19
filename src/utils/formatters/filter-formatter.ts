@@ -1,5 +1,5 @@
-import { FilterResponse } from '../../types/index.js';
 import { BaseFormatter, FormattedResponse, ResponseMetadata, ResponseSummary } from './base-formatter.js';
+import { FilterResponse } from '../../types/index.js';
 
 export interface FilterData extends FilterResponse {
   issueCount?: number;

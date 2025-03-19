@@ -1,5 +1,5 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { CallToolRequestSchema, ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import { JiraClient } from '../client/jira-client.js';
 import { IssueExpansionOptions, IssueFormatter } from '../utils/formatters/index.js';
@@ -308,7 +308,7 @@ async function handleUpdateIssue(jiraClient: JiraClient, args: ManageJiraIssueAr
   };
 }
 
-async function handleDeleteIssue(_jiraClient: JiraClient, args: ManageJiraIssueArgs) {
+async function handleDeleteIssue(_jiraClient: JiraClient, _args: ManageJiraIssueArgs) {
   // Note: This is a placeholder. The current JiraClient doesn't have a deleteIssue method.
   // You would need to implement this in the JiraClient class.
   throw new McpError(
@@ -318,7 +318,7 @@ async function handleDeleteIssue(_jiraClient: JiraClient, args: ManageJiraIssueA
 
   // When implemented, it would look something like this:
   /*
-  await _jiraClient.deleteIssue(args.issueKey!);
+  await _jiraClient.deleteIssue(_args.issueKey!);
 
   return {
     content: [
@@ -326,7 +326,7 @@ async function handleDeleteIssue(_jiraClient: JiraClient, args: ManageJiraIssueA
         type: 'text',
         text: JSON.stringify({
           success: true,
-          message: `Issue ${args.issueKey} has been deleted successfully.`,
+          message: `Issue ${_args.issueKey} has been deleted successfully.`,
         }, null, 2),
       },
     ],
@@ -372,7 +372,7 @@ async function handleCommentIssue(jiraClient: JiraClient, args: ManageJiraIssueA
   };
 }
 
-async function handleLinkIssue(_jiraClient: JiraClient, args: ManageJiraIssueArgs) {
+async function handleLinkIssue(_jiraClient: JiraClient, _args: ManageJiraIssueArgs) {
   // Note: This is a placeholder. The current JiraClient doesn't have a linkIssues method.
   // You would need to implement this in the JiraClient class.
   throw new McpError(
@@ -383,13 +383,13 @@ async function handleLinkIssue(_jiraClient: JiraClient, args: ManageJiraIssueArg
   // When implemented, it would look something like this:
   /*
   await _jiraClient.linkIssues(
-    args.issueKey!,
-    args.linkedIssueKey!,
-    args.linkType!
+    _args.issueKey!,
+    _args.linkedIssueKey!,
+    _args.linkType!
   );
 
   // Get the updated issue to return
-  const updatedIssue = await _jiraClient.getIssue(args.issueKey!, false, false);
+  const updatedIssue = await _jiraClient.getIssue(_args.issueKey!, false, false);
   const formattedResponse = IssueFormatter.formatIssue(updatedIssue);
 
   return {

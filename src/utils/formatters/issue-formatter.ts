@@ -1,5 +1,5 @@
-import { JiraIssueDetails, TransitionDetails } from '../../types/index.js';
 import { BaseFormatter, FormattedResponse, ResponseMetadata, ResponseSummary } from './base-formatter.js';
+import { JiraIssueDetails, TransitionDetails } from '../../types/index.js';
 
 export interface IssueExpansionOptions {
   comments?: boolean;

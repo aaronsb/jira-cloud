@@ -3,7 +3,6 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import { JiraClient } from '../client/jira-client.js';
 import { FilterData, FilterExpansionOptions, FilterFormatter, SearchExpansionOptions, SearchFormatter } from '../utils/formatters/index.js';
-import { FilterResponse } from '../types/index.js';
 
 /**
  * Filter Handlers
@@ -217,7 +216,7 @@ async function handleGetFilter(jiraClient: JiraClient, args: ManageJiraFilterArg
     // Get the filter by first getting its issues
     // This is a workaround since we don't have direct access to the filter API
     // The getFilterIssues method internally calls the filter API
-    const issues = await jiraClient.getFilterIssues(filterId);
+    await jiraClient.getFilterIssues(filterId);
     
     // Now get the filter details from the list of all filters
     const allFilters = await jiraClient.listMyFilters(expansionOptions.jql || expansionOptions.description || expansionOptions.permissions);
@@ -450,8 +449,8 @@ async function handleDeleteFilter(_jiraClient: JiraClient, args: ManageJiraFilte
   */
 }
 
-async function handleExecuteFilter(jiraClient: JiraClient, args: ManageJiraFilterArgs) {
-  const filterId = args.filterId!;
+async function handleExecuteFilter(jiraClient: JiraClient, _args: ManageJiraFilterArgs) {
+  const filterId = _args.filterId!;
   
   // Get issues for the filter
   const issues = await jiraClient.getFilterIssues(filterId);

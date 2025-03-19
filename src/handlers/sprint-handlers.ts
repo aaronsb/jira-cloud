@@ -1,8 +1,20 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { CallToolRequestSchema, ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import { JiraClient } from '../client/jira-client.js';
 import { SprintData, SprintExpansionOptions, SprintFormatter } from '../utils/formatters/sprint-formatter.js';
+
+/**
+ * Sprint Handlers
+ * 
+ * This file implements handlers for the manage_jira_sprint tool.
+ * 
+ * Dependency Injection Pattern:
+ * - All handler functions receive the jiraClient as their first parameter for consistency
+ * - When a parameter is intentionally unused, it is prefixed with an underscore (_jiraClient)
+ * - This pattern ensures consistent function signatures and satisfies ESLint rules for unused variables
+ * - It also makes the code more maintainable by preserving the dependency injection pattern throughout
+ */
 
 // Type definition for the consolidated sprint management tool
 type ManageJiraSprintArgs = {
