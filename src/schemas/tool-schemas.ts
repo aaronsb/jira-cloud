@@ -83,17 +83,85 @@ export const toolSchemas = {
     },
   },
 
-  // Enhanced Issue API
-  get_jira_issue: {
-    name: 'get_jira_issue',
-    description: 'Get comprehensive information about a Jira issue with optional expansions',
+  // Consolidated Issue Management API
+  manage_jira_issue: {
+    name: 'manage_jira_issue',
+    description: 'Comprehensive issue management with CRUD operations, transitions, comments, and linking',
     inputSchema: {
       type: 'object',
       properties: {
+        operation: {
+          type: 'string',
+          enum: ['create', 'get', 'update', 'delete', 'transition', 'comment', 'link'],
+          description: 'Operation to perform on the issue',
+        },
+        // Parameters for get, update, delete, transition, comment, and link operations
         issueKey: {
           type: 'string',
-          description: 'The Jira issue key (e.g., WORK-123). Can also use snake_case "issue_key".',
+          description: 'The Jira issue key (e.g., WORK-123). Required for all operations except create. Can also use snake_case "issue_key".',
         },
+        // Parameters for create operation
+        projectKey: {
+          type: 'string',
+          description: 'Project key (e.g., PROJ). Required for create operation. Can also use snake_case "project_key".',
+        },
+        // Common parameters for create and update
+        summary: {
+          type: 'string',
+          description: 'Issue summary/title. Required for create, optional for update.',
+        },
+        description: {
+          type: 'string',
+          description: 'Detailed description of the issue. Optional for create/update.',
+        },
+        issueType: {
+          type: 'string',
+          description: 'Type of issue (e.g., Story, Bug, Task). Required for create. Can also use snake_case "issue_type".',
+        },
+        priority: {
+          type: 'string',
+          description: 'Issue priority (e.g., High, Medium, Low). Optional for create/update.',
+        },
+        assignee: {
+          type: 'string',
+          description: 'Username of the assignee. Optional for create/update.',
+        },
+        labels: {
+          type: 'array',
+          items: {
+            type: 'string'
+          },
+          description: 'Array of labels to apply to the issue. Optional for create/update.',
+        },
+        customFields: {
+          type: 'object',
+          description: 'Custom field values as key-value pairs. Optional for create/update. Can also use snake_case "custom_fields".',
+        },
+        // Parameters for update operation
+        parent: {
+          type: ['string', 'null'],
+          description: 'The key of the parent issue (e.g., PROJ-123) or null to remove parent. Optional for update.',
+        },
+        // Parameters for transition operation
+        transitionId: {
+          type: 'string',
+          description: 'The ID of the transition to perform. Required for transition operation. Can also use snake_case "transition_id".',
+        },
+        // Parameters for comment and transition operations
+        comment: {
+          type: 'string',
+          description: 'Comment text. Required for comment operation, optional for transition.',
+        },
+        // Parameters for link operation
+        linkType: {
+          type: 'string',
+          description: 'Type of link between issues (e.g., "relates to", "blocks"). Required for link operation. Can also use snake_case "link_type".',
+        },
+        linkedIssueKey: {
+          type: 'string',
+          description: 'The key of the issue to link to. Required for link operation. Can also use snake_case "linked_issue_key".',
+        },
+        // Common expansion options
         expand: {
           type: 'array',
           items: {
@@ -103,7 +171,7 @@ export const toolSchemas = {
           description: 'Optional fields to include in the response',
         },
       },
-      required: ['issueKey'],
+      required: ['operation'],
     },
   },
 
@@ -244,138 +312,4 @@ export const toolSchemas = {
     },
   },
 
-  // Retained for compatibility - Create, Update, Transition
-  create_jira_issue: {
-    name: 'create_jira_issue',
-    description: 'Create a new Jira issue',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        projectKey: {
-          type: 'string',
-          description: 'Project key (e.g., PROJ)',
-        },
-        summary: {
-          type: 'string',
-          description: 'Issue summary/title',
-        },
-        description: {
-          type: 'string',
-          description: 'Detailed description of the issue',
-        },
-        issueType: {
-          type: 'string',
-          description: 'Type of issue (e.g., Story, Bug, Task)',
-        },
-        priority: {
-          type: 'string',
-          description: 'Issue priority (e.g., High, Medium, Low)',
-        },
-        assignee: {
-          type: 'string',
-          description: 'Username of the assignee',
-        },
-        labels: {
-          type: 'array',
-          items: {
-            type: 'string'
-          },
-          description: 'Array of labels to apply to the issue',
-        },
-        customFields: {
-          type: 'object',
-          description: 'Custom field values as key-value pairs',
-        },
-      },
-      required: ['projectKey', 'summary', 'issueType'],
-    },
-  },
-
-  update_jira_issue: {
-    name: 'update_jira_issue',
-    description: 'Update a Jira issue',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        issueKey: {
-          type: 'string',
-          description: 'The Jira issue key (e.g., WORK-123). Can also use snake_case "issue_key".',
-        },
-        summary: {
-          type: 'string',
-          description: 'The new summary for the issue',
-        },
-        description: {
-          type: 'string',
-          description: 'The new description for the issue',
-        },
-        parent: {
-          type: ['string', 'null'],
-          description: 'The key of the parent issue (e.g., PROJ-123) or null to remove parent',
-        },
-        assignee: {
-          type: 'string',
-          description: 'Username of the assignee',
-        },
-        priority: {
-          type: 'string',
-          description: 'Issue priority (e.g., High, Medium, Low)',
-        },
-        labels: {
-          type: 'array',
-          items: {
-            type: 'string'
-          },
-          description: 'Array of labels to apply to the issue',
-        },
-        customFields: {
-          type: 'object',
-          description: 'Custom field values as key-value pairs',
-        },
-      },
-      required: ['issueKey'],
-    },
-  },
-
-  transition_jira_issue: {
-    name: 'transition_jira_issue',
-    description: 'Transition a Jira issue to a new status with an optional comment',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        issueKey: {
-          type: 'string',
-          description: 'The Jira issue key (e.g., WORK-123). Can also use snake_case "issue_key".',
-        },
-        transitionId: {
-          type: 'string',
-          description: 'The ID of the transition to perform. Can also use snake_case "transition_id".',
-        },
-        comment: {
-          type: 'string',
-          description: 'Optional comment to add with the transition',
-        },
-      },
-      required: ['issueKey', 'transitionId'],
-    },
-  },
-
-  add_jira_comment: {
-    name: 'add_jira_comment',
-    description: 'Add a comment to a Jira issue',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        issueKey: {
-          type: 'string',
-          description: 'The Jira issue key (e.g., WORK-123). Can also use snake_case "issue_key".',
-        },
-        body: {
-          type: 'string',
-          description: 'The comment text',
-        },
-      },
-      required: ['issueKey', 'body'],
-    },
-  },
 };

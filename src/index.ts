@@ -129,37 +129,36 @@ class JiraServer {
       console.error(`Handling tool request: ${name}`);
 
       try {
+        let result;
+        
         // Issue-related tools
-        if (['get_jira_issue', 'update_jira_issue', 'add_jira_comment', 'transition_jira_issue', 'create_jira_issue'].includes(name)) {
-          return await setupIssueHandlers(this.server, this.jiraClient, request);
+        if (['manage_jira_issue'].includes(name)) {
+          result = await setupIssueHandlers(this.server, this.jiraClient, request);
+          if (result) return result;
         }
         
         // Search-related tools
-        if (['search_jira_issues'].includes(name)) {
-          return await setupSearchHandlers(this.server, this.jiraClient, request);
+        else if (['search_jira_issues'].includes(name)) {
+          result = await setupSearchHandlers(this.server, this.jiraClient, request);
+          if (result) return result;
         }
 
         // Project-related tools
-        if (['list_jira_projects', 'get_jira_project'].includes(name)) {
-          return await setupProjectHandlers(this.server, this.jiraClient, request);
+        else if (['list_jira_projects', 'get_jira_project'].includes(name)) {
+          result = await setupProjectHandlers(this.server, this.jiraClient, request);
+          if (result) return result;
         }
 
         // Board-related tools
-        if (['list_jira_boards', 'get_jira_board'].includes(name)) {
-          return await setupBoardHandlers(this.server, this.jiraClient, request);
+        else if (['list_jira_boards', 'get_jira_board'].includes(name)) {
+          result = await setupBoardHandlers(this.server, this.jiraClient, request);
+          if (result) return result;
         }
 
         // Sprint-related tools
-        if ([
-          'create_jira_sprint', 
-          'get_jira_sprint', 
-          'list_jira_sprints', 
-          'update_jira_sprint', 
-          'delete_jira_sprint', 
-          'update_sprint_issues',
-          'manage_jira_sprint' // Add the new consolidated tool
-        ].includes(name)) {
-          return await setupSprintHandlers(this.server, this.jiraClient, request);
+        else if (['manage_jira_sprint'].includes(name)) {
+          result = await setupSprintHandlers(this.server, this.jiraClient, request);
+          if (result) return result;
         }
 
         console.error(`Unknown tool requested: ${name}`);
