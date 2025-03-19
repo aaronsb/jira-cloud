@@ -372,24 +372,19 @@ async function handleCommentIssue(jiraClient: JiraClient, args: ManageJiraIssueA
   };
 }
 
-async function handleLinkIssue(_jiraClient: JiraClient, _args: ManageJiraIssueArgs) {
-  // Note: This is a placeholder. The current JiraClient doesn't have a linkIssues method.
-  // You would need to implement this in the JiraClient class.
-  throw new McpError(
-    ErrorCode.InternalError,
-    'Link issue operation is not yet implemented'
-  );
-
-  // When implemented, it would look something like this:
-  /*
-  await _jiraClient.linkIssues(
-    _args.issueKey!,
-    _args.linkedIssueKey!,
-    _args.linkType!
+async function handleLinkIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs) {
+  console.error(`Linking issue ${args.issueKey} to ${args.linkedIssueKey} with type ${args.linkType}`);
+  
+  // Link the issues
+  await jiraClient.linkIssues(
+    args.issueKey!,
+    args.linkedIssueKey!,
+    args.linkType!,
+    args.comment
   );
 
   // Get the updated issue to return
-  const updatedIssue = await _jiraClient.getIssue(_args.issueKey!, false, false);
+  const updatedIssue = await jiraClient.getIssue(args.issueKey!, false, false);
   const formattedResponse = IssueFormatter.formatIssue(updatedIssue);
 
   return {
@@ -400,7 +395,6 @@ async function handleLinkIssue(_jiraClient: JiraClient, _args: ManageJiraIssueAr
       },
     ],
   };
-  */
 }
 
 // Main handler function

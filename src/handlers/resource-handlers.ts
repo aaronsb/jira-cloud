@@ -26,6 +26,12 @@ export function setupResourceHandlers(jiraClient: JiraClient) {
             name: 'Project Distribution',
             mimeType: 'application/json',
             description: 'Distribution of projects by type and status'
+          },
+          {
+            uri: 'jira://issue-link-types',
+            name: 'Issue Link Types',
+            mimeType: 'application/json',
+            description: 'List of all available issue link types in the Jira instance'
           }
         ]
       };
@@ -67,6 +73,10 @@ export function setupResourceHandlers(jiraClient: JiraClient) {
         
         if (uri === 'jira://projects/distribution') {
           return await getProjectDistribution(jiraClient);
+        }
+        
+        if (uri === 'jira://issue-link-types') {
+          return await getIssueLinkTypes(jiraClient);
         }
         
         // Handle resource templates
@@ -290,6 +300,45 @@ async function getBoardOverview(jiraClient: JiraClient, boardId: number) {
     };
   } catch (error) {
     console.error(`Error getting board overview for ${boardId}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Gets all available issue link types
+ */
+async function getIssueLinkTypes(jiraClient: JiraClient) {
+  try {
+    // Get all issue link types
+    const linkTypes = await jiraClient.getIssueLinkTypes();
+    
+    // Format the response with usage examples
+    const formattedLinkTypes = linkTypes.map(linkType => ({
+      id: linkType.id,
+      name: linkType.name,
+      inward: linkType.inward,
+      outward: linkType.outward,
+      usage: {
+        description: `Use this link type to establish a "${linkType.outward}" relationship from one issue to another.`,
+        example: `When issue A ${linkType.outward} issue B, then issue B ${linkType.inward} issue A.`
+      }
+    }));
+    
+    return {
+      contents: [
+        {
+          uri: 'jira://issue-link-types',
+          mimeType: 'application/json',
+          text: JSON.stringify({
+            linkTypes: formattedLinkTypes,
+            count: formattedLinkTypes.length,
+            timestamp: new Date().toISOString()
+          }, null, 2)
+        }
+      ]
+    };
+  } catch (error) {
+    console.error('Error getting issue link types:', error);
     throw error;
   }
 }
