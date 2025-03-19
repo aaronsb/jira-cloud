@@ -18,12 +18,13 @@ await use_mcp_tool({
 
 ## Available Tools
 
-### Board and Project Management
+### Board, Project, and Filter Management
 
 | Tool | Description | Required Parameters | Optional Parameters |
 |------|-------------|---------------------|---------------------|
-| `manage_jira_board` | Comprehensive board management | `operation` | Depends on operation (see below) |
-| `manage_jira_project` | Comprehensive project management | `operation` | Depends on operation (see below) |
+| `manage_jira_board` | Board management with CRUD operations and related data | `operation` | Depends on operation (see below) |
+| `manage_jira_project` | Project management with CRUD operations and related data | `operation` | Depends on operation (see below) |
+| `manage_jira_filter` | Filter management with CRUD operations and issue retrieval | `operation` | Depends on operation (see below) |
 
 #### Board Operations
 
@@ -46,6 +47,18 @@ await use_mcp_tool({
 | `create` | Create a new project | `name`, `key` | `description`, `lead` |
 | `update` | Update a project | `projectKey` | `name`, `description`, `lead` |
 | `delete` | Delete a project | `projectKey` | None |
+
+#### Filter Operations
+
+| Operation | Description | Required Parameters | Optional Parameters |
+|-----------|-------------|---------------------|---------------------|
+| `get` | Get filter details | `filterId` | `expand` |
+| `list` | List all filters | None | `startAt`, `maxResults`, `expand` |
+| `create` | Create a new filter | `name`, `jql` | `description`, `favourite`, `sharePermissions` |
+| `update` | Update a filter | `filterId` | `name`, `jql`, `description`, `favourite`, `sharePermissions` |
+| `delete` | Delete a filter | `filterId` | None |
+| `execute_filter` | Execute a filter to get matching issues | `filterId` | None |
+| `execute_jql` | Execute a JQL query directly | `jql` | `startAt`, `maxResults` |
 
 ### Issue Operations
 
@@ -155,7 +168,7 @@ await use_mcp_tool({
 ```
 
 
-### Using Consolidated Board Management
+### Using Board Management
 
 ```typescript
 // Get a board with sprints
@@ -190,6 +203,41 @@ await use_mcp_tool({
     name: "New Development Board",
     type: "scrum",
     projectKey: "PROJ"
+  }
+});
+```
+
+### Using Filter Management
+
+```typescript
+// List all filters
+await use_mcp_tool({
+  server_name: "jira-cloud",
+  tool_name: "manage_jira_filter",
+  arguments: {
+    operation: "list",
+    expand: ["jql", "description"]
+  }
+});
+
+// Execute a filter to get matching issues
+await use_mcp_tool({
+  server_name: "jira-cloud",
+  tool_name: "manage_jira_filter",
+  arguments: {
+    operation: "execute_filter",
+    filterId: "12345"
+  }
+});
+
+// Execute a JQL query directly
+await use_mcp_tool({
+  server_name: "jira-cloud",
+  tool_name: "manage_jira_filter",
+  arguments: {
+    operation: "execute_jql",
+    jql: "project = PROJ AND status = 'In Progress' ORDER BY created DESC",
+    maxResults: 50
   }
 });
 ```

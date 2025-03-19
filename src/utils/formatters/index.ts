@@ -4,3 +4,4 @@ export * from './project-formatter.js';
 export * from './search-formatter.js';
 export * from './board-formatter.js';
 export * from './sprint-formatter.js';
+export * from './filter-formatter.js';

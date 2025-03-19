@@ -1,8 +1,91 @@
 export const toolSchemas = {
-  // Consolidated Sprint Management API
+  // Filter Management API
+  manage_jira_filter: {
+    name: 'manage_jira_filter',
+    description: 'Filter management with CRUD operations and issue retrieval',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        operation: {
+          type: 'string',
+          enum: ['get', 'create', 'update', 'delete', 'list', 'execute_filter', 'execute_jql'],
+          description: 'Operation to perform on the filter',
+        },
+        // Parameters for get, update, delete, execute_filter operations
+        filterId: {
+          type: 'string',
+          description: 'The ID of the filter. Required for get, update, delete, and execute_filter operations. Can also use snake_case "filter_id".',
+        },
+        // Parameters for create and update operations
+        name: {
+          type: 'string',
+          description: 'Name of the filter. Required for create operation, optional for update.',
+        },
+        jql: {
+          type: 'string',
+          description: 'JQL query string for the filter. Required for create operation, optional for update.',
+        },
+        description: {
+          type: 'string',
+          description: 'Description of the filter. Optional for create/update.',
+        },
+        favourite: {
+          type: 'boolean',
+          description: 'Whether to mark the filter as a favorite. Optional for create/update.',
+        },
+        // Parameters for list operation
+        startAt: {
+          type: 'integer',
+          description: 'Index of the first filter to return (0-based). Used for list operation. Can also use snake_case "start_at".',
+          default: 0,
+        },
+        maxResults: {
+          type: 'integer',
+          description: 'Maximum number of filters to return. Used for list operation. Can also use snake_case "max_results".',
+          default: 50,
+        },
+        // Parameters for sharing
+        sharePermissions: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              type: {
+                type: 'string',
+                enum: ['group', 'project', 'global'],
+                description: 'Type of share permission',
+              },
+              group: {
+                type: 'string',
+                description: 'Group name (required when type is "group")',
+              },
+              project: {
+                type: 'string',
+                description: 'Project key (required when type is "project")',
+              },
+            },
+            required: ['type'],
+          },
+          description: 'Share permissions for the filter. Optional for create/update. Can also use snake_case "share_permissions".',
+        },
+        // Common expansion options
+        expand: {
+          type: 'array',
+          items: {
+            type: 'string',
+            enum: ['jql', 'description', 'permissions', 'issue_count'],
+          },
+          description: 'Optional fields to include in the response',
+        },
+      },
+      required: ['operation'],
+    },
+  },
+
+  // Sprint Management API
   manage_jira_sprint: {
     name: 'manage_jira_sprint',
-    description: 'Comprehensive sprint management with CRUD operations and issue management',
+    description: 'Sprint management with CRUD operations and issue management',
     inputSchema: {
       type: 'object',
       properties: {
@@ -83,10 +166,10 @@ export const toolSchemas = {
     },
   },
 
-  // Consolidated Issue Management API
+  // Issue Management API
   manage_jira_issue: {
     name: 'manage_jira_issue',
-    description: 'Comprehensive issue management with CRUD operations, transitions, comments, and linking',
+    description: 'Issue management with CRUD operations, transitions, comments, and linking',
     inputSchema: {
       type: 'object',
       properties: {
@@ -175,10 +258,10 @@ export const toolSchemas = {
     },
   },
 
-  // Consolidated Project Management API
+  // Project Management API
   manage_jira_project: {
     name: 'manage_jira_project',
-    description: 'Comprehensive project management with CRUD operations and related data',
+    description: 'Project management with CRUD operations and related data',
     inputSchema: {
       type: 'object',
       properties: {
@@ -241,10 +324,10 @@ export const toolSchemas = {
   },
 
 
-  // Consolidated Board Management API
+  // Board Management API
   manage_jira_board: {
     name: 'manage_jira_board',
-    description: 'Comprehensive board management with CRUD operations and related data',
+    description: 'Board management with CRUD operations and related data',
     inputSchema: {
       type: 'object',
       properties: {

@@ -13,6 +13,7 @@ import {
 
 import { JiraClient } from './client/jira-client.js';
 import { setupBoardHandlers } from './handlers/board-handlers.js';
+import { setupFilterHandlers } from './handlers/filter-handlers.js';
 import { setupIssueHandlers } from './handlers/issue-handlers.js';
 import { setupProjectHandlers } from './handlers/project-handlers.js';
 import { setupSearchHandlers } from './handlers/search-handlers.js';
@@ -154,6 +155,10 @@ class JiraServer {
         // Sprint-related tools
         else if (['manage_jira_sprint'].includes(name)) {
           response = await setupSprintHandlers(this.server, this.jiraClient, request);
+        }
+        // Filter-related tools
+        else if (['manage_jira_filter'].includes(name)) {
+          response = await setupFilterHandlers(this.server, this.jiraClient, request);
         }
         else {
           console.error(`Unknown tool requested: ${name}`);
