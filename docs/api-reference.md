@@ -18,83 +18,273 @@ await use_mcp_tool({
 
 ## Available Tools
 
-### Board and Project Management
+### Board, Project, and Filter Management
 
-| Tool | Description | Required Parameters |
-|------|-------------|---------------------|
-| `list_jira_boards` | List all boards | None |
-| `list_jira_sprints` | List sprints for a board | `boardId` |
-| `list_jira_projects` | List all projects | None |
-| `list_jira_filters` | List saved filters | None |
+| Tool | Description | Required Parameters | Optional Parameters |
+|------|-------------|---------------------|---------------------|
+| `manage_jira_board` | Board management with CRUD operations and related data | `operation` | Depends on operation (see below) |
+| `manage_jira_project` | Project management with CRUD operations and related data | `operation` | Depends on operation (see below) |
+| `manage_jira_filter` | Filter management with CRUD operations and issue retrieval | `operation` | Depends on operation (see below) |
 
-### Issue Operations
+#### Board Operations
 
-| Tool | Description | Required Parameters |
-|------|-------------|---------------------|
-| `create_jira_issue` | Create a new issue | `projectKey`, `summary`, `issueType` |
-| `get_jira_issue` | Get basic issue info | `issueKey` |
-| `get_jira_issue_details` | Get comprehensive issue info | `issueKey` |
-| `get_jira_issue_attachments` | Get issue attachments | `issueKey` |
-| `update_jira_issue` | Update an issue | `issueKey` |
+| Operation | Description | Required Parameters | Optional Parameters |
+|-----------|-------------|---------------------|---------------------|
+| `get` | Get board details | `boardId` | `expand`, `include_sprints` |
+| `list` | List all boards | None | `startAt`, `maxResults`, `include_sprints` |
+| `create` | Create a new board | `name`, `type`, `projectKey` | None |
+| `update` | Update a board | `boardId` | `name` |
+| `delete` | Delete a board | `boardId` | None |
+| `get_configuration` | Get board configuration | `boardId` | None |
 
-### Issue Transitions and Comments
 
-| Tool | Description | Required Parameters |
-|------|-------------|---------------------|
-| `get_jira_transitions` | Get available transitions | `issueKey` |
-| `transition_jira_issue` | Change issue status | `issueKey`, `transitionId` |
-| `add_jira_comment` | Add a comment | `issueKey`, `body` |
+#### Project Operations
 
-### Search and Filtering
+| Operation | Description | Required Parameters | Optional Parameters |
+|-----------|-------------|---------------------|---------------------|
+| `get` | Get project details | `projectKey` | `expand`, `include_status_counts` |
+| `list` | List all projects | None | `startAt`, `maxResults`, `include_status_counts` |
+| `create` | Create a new project | `name`, `key` | `description`, `lead` |
+| `update` | Update a project | `projectKey` | `name`, `description`, `lead` |
+| `delete` | Delete a project | `projectKey` | None |
 
-| Tool | Description | Required Parameters |
-|------|-------------|---------------------|
-| `search_jira_issues` | Search using JQL | `jql` |
-| `get_jira_filter_issues` | Get issues from saved filter | `filterId` |
-| `get_jira_fields` | Get populated fields | `issueKey` |
+#### Filter Operations
+
+| Operation | Description | Required Parameters | Optional Parameters |
+|-----------|-------------|---------------------|---------------------|
+| `get` | Get filter details | `filterId` | `expand` |
+| `list` | List all filters | None | `startAt`, `maxResults`, `expand` |
+| `create` | Create a new filter | `name`, `jql` | `description`, `favourite`, `sharePermissions` |
+| `update` | Update a filter | `filterId` | `name`, `jql`, `description`, `favourite`, `sharePermissions` |
+| `delete` | Delete a filter | `filterId` | None |
+| `execute_filter` | Execute a filter to get matching issues | `filterId` | None |
+| `execute_jql` | Execute a JQL query directly | `jql` | `startAt`, `maxResults`, `expand` |
+
+### Issue Management
+
+| Tool | Description | Required Parameters | Optional Parameters |
+|------|-------------|---------------------|---------------------|
+| `manage_jira_issue` | Issue management with CRUD operations, transitions, comments, and linking | `operation` | Depends on operation (see below) |
+
+#### Issue Operations
+
+| Operation | Description | Required Parameters | Optional Parameters |
+|-----------|-------------|---------------------|---------------------|
+| `create` | Create a new issue | `projectKey`, `summary`, `issueType` | `description`, `priority`, `assignee`, `labels`, `customFields` |
+| `get` | Get issue with optional expansions | `issueKey` | `expand` |
+| `update` | Update an issue | `issueKey` | `summary`, `description`, `parent`, `assignee`, `priority`, `labels`, `customFields` |
+| `delete` | Delete an issue | `issueKey` | None |
+| `transition` | Change issue status | `issueKey`, `transitionId` | `comment` |
+| `comment` | Add a comment | `issueKey`, `comment` | None |
+| `link` | Link issues together | `issueKey`, `linkedIssueKey`, `linkType` | None |
+
+### Sprint Management
+
+| Tool | Description | Required Parameters | Optional Parameters |
+|------|-------------|---------------------|---------------------|
+| `manage_jira_sprint` | Sprint management with CRUD operations and issue management | `operation` | Depends on operation (see below) |
+
+#### Sprint Operations
+
+| Operation | Description | Required Parameters | Optional Parameters |
+|-----------|-------------|---------------------|---------------------|
+| `get` | Get sprint details | `sprintId` | `expand` |
+| `list` | List all sprints for a board | `boardId` | `startAt`, `maxResults`, `state`, `expand` |
+| `create` | Create a new sprint | `boardId`, `name` | `startDate`, `endDate`, `goal` |
+| `update` | Update a sprint | `sprintId` | `name`, `startDate`, `endDate`, `goal`, `state` |
+| `delete` | Delete a sprint | `sprintId` | None |
+| `manage_issues` | Add or remove issues from a sprint | `sprintId` | `add`, `remove` |
 
 ## Common Parameters
 
 - `issueKey`: The Jira issue key (e.g., "PROJ-123")
-- `boardId`: The ID of the board
+- `boardId`: The ID of the board (numeric)
+- `projectKey`: The Jira project key (e.g., "PROJ")
 - `jql`: JQL query string
-- `filterId`: The saved filter ID
+- `expand`: Array of fields to expand in the response
+
+### Expansion Options
+
+#### Issue Expansions
+- `comments`: Include issue comments
+- `transitions`: Include available transitions
+- `attachments`: Include file attachments
+- `related_issues`: Include linked issues
+- `history`: Include change history
+
+#### Project Expansions
+- `boards`: Include project boards
+- `components`: Include project components
+- `versions`: Include project versions
+- `recent_issues`: Include recent issues
+
+#### Board Expansions
+- `sprints`: Include board sprints
+- `issues`: Include board issues
+- `configuration`: Include board configuration
+
+#### Filter Expansions
+- `jql`: Include JQL query
+- `description`: Include filter description
+- `permissions`: Include sharing permissions
+- `issue_count`: Include count of matching issues
+
+#### Search/Execute JQL Expansions
+- `issue_details`: Include detailed issue information
+- `transitions`: Include available transitions
+- `comments_preview`: Include comment previews
 
 ## Example Usage
 
-### List Projects
+### Using Issue Management
 
 ```typescript
+// Create a new issue
 await use_mcp_tool({
   server_name: "jira-cloud",
-  tool_name: "list_jira_projects",
-  arguments: {}
-});
-```
-
-### Create Issue
-
-```typescript
-await use_mcp_tool({
-  server_name: "jira-cloud",
-  tool_name: "create_jira_issue",
+  tool_name: "manage_jira_issue",
   arguments: {
+    operation: "create",
     projectKey: "PROJ",
     summary: "Example Issue",
     description: "This is a test issue",
     issueType: "Task"
   }
 });
-```
 
-### Search Issues
-
-```typescript
+// Get issue with comments and transitions
 await use_mcp_tool({
   server_name: "jira-cloud",
-  tool_name: "search_jira_issues",
+  tool_name: "manage_jira_issue",
   arguments: {
-    jql: "project = PROJ AND status = 'In Progress'"
+    operation: "get",
+    issueKey: "PROJ-123",
+    expand: ["comments", "transitions"]
+  }
+});
+
+// Update an issue
+await use_mcp_tool({
+  server_name: "jira-cloud",
+  tool_name: "manage_jira_issue",
+  arguments: {
+    operation: "update",
+    issueKey: "PROJ-123",
+    summary: "Updated Issue Title",
+    description: "This issue has been updated"
+  }
+});
+
+// Add a comment to an issue
+await use_mcp_tool({
+  server_name: "jira-cloud",
+  tool_name: "manage_jira_issue",
+  arguments: {
+    operation: "comment",
+    issueKey: "PROJ-123",
+    comment: "This is a new comment"
+  }
+});
+```
+
+### Using Board Management
+
+```typescript
+// Get a board with sprints
+await use_mcp_tool({
+  server_name: "jira-cloud",
+  tool_name: "manage_jira_board",
+  arguments: {
+    operation: "get",
+    boardId: 123,
+    expand: ["sprints"]
+  }
+});
+
+// List all boards with pagination
+await use_mcp_tool({
+  server_name: "jira-cloud",
+  tool_name: "manage_jira_board",
+  arguments: {
+    operation: "list",
+    startAt: 0,
+    maxResults: 50,
+    include_sprints: true
+  }
+});
+
+// Create a new board
+await use_mcp_tool({
+  server_name: "jira-cloud",
+  tool_name: "manage_jira_board",
+  arguments: {
+    operation: "create",
+    name: "New Development Board",
+    type: "scrum",
+    projectKey: "PROJ"
+  }
+});
+```
+
+### Using Filter Management
+
+```typescript
+// List all filters
+await use_mcp_tool({
+  server_name: "jira-cloud",
+  tool_name: "manage_jira_filter",
+  arguments: {
+    operation: "list",
+    expand: ["jql", "description"]
+  }
+});
+
+// Execute a filter to get matching issues
+await use_mcp_tool({
+  server_name: "jira-cloud",
+  tool_name: "manage_jira_filter",
+  arguments: {
+    operation: "execute_filter",
+    filterId: "12345"
+  }
+});
+
+// Execute a JQL query directly with enhanced results
+await use_mcp_tool({
+  server_name: "jira-cloud",
+  tool_name: "manage_jira_filter",
+  arguments: {
+    operation: "execute_jql",
+    jql: "project = PROJ AND status = 'In Progress' ORDER BY created DESC",
+    maxResults: 50,
+    expand: ["issue_details", "transitions"]
+  }
+});
+```
+
+### Using Sprint Management
+
+```typescript
+// Create a new sprint
+await use_mcp_tool({
+  server_name: "jira-cloud",
+  tool_name: "manage_jira_sprint",
+  arguments: {
+    operation: "create",
+    boardId: 123,
+    name: "Sprint 1",
+    goal: "Complete core features"
+  }
+});
+
+// Add issues to a sprint
+await use_mcp_tool({
+  server_name: "jira-cloud",
+  tool_name: "manage_jira_sprint",
+  arguments: {
+    operation: "manage_issues",
+    sprintId: 456,
+    add: ["PROJ-123", "PROJ-124", "PROJ-125"]
   }
 });
 ```

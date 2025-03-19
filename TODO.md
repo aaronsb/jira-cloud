@@ -1,21 +1,38 @@
 # TODO List
 
-## Current Branch (feature/docker-containerization)
+## Next Development Phase (feature/jira-api-extensions)
 
-1. Container Implementation
-   - [ ] Add GitHub Actions workflow for container builds
-   - [ ] Create container deployment documentation
-   - [ ] Add container health checks
-   - [ ] Implement graceful shutdown handling
-   - [ ] Add container metrics/monitoring
+### Priority 1: Sprint Management
+- [x] Create schema for sprint operations (create, update, get, list)
+- [x] Implement formatter for sprint entities
+- [x] Add endpoint for creating new sprints
+- [x] Add endpoint for moving issues to/from sprints
+- [x] Implement sprint start/complete functionality
+- [x] Add sprint report retrieval capability
 
-2. Testing & Validation
-   - [ ] Add container integration tests
-   - [ ] Test with different Jira Cloud instances
-   - [ ] Validate environment variable handling
-   - [ ] Test volume mounting and permissions
+### Priority 2: Issue Relations
+- [ ] Create schema for issue link operations
+- [ ] Implement link type discovery endpoint
+- [ ] Add functionality for creating parent-child relationships
+- [ ] Add support for issue links (blocks, is blocked by, relates to)
+- [ ] Enhance issue responses to include relationship data
+- [ ] Add endpoint for retrieving issue link types
 
-## Planned Features (from progress.md)
+### Priority 3: Attachments
+- [ ] Create schema for attachment operations
+- [ ] Implement file upload functionality for issues
+- [ ] Add attachment download capability
+- [ ] Implement listing attachments on an issue
+- [ ] Add attachment removal functionality
+- [ ] Enhance issue responses to include attachment metadata
+
+### Priority 4: Worklog & Time Tracking
+- [ ] Create schema for worklog operations
+- [ ] Implement adding work logs to issues
+- [ ] Add support for updating existing work logs
+- [ ] Create endpoint for retrieving time tracking information
+- [ ] Implement time estimate updates
+- [ ] Enhance issue responses to include time tracking data
 
 ### Issue Operations
 - [ ] Implement bulk operations support
@@ -23,9 +40,9 @@
 - [ ] Optimize for rate limiting constraints
 
 ### Sprint Management
-- [ ] Create/update sprints functionality
-- [ ] Move issues between sprints
-- [ ] Implement sprint reports
+- [x] Create/update sprints functionality
+- [x] Move issues between sprints
+- [x] Implement sprint reports
 - [ ] Add sprint velocity tracking
 
 ### Performance Improvements
@@ -33,43 +50,3 @@
 - [ ] Add batch operations support
 - [ ] Configure connection pooling
 - [ ] Add performance monitoring
-
-## Technical Debt
-
-### Testing
-- [ ] Increase test coverage
-- [ ] Add integration test suite
-- [ ] Implement performance benchmarks
-- [ ] Add load testing
-
-### Optimization
-- [ ] Optimize pagination handling
-- [ ] Implement request caching
-- [ ] Add request batching
-- [ ] Optimize memory usage
-
-### Documentation
-- [x] Create documentation restructuring plan (see docs/documentation-restructuring-plan.md)
-- [x] Update README.md according to restructuring plan
-- [ ] Fix all inconsistent references (e.g., "cline_docs/" vs "docs/")
-- [ ] Consolidate duplicated content in docs/ folder
-- [ ] Add missing documentation (troubleshooting, API reference)
-- [ ] Implement consistent formatting across all documentation
-- [ ] Integrate documentation maintenance into development workflow
-- [ ] Add API documentation
-- [ ] Create usage examples
-- [ ] Document best practices
-
-## Future Considerations
-
-### Scalability
-- [ ] Consider horizontal scaling options
-- [ ] Implement rate limit handling
-- [ ] Add request queuing
-- [ ] Optimize resource usage
-
-### Monitoring
-- [ ] Add telemetry
-- [ ] Implement logging strategy
-- [ ] Add error tracking
-- [ ] Create monitoring dashboards

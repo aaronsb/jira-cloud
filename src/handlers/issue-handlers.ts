@@ -2,54 +2,26 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema, ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import { JiraClient } from '../client/jira-client.js';
+import { IssueExpansionOptions, IssueFormatter } from '../utils/formatters/index.js';
 
-type GetIssueArgs = {
-  issueKey: string;
-};
-
-type GetIssueDetailsArgs = {
-  issueKey: string;
-};
-
-type GetIssueAttachmentsArgs = {
-  issueKey: string;
-};
-
-// Basic issue response type for get_issue
-type BasicIssueResponse = {
-  key: string;
-  summary: string;
-  status: string;
-  assignee: string | null;
-};
-
-type UpdateIssueArgs = {
-  issueKey: string;
+// Type definition for the manage_jira_issue tool
+type ManageJiraIssueArgs = {
+  operation: 'create' | 'get' | 'update' | 'delete' | 'transition' | 'comment' | 'link';
+  issueKey?: string;
+  projectKey?: string;
   summary?: string;
   description?: string;
-  parent?: string | null;
-};
-
-type AddCommentArgs = {
-  issueKey: string;
-  body: string;
-};
-
-type TransitionIssueArgs = {
-  issueKey: string;
-  transitionId: string;
-  comment?: string;
-};
-
-type CreateIssueArgs = {
-  projectKey: string;
-  summary: string;
-  description?: string;
-  issueType: string;
+  issueType?: string;
   priority?: string;
   assignee?: string;
   labels?: string[];
   customFields?: Record<string, any>;
+  transitionId?: string;
+  comment?: string;
+  linkType?: string;
+  linkedIssueKey?: string;
+  expand?: string[];
+  parent?: string | null;
 };
 
 // Helper function to normalize parameter names (support both snake_case and camelCase)
@@ -59,6 +31,18 @@ function normalizeArgs(args: Record<string, unknown>): Record<string, unknown> {
     // Convert snake_case to camelCase
     if (key === 'issue_key') {
       normalized['issueKey'] = value;
+    } else if (key === 'project_key') {
+      normalized['projectKey'] = value;
+    } else if (key === 'issue_type') {
+      normalized['issueType'] = value;
+    } else if (key === 'transition_id') {
+      normalized['transitionId'] = value;
+    } else if (key === 'linked_issue_key') {
+      normalized['linkedIssueKey'] = value;
+    } else if (key === 'link_type') {
+      normalized['linkType'] = value;
+    } else if (key === 'custom_fields') {
+      normalized['customFields'] = value;
     } else {
       normalized[key] = value;
     }
@@ -66,98 +50,348 @@ function normalizeArgs(args: Record<string, unknown>): Record<string, unknown> {
   return normalized;
 }
 
-// Enhanced parameter validation with helpful error messages
-function validateIssueKey(args: unknown, toolName: string): void {
+// Validate the manage_jira_issue arguments
+function validateManageJiraIssueArgs(args: unknown): args is ManageJiraIssueArgs {
   if (typeof args !== 'object' || args === null) {
     throw new McpError(
       ErrorCode.InvalidParams,
-      `Invalid ${toolName} arguments: Expected an object with an issueKey parameter. Example: { "issueKey": "WORK-123" } or { "issue_key": "WORK-123" }`
+      'Invalid manage_jira_issue arguments: Expected an object with an operation parameter'
     );
   }
 
   const normalizedArgs = normalizeArgs(args as Record<string, unknown>);
   
-  if (typeof normalizedArgs.issueKey !== 'string') {
+  // Validate operation parameter
+  if (typeof normalizedArgs.operation !== 'string' || 
+      !['create', 'get', 'update', 'delete', 'transition', 'comment', 'link'].includes(normalizedArgs.operation as string)) {
     throw new McpError(
       ErrorCode.InvalidParams,
-      `Missing or invalid issueKey parameter. Please provide a valid issue key using either "issueKey" or "issue_key". Example: { "issueKey": "WORK-123" }`
+      'Invalid operation parameter. Valid values are: create, get, update, delete, transition, comment, link'
     );
   }
 
-  // Validate issue key format (e.g., PROJ-123)
-  if (!/^[A-Z][A-Z0-9_]+(-\d+)?$/.test(normalizedArgs.issueKey as string)) {
-    throw new McpError(
-      ErrorCode.InvalidParams,
-      `Invalid issue key format. Expected format: PROJ-123`
-    );
+  // Validate parameters based on operation
+  switch (normalizedArgs.operation) {
+    case 'get':
+      if (typeof normalizedArgs.issueKey !== 'string' || normalizedArgs.issueKey.trim() === '') {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          'Missing or invalid issueKey parameter. Please provide a valid issue key for the get operation.'
+        );
+      }
+      break;
+      
+    case 'create':
+      if (typeof normalizedArgs.projectKey !== 'string' || normalizedArgs.projectKey.trim() === '') {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          'Missing or invalid projectKey parameter. Please provide a valid project key for the create operation.'
+        );
+      }
+      if (typeof normalizedArgs.summary !== 'string' || normalizedArgs.summary.trim() === '') {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          'Missing or invalid summary parameter. Please provide a valid summary for the create operation.'
+        );
+      }
+      if (typeof normalizedArgs.issueType !== 'string' || normalizedArgs.issueType.trim() === '') {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          'Missing or invalid issueType parameter. Please provide a valid issue type for the create operation.'
+        );
+      }
+      break;
+      
+    case 'update':
+      if (typeof normalizedArgs.issueKey !== 'string' || normalizedArgs.issueKey.trim() === '') {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          'Missing or invalid issueKey parameter. Please provide a valid issue key for the update operation.'
+        );
+      }
+      // Ensure at least one update field is provided
+      if (
+        normalizedArgs.summary === undefined &&
+        normalizedArgs.description === undefined &&
+        normalizedArgs.parent === undefined &&
+        normalizedArgs.assignee === undefined &&
+        normalizedArgs.priority === undefined &&
+        normalizedArgs.labels === undefined &&
+        normalizedArgs.customFields === undefined
+      ) {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          'At least one update field (summary, description, parent, assignee, priority, labels, or customFields) must be provided for the update operation.'
+        );
+      }
+      break;
+      
+    case 'delete':
+      if (typeof normalizedArgs.issueKey !== 'string' || normalizedArgs.issueKey.trim() === '') {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          'Missing or invalid issueKey parameter. Please provide a valid issue key for the delete operation.'
+        );
+      }
+      break;
+      
+    case 'transition':
+      if (typeof normalizedArgs.issueKey !== 'string' || normalizedArgs.issueKey.trim() === '') {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          'Missing or invalid issueKey parameter. Please provide a valid issue key for the transition operation.'
+        );
+      }
+      if (typeof normalizedArgs.transitionId !== 'string' || normalizedArgs.transitionId.trim() === '') {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          'Missing or invalid transitionId parameter. Please provide a valid transition ID for the transition operation.'
+        );
+      }
+      break;
+      
+    case 'comment':
+      if (typeof normalizedArgs.issueKey !== 'string' || normalizedArgs.issueKey.trim() === '') {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          'Missing or invalid issueKey parameter. Please provide a valid issue key for the comment operation.'
+        );
+      }
+      if (typeof normalizedArgs.comment !== 'string' || normalizedArgs.comment.trim() === '') {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          'Missing or invalid comment parameter. Please provide a valid comment for the comment operation.'
+        );
+      }
+      break;
+      
+    case 'link':
+      if (typeof normalizedArgs.issueKey !== 'string' || normalizedArgs.issueKey.trim() === '') {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          'Missing or invalid issueKey parameter. Please provide a valid issue key for the link operation.'
+        );
+      }
+      if (typeof normalizedArgs.linkedIssueKey !== 'string' || normalizedArgs.linkedIssueKey.trim() === '') {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          'Missing or invalid linkedIssueKey parameter. Please provide a valid linked issue key for the link operation.'
+        );
+      }
+      if (typeof normalizedArgs.linkType !== 'string' || normalizedArgs.linkType.trim() === '') {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          'Missing or invalid linkType parameter. Please provide a valid link type for the link operation.'
+        );
+      }
+      break;
   }
-}
 
-function isGetIssueArgs(args: unknown): args is GetIssueArgs {
-  validateIssueKey(args, 'get_jira_issue');
-  return true;
-}
-
-function isGetIssueDetailsArgs(args: unknown): args is GetIssueDetailsArgs {
-  validateIssueKey(args, 'get_jira_issue_details');
-  return true;
-}
-
-function isGetIssueAttachmentsArgs(args: unknown): args is GetIssueAttachmentsArgs {
-  validateIssueKey(args, 'get_jira_issue_attachments');
-  return true;
-}
-
-function isUpdateIssueArgs(args: unknown): args is UpdateIssueArgs {
-  validateIssueKey(args, 'update_jira_issue');
-  return true;
-}
-
-function isAddCommentArgs(args: unknown): args is AddCommentArgs {
-  validateIssueKey(args, 'add_jira_comment');
-  const normalizedArgs = normalizeArgs(args as Record<string, unknown>);
-  if (typeof normalizedArgs.body !== 'string') {
-    throw new McpError(
-      ErrorCode.InvalidParams,
-      'Missing or invalid body parameter. Please provide a comment body as a string.'
-    );
+  // Validate expand parameter
+  if (normalizedArgs.expand !== undefined) {
+    if (!Array.isArray(normalizedArgs.expand)) {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        'Invalid expand parameter. Expected an array of strings.'
+      );
+    }
+    
+    const validExpansions = ['comments', 'transitions', 'attachments', 'related_issues', 'history'];
+    for (const expansion of normalizedArgs.expand) {
+      if (typeof expansion !== 'string' || !validExpansions.includes(expansion)) {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          `Invalid expansion: ${expansion}. Valid expansions are: ${validExpansions.join(', ')}`
+        );
+      }
+    }
   }
+
   return true;
 }
 
-function isCreateIssueArgs(args: unknown): args is CreateIssueArgs {
-  const typedArgs = args as CreateIssueArgs;
-  return (
-    typeof args === 'object' &&
-    args !== null &&
-    typeof typedArgs.projectKey === 'string' &&
-    typeof typedArgs.summary === 'string' &&
-    typeof typedArgs.issueType === 'string' &&
-    (typedArgs.description === undefined || typeof typedArgs.description === 'string') &&
-    (typedArgs.priority === undefined || typeof typedArgs.priority === 'string') &&
-    (typedArgs.assignee === undefined || typeof typedArgs.assignee === 'string') &&
-    (typedArgs.labels === undefined || Array.isArray(typedArgs.labels)) &&
-    (typedArgs.customFields === undefined || typeof typedArgs.customFields === 'object')
+// Handler functions for each operation
+async function handleGetIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs) {
+  // Parse expansion options
+  const expansionOptions: IssueExpansionOptions = {};
+  if (args.expand) {
+    for (const expansion of args.expand) {
+      expansionOptions[expansion as keyof IssueExpansionOptions] = true;
+    }
+  }
+
+  // Get issue with requested expansions
+  const includeComments = expansionOptions.comments || false;
+  const includeAttachments = expansionOptions.attachments || false;
+  const issue = await jiraClient.getIssue(
+    args.issueKey!, 
+    includeComments, 
+    includeAttachments
   );
-}
-
-function isTransitionIssueArgs(args: unknown): args is TransitionIssueArgs {
-  validateIssueKey(args, 'transition_jira_issue');
-  const normalizedArgs = normalizeArgs(args as Record<string, unknown>);
-  if (typeof normalizedArgs.transitionId !== 'string') {
-    throw new McpError(
-      ErrorCode.InvalidParams,
-      'Missing or invalid transitionId parameter. Please provide a valid transition ID as a string.'
-    );
+  
+  // Get transitions if requested
+  let transitions = undefined;
+  if (expansionOptions.transitions) {
+    transitions = await jiraClient.getTransitions(args.issueKey!);
   }
-  return true;
+  
+  // Format the response using the IssueFormatter
+  const formattedResponse = IssueFormatter.formatIssue(issue, expansionOptions, transitions);
+
+  return {
+    content: [
+      {
+        type: 'text',
+        text: JSON.stringify(formattedResponse, null, 2),
+      },
+    ],
+  };
 }
 
-function hasIssueKey(args: unknown): args is { issueKey: string } {
-  validateIssueKey(args, 'get_jira_populated_fields');
-  return true;
+async function handleCreateIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs) {
+  const result = await jiraClient.createIssue({
+    projectKey: args.projectKey!,
+    summary: args.summary!,
+    issueType: args.issueType!,
+    description: args.description,
+    priority: args.priority,
+    assignee: args.assignee,
+    labels: args.labels,
+    customFields: args.customFields
+  });
+  
+  // Get the created issue to return
+  const createdIssue = await jiraClient.getIssue(result.key, false, false);
+  const formattedResponse = IssueFormatter.formatIssue(createdIssue);
+
+  return {
+    content: [
+      {
+        type: 'text',
+        text: JSON.stringify(formattedResponse, null, 2),
+      },
+    ],
+  };
 }
 
+async function handleUpdateIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs) {
+  await jiraClient.updateIssue(
+    args.issueKey!,
+    args.summary,
+    args.description,
+    args.parent
+  );
+
+  // Get the updated issue to return
+  const updatedIssue = await jiraClient.getIssue(args.issueKey!, false, false);
+  const formattedResponse = IssueFormatter.formatIssue(updatedIssue);
+
+  return {
+    content: [
+      {
+        type: 'text',
+        text: JSON.stringify(formattedResponse, null, 2),
+      },
+    ],
+  };
+}
+
+async function handleDeleteIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs) {
+  // Note: This is a placeholder. The current JiraClient doesn't have a deleteIssue method.
+  // You would need to implement this in the JiraClient class.
+  throw new McpError(
+    ErrorCode.InternalError,
+    'Delete issue operation is not yet implemented'
+  );
+
+  // When implemented, it would look something like this:
+  /*
+  await jiraClient.deleteIssue(args.issueKey!);
+
+  return {
+    content: [
+      {
+        type: 'text',
+        text: JSON.stringify({
+          success: true,
+          message: `Issue ${args.issueKey} has been deleted successfully.`,
+        }, null, 2),
+      },
+    ],
+  };
+  */
+}
+
+async function handleTransitionIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs) {
+  await jiraClient.transitionIssue(
+    args.issueKey!,
+    args.transitionId!,
+    args.comment
+  );
+
+  // Get the updated issue to return
+  const updatedIssue = await jiraClient.getIssue(args.issueKey!, false, false);
+  const formattedResponse = IssueFormatter.formatIssue(updatedIssue);
+
+  return {
+    content: [
+      {
+        type: 'text',
+        text: JSON.stringify(formattedResponse, null, 2),
+      },
+    ],
+  };
+}
+
+async function handleCommentIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs) {
+  await jiraClient.addComment(args.issueKey!, args.comment!);
+
+  // Get the updated issue with comments to return
+  const updatedIssue = await jiraClient.getIssue(args.issueKey!, true, false);
+  const formattedResponse = IssueFormatter.formatIssue(updatedIssue, { comments: true });
+
+  return {
+    content: [
+      {
+        type: 'text',
+        text: JSON.stringify(formattedResponse, null, 2),
+      },
+    ],
+  };
+}
+
+async function handleLinkIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs) {
+  // Note: This is a placeholder. The current JiraClient doesn't have a linkIssues method.
+  // You would need to implement this in the JiraClient class.
+  throw new McpError(
+    ErrorCode.InternalError,
+    'Link issue operation is not yet implemented'
+  );
+
+  // When implemented, it would look something like this:
+  /*
+  await jiraClient.linkIssues(
+    args.issueKey!,
+    args.linkedIssueKey!,
+    args.linkType!
+  );
+
+  // Get the updated issue to return
+  const updatedIssue = await jiraClient.getIssue(args.issueKey!, false, false);
+  const formattedResponse = IssueFormatter.formatIssue(updatedIssue);
+
+  return {
+    content: [
+      {
+        type: 'text',
+        text: JSON.stringify(formattedResponse, null, 2),
+      },
+    ],
+  };
+  */
+}
+
+// Main handler function
 export async function setupIssueHandlers(
   server: Server,
   jiraClient: JiraClient,
@@ -179,225 +413,60 @@ export async function setupIssueHandlers(
     );
   }
 
-  // Normalize arguments to support both snake_case and camelCase
-  const normalizedArgs = normalizeArgs(args);
+  // Handle the manage_jira_issue tool
+  if (name === 'manage_jira_issue') {
+    // Normalize arguments to support both snake_case and camelCase
+    const normalizedArgs = normalizeArgs(args);
+    
+    // Validate arguments
+    if (!validateManageJiraIssueArgs(normalizedArgs)) {
+      throw new McpError(ErrorCode.InvalidParams, 'Invalid manage_jira_issue arguments');
+    }
 
-  switch (name) {
-      case 'get_jira_issue': {
-        console.error('Processing get_jira_issue request');
-        if (!isGetIssueArgs(normalizedArgs)) {
-          throw new McpError(ErrorCode.InvalidParams, 'Invalid get_issue arguments');
-        }
-
-        const issue = await jiraClient.getIssue(normalizedArgs.issueKey as string, false);
-        
-        // Return only basic information
-        const basicResponse: BasicIssueResponse = {
-          key: issue.key,
-          summary: issue.summary,
-          status: issue.status,
-          assignee: issue.assignee,
-        };
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(basicResponse, null, 2),
-            },
-          ],
-        };
+    // Process the operation
+    switch (normalizedArgs.operation) {
+      case 'get': {
+        console.error('Processing get issue operation');
+        return await handleGetIssue(jiraClient, normalizedArgs as ManageJiraIssueArgs);
       }
-
-      case 'get_jira_issue_details': {
-        console.error('Processing get_jira_issue_details request');
-        if (!isGetIssueDetailsArgs(normalizedArgs)) {
-          throw new McpError(ErrorCode.InvalidParams, 'Invalid get_issue_details arguments');
-        }
-
-        // Get full issue details including comments but not attachments
-        const issue = await jiraClient.getIssue(normalizedArgs.issueKey as string, true, false);
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(issue, null, 2),
-            },
-          ],
-        };
+      
+      case 'create': {
+        console.error('Processing create issue operation');
+        return await handleCreateIssue(jiraClient, normalizedArgs as ManageJiraIssueArgs);
       }
-
-      case 'get_jira_issue_attachments': {
-        console.error('Processing get_jira_issue_attachments request');
-        if (!isGetIssueAttachmentsArgs(normalizedArgs)) {
-          throw new McpError(ErrorCode.InvalidParams, 'Invalid get_issue_attachments arguments');
-        }
-
-        const attachments = await jiraClient.getIssueAttachments(normalizedArgs.issueKey as string);
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(attachments, null, 2),
-            },
-          ],
-        };
+      
+      case 'update': {
+        console.error('Processing update issue operation');
+        return await handleUpdateIssue(jiraClient, normalizedArgs as ManageJiraIssueArgs);
       }
-
-      case 'get_jira_fields': {
-        console.error('Processing get_jira_fields request');
-        if (!hasIssueKey(normalizedArgs)) {
-          throw new McpError(ErrorCode.InvalidParams, 'Invalid get_jira_fields arguments');
-        }
-
-        const fields = await jiraClient.getPopulatedFields(normalizedArgs.issueKey as string);
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: fields,
-            },
-          ],
-        };
+      
+      case 'delete': {
+        console.error('Processing delete issue operation');
+        return await handleDeleteIssue(jiraClient, normalizedArgs as ManageJiraIssueArgs);
       }
-
-      case 'get_jira_transitions': {
-        console.error('Processing get_jira_transitions request');
-        if (!hasIssueKey(normalizedArgs)) {
-          throw new McpError(ErrorCode.InvalidParams, 'Invalid get_jira_transitions arguments');
-        }
-
-        const transitions = await jiraClient.getTransitions(normalizedArgs.issueKey as string);
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(transitions, null, 2),
-            },
-          ],
-        };
+      
+      case 'transition': {
+        console.error('Processing transition issue operation');
+        return await handleTransitionIssue(jiraClient, normalizedArgs as ManageJiraIssueArgs);
       }
-
-      case 'update_jira_issue': {
-        console.error('Processing update_jira_issue request');
-        if (!isUpdateIssueArgs(normalizedArgs)) {
-          throw new McpError(ErrorCode.InvalidParams, 'Invalid update_jira_issue arguments');
-        }
-
-        if (!normalizedArgs.summary && !normalizedArgs.description && normalizedArgs.parent === undefined) {
-          throw new McpError(
-            ErrorCode.InvalidParams,
-            'Must provide at least one of summary, description, or parent'
-          );
-        }
-
-        await jiraClient.updateIssue(
-          normalizedArgs.issueKey as string,
-          normalizedArgs.summary as string | undefined,
-          normalizedArgs.description as string | undefined,
-          normalizedArgs.parent as string | null | undefined
-        );
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify({ message: 'Issue updated successfully' }, null, 2),
-            },
-          ],
-        };
+      
+      case 'comment': {
+        console.error('Processing comment issue operation');
+        return await handleCommentIssue(jiraClient, normalizedArgs as ManageJiraIssueArgs);
       }
-
-      case 'add_jira_comment': {
-        console.error('Processing add_jira_comment request');
-        if (!isAddCommentArgs(normalizedArgs)) {
-          throw new McpError(ErrorCode.InvalidParams, 'Invalid add_jira_comment arguments');
-        }
-
-        await jiraClient.addComment(normalizedArgs.issueKey as string, normalizedArgs.body as string);
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(
-                {
-                  message: 'Comment added successfully',
-                  body: normalizedArgs.body,
-                },
-                null,
-                2
-              ),
-            },
-          ],
-        };
+      
+      case 'link': {
+        console.error('Processing link issue operation');
+        return await handleLinkIssue(jiraClient, normalizedArgs as ManageJiraIssueArgs);
       }
-
-      case 'transition_jira_issue': {
-        console.error('Processing transition_jira_issue request');
-        if (!isTransitionIssueArgs(normalizedArgs)) {
-          throw new McpError(ErrorCode.InvalidParams, 'Invalid transition_jira_issue arguments');
-        }
-
-        await jiraClient.transitionIssue(
-          normalizedArgs.issueKey as string,
-          normalizedArgs.transitionId as string,
-          normalizedArgs.comment as string | undefined
-        );
-
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(
-                {
-                  message: 'Issue transitioned successfully',
-                  transitionId: normalizedArgs.transitionId,
-                  comment: normalizedArgs.comment || 'No comment provided',
-                },
-                null,
-                2
-              ),
-            },
-          ],
-        };
-      }
-
-      case 'create_jira_issue': {
-        console.error('Processing create_jira_issue request');
-        if (!isCreateIssueArgs(normalizedArgs)) {
-          throw new McpError(
-            ErrorCode.InvalidParams,
-            'Invalid create_jira_issue arguments. Required: projectKey (string), summary (string), issueType (string)'
-          );
-        }
-
-        const result = await jiraClient.createIssue(normalizedArgs);
-        
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(
-                {
-                  message: 'Issue created successfully',
-                  key: result.key
-                },
-                null,
-                2
-              ),
-            },
-          ],
-        };
-      }
-
+      
       default: {
-        console.error(`Unknown tool requested: ${name}`);
-        throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
+        console.error(`Unknown operation: ${normalizedArgs.operation}`);
+        throw new McpError(ErrorCode.MethodNotFound, `Unknown operation: ${normalizedArgs.operation}`);
       }
     }
+  }
+
+  console.error(`Unknown tool requested: ${name}`);
+  throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
 }
