@@ -23,7 +23,24 @@ export const toolSchemas = {
         },
         jql: {
           type: 'string',
-          description: 'JQL query string for the filter. Required for create operation, optional for update.',
+          description: 'JQL query string. Supports a wide range of search patterns:\n\n' +
+            '# Portfolio/Plans Queries\n' +
+            '- Find child issues: issue in portfolioChildIssuesOf("PROJ-123")\n' +
+            '- Combined portfolio search: issue in portfolioChildIssuesOf("PROJ-123") AND status = "In Progress"\n' +
+            '- Multiple portfolios: issue in portfolioChildIssuesOf("PROJ-123") OR issue in portfolioChildIssuesOf("PROJ-456")\n\n' +
+            '# Common Search Patterns\n' +
+            '- Assigned issues: assignee = currentUser()\n' +
+            '- Unassigned issues: assignee IS EMPTY\n' +
+            '- Recent changes: status CHANGED AFTER -1w\n' +
+            '- Multiple statuses: status IN ("In Progress", "Under Review", "Testing")\n' +
+            '- Priority tasks: priority = High AND status = Open\n' +
+            '- Component search: component = "User Interface" OR component = "API"\n\n' +
+            '# Advanced Functions\n' +
+            '- Sort results: ORDER BY created DESC\n' +
+            '- Track changes: status WAS "Resolved" AND status = "Open"\n' +
+            '- Team filters: assignee IN MEMBERSOF("developers")\n\n' +
+            'JQL supports complex combinations using AND, OR, NOT operators and parentheses for grouping. ' +
+            'All text values are case-sensitive and must be enclosed in quotes when they contain spaces.',
         },
         description: {
           type: 'string',
@@ -36,12 +53,12 @@ export const toolSchemas = {
         // Parameters for list operation
         startAt: {
           type: 'integer',
-          description: 'Index of the first filter to return (0-based). Used for list operation. Can also use snake_case "start_at".',
+          description: 'Index of the first filter to return (0-based). Used for list and execute_jql operations. Can also use snake_case "start_at".',
           default: 0,
         },
         maxResults: {
           type: 'integer',
-          description: 'Maximum number of filters to return. Used for list operation. Can also use snake_case "max_results".',
+          description: 'Maximum number of filters or issues to return. Used for list and execute_jql operations. Can also use snake_case "max_results".',
           default: 50,
         },
         // Parameters for sharing
@@ -73,7 +90,7 @@ export const toolSchemas = {
           type: 'array',
           items: {
             type: 'string',
-            enum: ['jql', 'description', 'permissions', 'issue_count'],
+            enum: ['jql', 'description', 'permissions', 'issue_count', 'issue_details', 'transitions', 'comments_preview'],
           },
           description: 'Optional fields to include in the response',
         },
@@ -323,7 +340,6 @@ export const toolSchemas = {
     },
   },
 
-
   // Board Management API
   manage_jira_board: {
     name: 'manage_jira_board',
@@ -385,7 +401,7 @@ export const toolSchemas = {
     },
   },
 
-  // Enhanced Search API
+  // Enhanced Search API - will be deprecated after consolidation
   search_jira_issues: {
     name: 'search_jira_issues',
     description: 'Search for issues using JQL with enhanced results and optional expansions',
@@ -436,7 +452,4 @@ export const toolSchemas = {
       required: ['jql'],
     },
   },
-
-
-
 };

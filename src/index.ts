@@ -16,7 +16,6 @@ import { setupBoardHandlers } from './handlers/board-handlers.js';
 import { setupFilterHandlers } from './handlers/filter-handlers.js';
 import { setupIssueHandlers } from './handlers/issue-handlers.js';
 import { setupProjectHandlers } from './handlers/project-handlers.js';
-import { setupSearchHandlers } from './handlers/search-handlers.js';
 import { setupSprintHandlers } from './handlers/sprint-handlers.js';
 import { toolSchemas } from './schemas/tool-schemas.js';
 
@@ -38,24 +37,27 @@ class JiraServer {
     console.error('Available schemas:', Object.keys(toolSchemas));
 
     // Convert tool schemas to the format expected by the MCP SDK
-    const tools = Object.entries(toolSchemas).map(([key, schema]) => {
-      console.error(`Registering tool: ${key}`);
-      const inputSchema = {
-        type: 'object',
-        properties: schema.inputSchema.properties,
-      } as const;
+    const tools = Object.entries(toolSchemas)
+      // Filter out the deprecated search_jira_issues tool
+      .filter(([key]) => key !== 'search_jira_issues')
+      .map(([key, schema]) => {
+        console.error(`Registering tool: ${key}`);
+        const inputSchema = {
+          type: 'object',
+          properties: schema.inputSchema.properties,
+        } as const;
 
-      // Only add required field if it exists in the schema
-      if ('required' in schema.inputSchema) {
-        Object.assign(inputSchema, { required: schema.inputSchema.required });
-      }
+        // Only add required field if it exists in the schema
+        if ('required' in schema.inputSchema) {
+          Object.assign(inputSchema, { required: schema.inputSchema.required });
+        }
 
-      return {
-        name: key,
-        description: schema.description,
-        inputSchema,
-      };
-    });
+        return {
+          name: key,
+          description: schema.description,
+          inputSchema,
+        };
+      });
 
     console.error('Initializing server with tools:', JSON.stringify(tools, null, 2));
 
@@ -99,15 +101,18 @@ class JiraServer {
   private setupHandlers() {
     // Set up required MCP protocol handlers
     this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
-      tools: Object.entries(toolSchemas).map(([key, schema]) => ({
-        name: key,
-        description: schema.description,
-        inputSchema: {
-          type: 'object',
-          properties: schema.inputSchema.properties,
-          ...(('required' in schema.inputSchema) ? { required: schema.inputSchema.required } : {}),
-        },
-      })),
+      tools: Object.entries(toolSchemas)
+        // Filter out the deprecated search_jira_issues tool
+        .filter(([key]) => key !== 'search_jira_issues')
+        .map(([key, schema]) => ({
+          name: key,
+          description: schema.description,
+          inputSchema: {
+            type: 'object',
+            properties: schema.inputSchema.properties,
+            ...(('required' in schema.inputSchema) ? { required: schema.inputSchema.required } : {}),
+          },
+        })),
     }));
 
     this.server.setRequestHandler(ListResourcesRequestSchema, async () => ({
@@ -137,11 +142,6 @@ class JiraServer {
           response = await setupIssueHandlers(this.server, this.jiraClient, request);
         }
         
-        // Search-related tools
-        else if (['search_jira_issues'].includes(name)) {
-          response = await setupSearchHandlers(this.server, this.jiraClient, request);
-        }
-
         // Project-related tools
         else if (['manage_jira_project'].includes(name)) {
           response = await setupProjectHandlers(this.server, this.jiraClient, request);
@@ -156,10 +156,32 @@ class JiraServer {
         else if (['manage_jira_sprint'].includes(name)) {
           response = await setupSprintHandlers(this.server, this.jiraClient, request);
         }
+        
         // Filter-related tools
         else if (['manage_jira_filter'].includes(name)) {
           response = await setupFilterHandlers(this.server, this.jiraClient, request);
         }
+        
+        // Legacy search tool - redirect to filter handler with execute_jql operation
+        else if (name === 'search_jira_issues') {
+          console.error('Redirecting deprecated search_jira_issues to manage_jira_filter with execute_jql operation');
+          
+          // Transform the request to use manage_jira_filter with execute_jql operation
+          const transformedRequest = {
+            ...request,
+            params: {
+              ...request.params,
+              name: 'manage_jira_filter',
+              arguments: {
+                ...request.params.arguments,
+                operation: 'execute_jql'
+              }
+            }
+          };
+          
+          response = await setupFilterHandlers(this.server, this.jiraClient, transformedRequest);
+        }
+        
         else {
           console.error(`Unknown tool requested: ${name}`);
           throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);

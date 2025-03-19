@@ -2,7 +2,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import { JiraClient } from '../client/jira-client.js';
-import { FilterData, FilterExpansionOptions, FilterFormatter } from '../utils/formatters/index.js';
+import { FilterData, FilterExpansionOptions, FilterFormatter, SearchExpansionOptions, SearchFormatter } from '../utils/formatters/index.js';
 import { FilterResponse } from '../types/index.js';
 
 // Type definition for the consolidated filter management tool
@@ -102,8 +102,8 @@ function validateManageJiraFilterArgs(args: unknown): args is ManageJiraFilterAr
       break;
   }
 
-  // Validate pagination parameters for list operation
-  if (normalizedArgs.operation === 'list') {
+  // Validate pagination parameters for list and execute_jql operations
+  if (normalizedArgs.operation === 'list' || normalizedArgs.operation === 'execute_jql') {
     if (normalizedArgs.startAt !== undefined && typeof normalizedArgs.startAt !== 'number') {
       throw new McpError(
         ErrorCode.InvalidParams,
@@ -128,7 +128,12 @@ function validateManageJiraFilterArgs(args: unknown): args is ManageJiraFilterAr
       );
     }
     
-    const validExpansions = ['jql', 'description', 'permissions', 'issue_count'];
+    // Combined list of valid expansions for both filter and search operations
+    const validExpansions = [
+      'jql', 'description', 'permissions', 'issue_count',  // Filter expansions
+      'issue_details', 'transitions', 'comments_preview'   // Search expansions
+    ];
+    
     for (const expansion of normalizedArgs.expand) {
       if (typeof expansion !== 'string' || !validExpansions.includes(expansion)) {
         throw new McpError(
@@ -190,7 +195,9 @@ async function handleGetFilter(jiraClient: JiraClient, args: ManageJiraFilterArg
   const expansionOptions: FilterExpansionOptions = {};
   if (args.expand) {
     for (const expansion of args.expand) {
-      expansionOptions[expansion as keyof FilterExpansionOptions] = true;
+      if (['jql', 'description', 'permissions', 'issue_count'].includes(expansion)) {
+        expansionOptions[expansion as keyof FilterExpansionOptions] = true;
+      }
     }
   }
   
@@ -201,7 +208,7 @@ async function handleGetFilter(jiraClient: JiraClient, args: ManageJiraFilterArg
     const issues = await jiraClient.getFilterIssues(filterId);
     
     // Now get the filter details from the list of all filters
-    const allFilters = await jiraClient.listMyFilters(true);
+    const allFilters = await jiraClient.listMyFilters(expansionOptions.jql || expansionOptions.description || expansionOptions.permissions);
     const filter = allFilters.find(f => f.id === filterId);
     
     if (!filter) {
@@ -274,7 +281,9 @@ async function handleListFilters(jiraClient: JiraClient, args: ManageJiraFilterA
   const expansionOptions: FilterExpansionOptions = {};
   if (args.expand) {
     for (const expansion of args.expand) {
-      expansionOptions[expansion as keyof FilterExpansionOptions] = true;
+      if (['jql', 'description', 'permissions', 'issue_count'].includes(expansion)) {
+        expansionOptions[expansion as keyof FilterExpansionOptions] = true;
+      }
     }
   }
   
@@ -463,23 +472,44 @@ async function handleExecuteJql(jiraClient: JiraClient, args: ManageJiraFilterAr
   const startAt = args.startAt !== undefined ? args.startAt : 0;
   const maxResults = args.maxResults !== undefined ? args.maxResults : 25;
   
-  // Execute the JQL query
-  const searchResults = await jiraClient.searchIssues(args.jql, startAt, maxResults);
-  
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify({
-          data: searchResults.issues,
-          _metadata: {
-            jql: args.jql,
-            pagination: searchResults.pagination
-          }
-        }, null, 2),
-      },
-    ],
-  };
+  try {
+    console.error(`Executing JQL search with args:`, JSON.stringify(args, null, 2));
+    
+    // Parse search expansion options
+    const searchExpansionOptions: SearchExpansionOptions = {};
+    if (args.expand) {
+      for (const expansion of args.expand) {
+        if (['issue_details', 'transitions', 'comments_preview'].includes(expansion)) {
+          searchExpansionOptions[expansion as keyof SearchExpansionOptions] = true;
+        }
+      }
+    }
+    
+    // Execute the search
+    const searchResult = await jiraClient.searchIssues(
+      args.jql,
+      startAt,
+      maxResults
+    );
+    
+    // Format the response using the SearchFormatter for enhanced results
+    const formattedResponse = SearchFormatter.formatSearchResult(searchResult, searchExpansionOptions);
+    
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(formattedResponse, null, 2),
+        },
+      ],
+    };
+  } catch (error) {
+    console.error('Error in execute_jql:', error);
+    if (error instanceof Error) {
+      throw new McpError(ErrorCode.InvalidRequest, `Jira API error: ${error.message}`);
+    }
+    throw new McpError(ErrorCode.InvalidRequest, 'Failed to execute Jira search');
+  }
 }
 
 // Main handler function
