@@ -16,6 +16,7 @@ import { setupBoardHandlers } from './handlers/board-handlers.js';
 import { setupFilterHandlers } from './handlers/filter-handlers.js';
 import { setupIssueHandlers } from './handlers/issue-handlers.js';
 import { setupProjectHandlers } from './handlers/project-handlers.js';
+import { setupResourceHandlers } from './handlers/resource-handlers.js';
 import { setupSprintHandlers } from './handlers/sprint-handlers.js';
 import { toolSchemas } from './schemas/tool-schemas.js';
 
@@ -77,7 +78,7 @@ class JiraServer {
             schemas: tools,
           },
           resources: {
-            schemas: [], // Explicitly define empty resources
+            schemas: [], // Resource schemas are handled by the resource handlers
           },
         },
       }
@@ -115,16 +116,12 @@ class JiraServer {
         })),
     }));
 
-    this.server.setRequestHandler(ListResourcesRequestSchema, async () => ({
-      resources: [], // No resources provided by this server
-    }));
-
-    this.server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => ({
-      resourceTemplates: [], // No resource templates provided by this server
-    }));
-
+    // Set up resource handlers
+    const resourceHandlers = setupResourceHandlers(this.jiraClient);
+    this.server.setRequestHandler(ListResourcesRequestSchema, resourceHandlers.listResources);
+    this.server.setRequestHandler(ListResourceTemplatesRequestSchema, resourceHandlers.listResourceTemplates);
     this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-      throw new McpError(ErrorCode.InvalidRequest, `No resources available: ${request.params.uri}`);
+      return resourceHandlers.readResource(request.params.uri);
     });
 
     // Set up tool handlers
