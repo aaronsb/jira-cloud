@@ -22,10 +22,30 @@ await use_mcp_tool({
 
 | Tool | Description | Required Parameters | Optional Parameters |
 |------|-------------|---------------------|---------------------|
-| `list_jira_boards` | List all boards | None | `include_sprints` |
-| `get_jira_board` | Get board details | `boardId` | `expand` |
-| `list_jira_projects` | List all projects | None | `include_status_counts` |
-| `get_jira_project` | Get project details | `projectKey` | `expand`, `include_status_counts` |
+| `manage_jira_board` | Comprehensive board management | `operation` | Depends on operation (see below) |
+| `manage_jira_project` | Comprehensive project management | `operation` | Depends on operation (see below) |
+
+#### Board Operations
+
+| Operation | Description | Required Parameters | Optional Parameters |
+|-----------|-------------|---------------------|---------------------|
+| `get` | Get board details | `boardId` | `expand`, `include_sprints` |
+| `list` | List all boards | None | `startAt`, `maxResults`, `include_sprints` |
+| `create` | Create a new board | `name`, `type`, `projectKey` | None |
+| `update` | Update a board | `boardId` | `name` |
+| `delete` | Delete a board | `boardId` | None |
+| `get_configuration` | Get board configuration | `boardId` | None |
+
+
+#### Project Operations
+
+| Operation | Description | Required Parameters | Optional Parameters |
+|-----------|-------------|---------------------|---------------------|
+| `get` | Get project details | `projectKey` | `expand`, `include_status_counts` |
+| `list` | List all projects | None | `startAt`, `maxResults`, `include_status_counts` |
+| `create` | Create a new project | `name`, `key` | `description`, `lead` |
+| `update` | Update a project | `projectKey` | `name`, `description`, `lead` |
+| `delete` | Delete a project | `projectKey` | None |
 
 ### Issue Operations
 
@@ -134,15 +154,42 @@ await use_mcp_tool({
 });
 ```
 
-### Get Board with Sprints
+
+### Using Consolidated Board Management
 
 ```typescript
+// Get a board with sprints
 await use_mcp_tool({
   server_name: "jira-cloud",
-  tool_name: "get_jira_board",
+  tool_name: "manage_jira_board",
   arguments: {
+    operation: "get",
     boardId: 123,
     expand: ["sprints"]
+  }
+});
+
+// List all boards with pagination
+await use_mcp_tool({
+  server_name: "jira-cloud",
+  tool_name: "manage_jira_board",
+  arguments: {
+    operation: "list",
+    startAt: 0,
+    maxResults: 50,
+    include_sprints: true
+  }
+});
+
+// Create a new board
+await use_mcp_tool({
+  server_name: "jira-cloud",
+  tool_name: "manage_jira_board",
+  arguments: {
+    operation: "create",
+    name: "New Development Board",
+    type: "scrum",
+    projectKey: "PROJ"
   }
 });
 ```

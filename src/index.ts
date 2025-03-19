@@ -147,7 +147,7 @@ class JiraServer {
         }
 
         // Board-related tools
-        else if (['list_jira_boards', 'get_jira_board'].includes(name)) {
+        else if (['manage_jira_board'].includes(name)) {
           response = await setupBoardHandlers(this.server, this.jiraClient, request);
         }
 

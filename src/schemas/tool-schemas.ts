@@ -241,17 +241,49 @@ export const toolSchemas = {
   },
 
 
-  // Enhanced Board API
-  get_jira_board: {
-    name: 'get_jira_board',
-    description: 'Get comprehensive information about a Jira board with optional expansions',
+  // Consolidated Board Management API
+  manage_jira_board: {
+    name: 'manage_jira_board',
+    description: 'Comprehensive board management with CRUD operations and related data',
     inputSchema: {
       type: 'object',
       properties: {
+        operation: {
+          type: 'string',
+          enum: ['get', 'list', 'create', 'update', 'delete', 'get_configuration'],
+          description: 'Operation to perform on the board',
+        },
+        // Parameters for get, update, delete, get_configuration operations
         boardId: {
           type: 'integer',
-          description: 'The ID of the board. Can also use snake_case "board_id".',
+          description: 'The ID of the board. Required for get, update, delete, and get_configuration operations. Can also use snake_case "board_id".',
         },
+        // Parameters for create operation
+        name: {
+          type: 'string',
+          description: 'Name of the board. Required for create operation, optional for update.',
+        },
+        type: {
+          type: 'string',
+          enum: ['scrum', 'kanban'],
+          description: 'Type of board. Required for create operation.',
+        },
+        projectKey: {
+          type: 'string',
+          description: 'Project key for the board. Required for create operation. Can also use snake_case "project_key".',
+        },
+        // Parameters for list operation
+        startAt: {
+          type: 'integer',
+          description: 'Index of the first board to return (0-based). Used for list operation. Can also use snake_case "start_at".',
+          default: 0,
+        },
+        maxResults: {
+          type: 'integer',
+          description: 'Maximum number of boards to return. Used for list operation. Can also use snake_case "max_results".',
+          default: 50,
+        },
+        // Common expansion options
         expand: {
           type: 'array',
           items: {
@@ -260,8 +292,13 @@ export const toolSchemas = {
           },
           description: 'Optional fields to include in the response',
         },
+        include_sprints: {
+          type: 'boolean',
+          description: 'Whether to include active sprints for each board (shorthand for expand: ["sprints"])',
+          default: false,
+        },
       },
-      required: ['boardId'],
+      required: ['operation'],
     },
   },
 
@@ -318,20 +355,5 @@ export const toolSchemas = {
   },
 
 
-  // List Boards (simplified)
-  list_jira_boards: {
-    name: 'list_jira_boards',
-    description: 'Get a list of all boards in Jira',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        include_sprints: {
-          type: 'boolean',
-          description: 'Whether to include active sprints for each board',
-          default: false,
-        },
-      },
-    },
-  },
 
 };
