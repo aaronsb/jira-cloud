@@ -1,6 +1,6 @@
 # API Reference
 
-This document provides information about the available tools in the Jira Cloud MCP Server.
+This document provides information about the available tools and resources in the Jira Cloud MCP Server.
 
 ## Using MCP Tools
 
@@ -15,6 +15,19 @@ await use_mcp_tool({
   }
 });
 ```
+
+## Using MCP Resources
+
+Resources provide contextual information about your Jira instance and can be accessed through the MCP `access_mcp_resource` function:
+
+```typescript
+await access_mcp_resource({
+  server_name: "jira-cloud",
+  uri: "jira://instance/summary"
+});
+```
+
+For detailed information about available resources, see the [Resources documentation](./resources.md).
 
 ## Available Tools
 

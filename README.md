@@ -39,6 +39,7 @@ For detailed installation instructions, see the [Getting Started Guide](./docs/g
 - **Issue Management**: Create, retrieve, update, and comment on Jira issues
 - **Search Capabilities**: JQL search with filtering
 - **Project & Board Management**: List and manage projects, boards, and sprints
+- **MCP Resources**: Access Jira data as context through MCP resources
 - **Customization**: Support for custom fields and workflows
 
 ## Architecture
@@ -61,6 +62,7 @@ Essential documentation is available in the `docs/` directory:
 
 - [Getting Started](./docs/getting-started.md) - Setup and installation
 - [API Reference](./docs/api-reference.md) - Available tools and usage
+- [Resources](./docs/resources.md) - Available MCP resources
 - [Troubleshooting](./docs/troubleshooting.md) - Common issues and solutions
 - [Development](./docs/development.md) - Development guide
 
