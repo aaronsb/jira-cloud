@@ -29,6 +29,9 @@ This document tracks the remaining work for the Jira Cloud MCP tool consolidatio
 - [ ] Optimize batch requests for related data
 - [ ] Implement more advanced contextual insights
 - [x] Add more suggested actions based on entity state
+- [ ] Consolidate Project API into a single `manage_jira_project` tool (similar to issue and sprint)
+- [ ] Consolidate Board API into a single `manage_jira_board` tool (similar to issue and sprint)
+- [ ] Implement and consolidate Filter API into a `manage_jira_filter` tool
 
 ### Documentation
 
