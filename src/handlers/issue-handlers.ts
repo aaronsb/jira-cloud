@@ -4,6 +4,18 @@ import { CallToolRequestSchema, ErrorCode, McpError } from '@modelcontextprotoco
 import { JiraClient } from '../client/jira-client.js';
 import { IssueExpansionOptions, IssueFormatter } from '../utils/formatters/index.js';
 
+/**
+ * Issue Handlers
+ * 
+ * This file implements handlers for the manage_jira_issue tool.
+ * 
+ * Dependency Injection Pattern:
+ * - All handler functions receive the jiraClient as their first parameter for consistency
+ * - When a parameter is intentionally unused, it is prefixed with an underscore (_jiraClient)
+ * - This pattern ensures consistent function signatures and satisfies ESLint rules for unused variables
+ * - It also makes the code more maintainable by preserving the dependency injection pattern throughout
+ */
+
 // Type definition for the manage_jira_issue tool
 type ManageJiraIssueArgs = {
   operation: 'create' | 'get' | 'update' | 'delete' | 'transition' | 'comment' | 'link';
@@ -296,7 +308,7 @@ async function handleUpdateIssue(jiraClient: JiraClient, args: ManageJiraIssueAr
   };
 }
 
-async function handleDeleteIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs) {
+async function handleDeleteIssue(_jiraClient: JiraClient, args: ManageJiraIssueArgs) {
   // Note: This is a placeholder. The current JiraClient doesn't have a deleteIssue method.
   // You would need to implement this in the JiraClient class.
   throw new McpError(
@@ -306,7 +318,7 @@ async function handleDeleteIssue(jiraClient: JiraClient, args: ManageJiraIssueAr
 
   // When implemented, it would look something like this:
   /*
-  await jiraClient.deleteIssue(args.issueKey!);
+  await _jiraClient.deleteIssue(args.issueKey!);
 
   return {
     content: [
@@ -360,7 +372,7 @@ async function handleCommentIssue(jiraClient: JiraClient, args: ManageJiraIssueA
   };
 }
 
-async function handleLinkIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs) {
+async function handleLinkIssue(_jiraClient: JiraClient, args: ManageJiraIssueArgs) {
   // Note: This is a placeholder. The current JiraClient doesn't have a linkIssues method.
   // You would need to implement this in the JiraClient class.
   throw new McpError(
@@ -370,14 +382,14 @@ async function handleLinkIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs
 
   // When implemented, it would look something like this:
   /*
-  await jiraClient.linkIssues(
+  await _jiraClient.linkIssues(
     args.issueKey!,
     args.linkedIssueKey!,
     args.linkType!
   );
 
   // Get the updated issue to return
-  const updatedIssue = await jiraClient.getIssue(args.issueKey!, false, false);
+  const updatedIssue = await _jiraClient.getIssue(args.issueKey!, false, false);
   const formattedResponse = IssueFormatter.formatIssue(updatedIssue);
 
   return {

@@ -3,7 +3,18 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import { JiraClient } from '../client/jira-client.js';
 import { BoardData, BoardExpansionOptions, BoardFormatter } from '../utils/formatters/index.js';
-import { BoardResponse, SprintResponse } from '../types/index.js';
+
+/**
+ * Board Handlers
+ * 
+ * This file implements handlers for the manage_jira_board tool.
+ * 
+ * Dependency Injection Pattern:
+ * - All handler functions receive the jiraClient as their first parameter for consistency
+ * - When a parameter is intentionally unused, it is prefixed with an underscore (_jiraClient)
+ * - This pattern ensures consistent function signatures and satisfies ESLint rules for unused variables
+ * - It also makes the code more maintainable by preserving the dependency injection pattern throughout
+ */
 
 // Type definition for the consolidated board management tool
 type ManageJiraBoardArgs = {
@@ -163,7 +174,7 @@ async function handleGetBoard(jiraClient: JiraClient, args: ManageJiraBoardArgs)
   
   // Get all boards and find the requested one
   const boards = await jiraClient.listBoards();
-  const board = boards.find(b => b.id === boardId);
+  const board = boards.find((b: { id: number }) => b.id === boardId);
   
   if (!board) {
     throw new McpError(ErrorCode.InvalidRequest, `Board not found: ${boardId}`);
@@ -263,7 +274,7 @@ async function handleListBoards(jiraClient: JiraClient, args: ManageJiraBoardArg
   };
 }
 
-async function handleCreateBoard(jiraClient: JiraClient, args: ManageJiraBoardArgs) {
+async function handleCreateBoard(_jiraClient: JiraClient, _args: ManageJiraBoardArgs) {
   // Note: This is a placeholder. The current JiraClient doesn't have a createBoard method.
   // You would need to implement this in the JiraClient class.
   throw new McpError(
@@ -273,14 +284,14 @@ async function handleCreateBoard(jiraClient: JiraClient, args: ManageJiraBoardAr
 
   // When implemented, it would look something like this:
   /*
-  const result = await jiraClient.createBoard({
-    name: args.name!,
-    type: args.type!,
-    projectKey: args.projectKey!
+  const result = await _jiraClient.createBoard({
+    name: _args.name!,
+    type: _args.type!,
+    projectKey: _args.projectKey!
   });
   
   // Get the created board to return
-  const createdBoard = await jiraClient.getBoard(result.id);
+  const createdBoard = await _jiraClient.getBoard(result.id);
   const formattedResponse = BoardFormatter.formatBoard(createdBoard);
 
   return {
@@ -294,7 +305,7 @@ async function handleCreateBoard(jiraClient: JiraClient, args: ManageJiraBoardAr
   */
 }
 
-async function handleUpdateBoard(jiraClient: JiraClient, args: ManageJiraBoardArgs) {
+async function handleUpdateBoard(_jiraClient: JiraClient, _args: ManageJiraBoardArgs) {
   // Note: This is a placeholder. The current JiraClient doesn't have an updateBoard method.
   // You would need to implement this in the JiraClient class.
   throw new McpError(
@@ -304,13 +315,13 @@ async function handleUpdateBoard(jiraClient: JiraClient, args: ManageJiraBoardAr
 
   // When implemented, it would look something like this:
   /*
-  await jiraClient.updateBoard(
-    args.boardId!,
-    args.name
+  await _jiraClient.updateBoard(
+    _args.boardId!,
+    _args.name
   );
 
   // Get the updated board to return
-  const updatedBoard = await jiraClient.getBoard(args.boardId!);
+  const updatedBoard = await _jiraClient.getBoard(_args.boardId!);
   const formattedResponse = BoardFormatter.formatBoard(updatedBoard);
 
   return {
@@ -324,7 +335,7 @@ async function handleUpdateBoard(jiraClient: JiraClient, args: ManageJiraBoardAr
   */
 }
 
-async function handleDeleteBoard(jiraClient: JiraClient, args: ManageJiraBoardArgs) {
+async function handleDeleteBoard(_jiraClient: JiraClient, _args: ManageJiraBoardArgs) {
   // Note: This is a placeholder. The current JiraClient doesn't have a deleteBoard method.
   // You would need to implement this in the JiraClient class.
   throw new McpError(
@@ -334,7 +345,7 @@ async function handleDeleteBoard(jiraClient: JiraClient, args: ManageJiraBoardAr
 
   // When implemented, it would look something like this:
   /*
-  await jiraClient.deleteBoard(args.boardId!);
+  await _jiraClient.deleteBoard(_args.boardId!);
 
   return {
     content: [
@@ -342,7 +353,7 @@ async function handleDeleteBoard(jiraClient: JiraClient, args: ManageJiraBoardAr
         type: 'text',
         text: JSON.stringify({
           success: true,
-          message: `Board ${args.boardId} has been deleted successfully.`,
+          message: `Board ${_args.boardId} has been deleted successfully.`,
         }, null, 2),
       },
     ],
@@ -350,7 +361,7 @@ async function handleDeleteBoard(jiraClient: JiraClient, args: ManageJiraBoardAr
   */
 }
 
-async function handleGetBoardConfiguration(jiraClient: JiraClient, args: ManageJiraBoardArgs) {
+async function handleGetBoardConfiguration(_jiraClient: JiraClient, _args: ManageJiraBoardArgs) {
   // Note: This is a placeholder. The current JiraClient doesn't have a getBoardConfiguration method.
   // You would need to implement this in the JiraClient class.
   throw new McpError(
@@ -360,7 +371,7 @@ async function handleGetBoardConfiguration(jiraClient: JiraClient, args: ManageJ
 
   // When implemented, it would look something like this:
   /*
-  const configuration = await jiraClient.getBoardConfiguration(args.boardId!);
+  const configuration = await _jiraClient.getBoardConfiguration(_args.boardId!);
   
   return {
     content: [

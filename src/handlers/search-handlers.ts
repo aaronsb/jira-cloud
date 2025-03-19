@@ -4,6 +4,18 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { JiraClient } from '../client/jira-client.js';
 import { SearchExpansionOptions, SearchFormatter, SearchResultData } from '../utils/formatters/index.js';
 
+/**
+ * Search Handlers
+ * 
+ * This file implements handlers for the search_jira_issues tool.
+ * 
+ * Dependency Injection Pattern:
+ * - All handler functions receive the jiraClient as their first parameter for consistency
+ * - When a parameter is intentionally unused, it is prefixed with an underscore (_jiraClient)
+ * - This pattern ensures consistent function signatures and satisfies ESLint rules for unused variables
+ * - It also makes the code more maintainable by preserving the dependency injection pattern throughout
+ */
+
 type SearchIssuesArgs = {
   jql: string;
   startAt?: number;
