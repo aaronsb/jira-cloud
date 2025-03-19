@@ -340,6 +340,65 @@ export class JiraClient {
     await this.client.issues.doTransition(transitionRequest);
   }
 
+  /**
+   * Link two issues together with a specified link type
+   * @param sourceIssueKey The source issue key
+   * @param targetIssueKey The target issue key
+   * @param linkType The type of link to create
+   * @param comment Optional comment to add with the link
+   */
+  async linkIssues(
+    sourceIssueKey: string, 
+    targetIssueKey: string, 
+    linkType: string,
+    comment?: string
+  ): Promise<void> {
+    const linkRequest: any = {
+      type: {
+        name: linkType
+      },
+      inwardIssue: {
+        key: targetIssueKey
+      },
+      outwardIssue: {
+        key: sourceIssueKey
+      }
+    };
+
+    if (comment) {
+      linkRequest.comment = {
+        body: TextProcessor.markdownToAdf(comment)
+      };
+    }
+
+    // Use the correct method from jira.js library
+    await this.client.issueLinks.linkIssues(linkRequest);
+  }
+
+  /**
+   * Get all available issue link types
+   * @returns Array of link types with their names and descriptions
+   */
+  async getIssueLinkTypes(): Promise<Array<{
+    id: string;
+    name: string;
+    inward: string;
+    outward: string;
+  }>> {
+    console.error('Fetching all issue link types...');
+    
+    const response = await this.client.issueLinkTypes.getIssueLinkTypes();
+    
+    return (response.issueLinkTypes || [])
+      .filter(linkType => linkType.id && linkType.name)
+      .map(linkType => ({
+        id: linkType.id!,
+        name: linkType.name!,
+        inward: linkType.inward || '',
+        outward: linkType.outward || ''
+      }));
+  }
+
   async getPopulatedFields(issueKey: string): Promise<string> {
     const issue = await this.client.issues.getIssue({
       issueIdOrKey: issueKey,
