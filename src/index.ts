@@ -125,7 +125,7 @@ class JiraServer {
     });
 
     // Set up tool handlers
-    this.server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
+    this.server.setRequestHandler(CallToolRequestSchema, async (request, _extra) => {
       console.error('Received request:', JSON.stringify(request, null, 2));
 
       const { name } = request.params;

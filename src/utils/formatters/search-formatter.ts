@@ -1,5 +1,5 @@
-import { JiraIssueDetails, SearchPagination } from '../../types/index.js';
 import { BaseFormatter, FormattedResponse, ResponseMetadata, ResponseSummary } from './base-formatter.js';
+import { JiraIssueDetails, SearchPagination } from '../../types/index.js';
 
 export interface SearchResultData {
   issues: JiraIssueDetails[];

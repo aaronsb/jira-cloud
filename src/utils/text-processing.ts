@@ -355,12 +355,12 @@ export class TextProcessor {
 
       // For other objects, try to extract meaningful values
       const meaningful = Object.entries(value)
-        .filter(([k, v]) => 
-          !TextProcessor.shouldExcludeField(k, v) && 
+        .filter(([_k, v]) => 
+          !TextProcessor.shouldExcludeField(_k, v) && 
           v !== null && 
           v !== undefined && 
-          !k.startsWith('_'))
-        .map(([k, v]) => TextProcessor.formatFieldValue(v))
+          !_k.startsWith('_'))
+        .map(([_k, v]) => TextProcessor.formatFieldValue(v))
         .filter(v => v)
         .join(' ');
       

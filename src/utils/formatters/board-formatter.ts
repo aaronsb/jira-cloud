@@ -1,5 +1,5 @@
-import { BoardResponse, SprintResponse } from '../../types/index.js';
 import { BaseFormatter, FormattedResponse, ResponseMetadata, ResponseSummary } from './base-formatter.js';
+import { BoardResponse, SprintResponse } from '../../types/index.js';
 
 export interface BoardData extends BoardResponse {
   sprints?: SprintResponse[];

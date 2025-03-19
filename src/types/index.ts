@@ -1,5 +1,3 @@
-import { Version3Models } from 'jira.js';
-
 export interface JiraAttachment {
   id: string;
   filename: string;
