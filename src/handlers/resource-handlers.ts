@@ -1,5 +1,6 @@
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 
+import { setupToolResourceHandlers } from './tool-resource-handlers.js';
 import { JiraClient } from '../client/jira-client.js';
 
 /**
@@ -13,6 +14,10 @@ export function setupResourceHandlers(jiraClient: JiraClient) {
      * Lists available static resources
      */
     async listResources() {
+      // Get tool resources
+      const toolResourceHandler = setupToolResourceHandlers();
+      const toolResources = await toolResourceHandler.listToolResources();
+      
       return {
         resources: [
           {
@@ -32,7 +37,9 @@ export function setupResourceHandlers(jiraClient: JiraClient) {
             name: 'Issue Link Types',
             mimeType: 'application/json',
             description: 'List of all available issue link types in the Jira instance'
-          }
+          },
+          // Add tool resources
+          ...toolResources.resources
         ]
       };
     },
@@ -90,6 +97,13 @@ export function setupResourceHandlers(jiraClient: JiraClient) {
         if (boardMatch) {
           const boardId = parseInt(boardMatch[1], 10);
           return await getBoardOverview(jiraClient, boardId);
+        }
+        
+        // Handle tool resources
+        const toolMatch = uri.match(/^jira:\/\/tools\/([^/]+)\/documentation$/);
+        if (toolMatch) {
+          const toolResourceHandler = setupToolResourceHandlers();
+          return await toolResourceHandler.readToolResource(uri);
         }
         
         throw new McpError(ErrorCode.InvalidRequest, `Unknown resource: ${uri}`);

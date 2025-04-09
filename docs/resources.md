@@ -4,7 +4,7 @@ This document describes the MCP resources provided by the Jira Cloud MCP server.
 
 ## Overview
 
-The Jira Cloud MCP server provides resources that allow AI systems to access information about your Jira instance. These resources provide context about projects, boards, and other Jira entities without requiring explicit tool calls.
+The Jira Cloud MCP server provides resources that allow AI systems to access information about your Jira instance. These resources provide context about projects, boards, tools, and other Jira entities without requiring explicit tool calls.
 
 ## Available Resources
 
@@ -16,6 +16,8 @@ Static resources have fixed URIs and provide specific information:
 |--------------|-------------|
 | `jira://instance/summary` | High-level statistics about the Jira instance |
 | `jira://projects/distribution` | Distribution of projects by type and status |
+| `jira://issue-link-types` | List of all available issue link types in the Jira instance |
+| `jira://tools/{toolName}/documentation` | Comprehensive documentation for a specific Jira tool |
 
 ### Resource Templates
 
@@ -151,6 +153,97 @@ Provides detailed information about a specific board:
   ]
 }
 ```
+
+### Tool Documentation (`jira://tools/{toolName}/documentation`)
+
+Provides comprehensive documentation for a specific Jira tool, including operations, parameters, examples, and common use cases:
+
+```json
+{
+  "name": "Issue Management",
+  "description": "Issue management with CRUD operations, transitions, comments, and linking",
+  "operations": {
+    "get": {
+      "description": "Retrieves issue details",
+      "required_parameters": ["issueKey"],
+      "optional_parameters": ["expand"],
+      "expand_options": ["comments", "transitions", "attachments", "related_issues", "history"],
+      "examples": [
+        {
+          "description": "Get basic issue details",
+          "code": {
+            "operation": "get",
+            "issueKey": "PROJ-123"
+          }
+        },
+        {
+          "description": "Get issue with comments and attachments",
+          "code": {
+            "operation": "get",
+            "issueKey": "PROJ-123",
+            "expand": ["comments", "attachments"]
+          }
+        }
+      ]
+    },
+    "create": {
+      "description": "Creates a new issue",
+      "required_parameters": ["projectKey", "summary", "issueType"],
+      "optional_parameters": ["description", "assignee", "priority", "labels", "customFields"],
+      "examples": [
+        {
+          "description": "Create a basic issue",
+          "code": {
+            "operation": "create",
+            "projectKey": "PROJ",
+            "summary": "New feature request",
+            "issueType": "Story"
+          }
+        }
+      ]
+    }
+  },
+  "common_use_cases": [
+    {
+      "title": "Tracking work logs",
+      "description": "To track time spent on issues:",
+      "steps": [
+        {
+          "description": "Add a work log to an issue",
+          "code": {
+            "operation": "update",
+            "issueKey": "PROJ-123",
+            "customFields": {
+              "worklog": {
+                "timeSpent": "3h 30m",
+                "comment": "Implemented feature X",
+                "started": "2025-04-09T09:00:00.000Z"
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "related_resources": [
+    {
+      "name": "Project Overview",
+      "uri": "jira://projects/{projectKey}/overview",
+      "description": "Get detailed information about a project"
+    }
+  ]
+}
+```
+
+Available tool documentation resources:
+
+| Tool Documentation URI | Description |
+|------------------------|-------------|
+| `jira://tools/manage_jira_issue/documentation` | Documentation for issue management operations |
+| `jira://tools/manage_jira_board/documentation` | Documentation for board management operations |
+| `jira://tools/manage_jira_sprint/documentation` | Documentation for sprint management operations |
+| `jira://tools/manage_jira_filter/documentation` | Documentation for filter management operations |
+| `jira://tools/manage_jira_project/documentation` | Documentation for project management operations |
 
 ## Error Handling
 
