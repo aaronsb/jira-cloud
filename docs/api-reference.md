@@ -27,6 +27,12 @@ await access_mcp_resource({
 });
 ```
 
+The Jira Cloud MCP server provides several types of resources:
+- **Instance resources**: High-level information about your Jira instance
+- **Project resources**: Detailed information about specific projects
+- **Board resources**: Information about boards and their sprints
+- **Tool resources**: Comprehensive documentation for each Jira tool
+
 For detailed information about available resources, see the [Resources documentation](./resources.md).
 
 ## Available Tools
@@ -301,6 +307,33 @@ await use_mcp_tool({
   }
 });
 ```
+
+## Accessing Tool Documentation
+
+The Jira Cloud MCP server provides comprehensive documentation for each tool through MCP resources. These resources can be accessed to get detailed information about tool operations, parameters, examples, and common use cases:
+
+```typescript
+// Access documentation for the issue management tool
+await access_mcp_resource({
+  server_name: "jira-cloud",
+  uri: "jira://tools/manage_jira_issue/documentation"
+});
+
+// Access documentation for the board management tool
+await access_mcp_resource({
+  server_name: "jira-cloud",
+  uri: "jira://tools/manage_jira_board/documentation"
+});
+```
+
+The documentation resources provide:
+- Detailed descriptions of each operation
+- Required and optional parameters for each operation
+- Example code snippets for common tasks
+- Common use cases with step-by-step instructions
+- Related resources that may be useful
+
+For a complete list of available tool documentation resources, see the [Resources documentation](./resources.md).
 
 ## Error Handling
 

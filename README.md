@@ -40,6 +40,7 @@ For detailed installation instructions, see the [Getting Started Guide](./docs/g
 - **Search Capabilities**: JQL search with filtering
 - **Project & Board Management**: List and manage projects, boards, and sprints
 - **MCP Resources**: Access Jira data as context through MCP resources
+- **Tool Documentation**: Comprehensive documentation for each tool available as MCP resources
 - **Customization**: Support for custom fields and workflows
 
 ## Architecture
