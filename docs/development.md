@@ -182,17 +182,3 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 - Mock external dependencies
 - Aim for high test coverage
 
-## Docker Development
-
-Build a local Docker image:
-```bash
-./scripts/build-local.sh
-```
-
-Run the local Docker image:
-```bash
-docker run -i \
-  -e JIRA_API_TOKEN=your_api_token \
-  -e JIRA_EMAIL=your_email \
-  -e JIRA_HOST=your-instance.atlassian.net \
-  jira-cloud:local

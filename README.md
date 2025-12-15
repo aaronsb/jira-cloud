@@ -6,22 +6,21 @@ A Model Context Protocol server for interacting with Jira Cloud instances.
 
 ### Installation
 
+```bash
+git clone https://github.com/aaronsb/jira-cloud.git
+cd jira-cloud
+npm install
+npm run build
+```
+
 To use this MCP server, add the server configuration to your MCP settings:
 
 ```json
 {
   "mcpServers": {
     "jira-cloud": {
-      "command": "docker",
-      "args": [
-        "run",
-        "-i",
-        "--rm",
-        "-e", "JIRA_EMAIL",
-        "-e", "JIRA_HOST",
-        "-e", "JIRA_API_TOKEN",
-        "ghcr.io/aaronsb/jira-cloud:latest"
-      ],
+      "command": "node",
+      "args": ["/path/to/jira-cloud/build/index.js"],
       "env": {
         "JIRA_API_TOKEN": "your-api-token",
         "JIRA_EMAIL": "your-email",

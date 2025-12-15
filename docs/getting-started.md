@@ -3,20 +3,8 @@
 ## Prerequisites
 - Node.js 20 or higher
 - npm 8 or higher
-- Docker (optional, for container deployment)
 
-## Installation Options
-
-### Docker Installation (Recommended)
-
-The simplest way to use this MCP server is with Docker:
-
-```bash
-# Pull the latest stable version
-docker pull ghcr.io/aaronsb/jira-cloud:latest
-```
-
-### Local Installation
+## Installation
 
 1. Clone the repository:
 ```bash
@@ -51,23 +39,11 @@ JIRA_HOST=your-instance.atlassian.net
 
 ## Usage
 
-### Docker Usage
-
-```bash
-docker run -i \
-  -e JIRA_API_TOKEN=your_api_token \
-  -e JIRA_EMAIL=your_email \
-  -e JIRA_HOST=your-instance.atlassian.net \
-  ghcr.io/aaronsb/jira-cloud:latest
-```
-
-### Local Development
-
 ```bash
 export JIRA_API_TOKEN=your-api-token
 export JIRA_EMAIL=your-email
 export JIRA_HOST=your-instance.atlassian.net
-npm run dev
+node build/index.js
 ```
 
 ## Examples

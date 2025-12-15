@@ -6,22 +6,23 @@ This guide is specifically designed for Large Language Models (LLMs) like Cline 
 
 ### Recommended Installation Method
 
-The recommended way to install this MCP server is using the Docker container from GitHub Container Registry:
+Install the MCP server by cloning and building:
+
+```bash
+git clone https://github.com/aaronsb/jira-cloud.git
+cd jira-cloud
+npm install
+npm run build
+```
+
+Then add to your MCP settings:
 
 ```json
 {
   "mcpServers": {
     "jira-cloud": {
-      "command": "docker",
-      "args": [
-        "run",
-        "-i",
-        "--rm",
-        "-e", "JIRA_EMAIL",
-        "-e", "JIRA_HOST",
-        "-e", "JIRA_API_TOKEN",
-        "ghcr.io/aaronsb/jira-cloud:latest"
-      ],
+      "command": "node",
+      "args": ["/path/to/jira-cloud/build/index.js"],
       "env": {
         "JIRA_API_TOKEN": "<user-jira-api-token>",
         "JIRA_EMAIL": "<user-jira-email>",
@@ -49,17 +50,6 @@ This MCP server requires the following environment variables:
    - Format: "your-instance.atlassian.net" (without https://)
    - Ask the user: "Please provide your Jira instance hostname (e.g., 'your-instance.atlassian.net' without the 'https://' prefix)"
 
-## Docker Image Tags
-
-The following Docker image tags are available:
-
-- `ghcr.io/aaronsb/jira-cloud:latest`: Most recent stable build from main branch (recommended)
-- `ghcr.io/aaronsb/jira-cloud:main`: Same as latest
-- `ghcr.io/aaronsb/jira-cloud:sha-[commit-hash]`: Specific commit version
-- `ghcr.io/aaronsb/jira-cloud:v[version]`: Specific semantic version release
-
-For most users, the `:latest` tag is recommended.
-
 ## Configuration Locations
 
 The MCP settings file location depends on the user's environment:
@@ -82,16 +72,8 @@ If the user needs to connect to multiple Jira instances, use a configuration lik
 {
   "mcpServers": {
     "jira-instance1": {
-      "command": "docker",
-      "args": [
-        "run",
-        "-i",
-        "--rm",
-        "-e", "JIRA_EMAIL",
-        "-e", "JIRA_HOST",
-        "-e", "JIRA_API_TOKEN",
-        "ghcr.io/aaronsb/jira-cloud:latest"
-      ],
+      "command": "node",
+      "args": ["/path/to/jira-cloud/build/index.js"],
       "env": {
         "JIRA_API_TOKEN": "<user-jira-api-token-1>",
         "JIRA_EMAIL": "<user-jira-email-1>",
@@ -101,16 +83,8 @@ If the user needs to connect to multiple Jira instances, use a configuration lik
       "disabled": false
     },
     "jira-instance2": {
-      "command": "docker",
-      "args": [
-        "run",
-        "-i",
-        "--rm",
-        "-e", "JIRA_EMAIL",
-        "-e", "JIRA_HOST",
-        "-e", "JIRA_API_TOKEN",
-        "ghcr.io/aaronsb/jira-cloud:latest"
-      ],
+      "command": "node",
+      "args": ["/path/to/jira-cloud/build/index.js"],
       "env": {
         "JIRA_API_TOKEN": "<user-jira-api-token-2>",
         "JIRA_EMAIL": "<user-jira-email-2>",
@@ -132,9 +106,10 @@ If the user needs to connect to multiple Jira instances, use a configuration lik
    - Check that the email matches the Atlassian account
    - Ensure the host URL is correct (should not include 'https://')
 
-2. **Docker Image Not Found**
-   - Ensure Docker is installed and running
-   - Try pulling the image manually: `docker pull ghcr.io/aaronsb/jira-cloud:latest`
+2. **Build Errors**
+   - Ensure Node.js 20 or higher is installed
+   - Run `npm install` to install dependencies
+   - Run `npm run build` to compile TypeScript
 
 3. **Permission Issues**
    - Check Jira permissions for the user account

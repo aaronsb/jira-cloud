@@ -35,16 +35,6 @@ This guide provides solutions for common issues when using the Jira Cloud MCP Se
 2. Batch related operations when possible
 3. Use pagination efficiently for large result sets
 
-## Docker Container Issues
-
-**Symptoms:**
-- Container exits immediately
-- Error messages in logs
-
-**Solutions:**
-1. Check environment variables are properly set
-2. Review container logs: `docker logs <container_id>`
-
 ## MCP Integration Problems
 
 **Symptoms:**
@@ -71,11 +61,6 @@ This guide provides solutions for common issues when using the Jira Cloud MCP Se
 Enable debug logs with:
 ```bash
 export LOG_LEVEL=debug
-```
-
-For Docker:
-```bash
-docker run -e LOG_LEVEL=debug ...
 ```
 
 ## Getting Help
