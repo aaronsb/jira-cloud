@@ -23,20 +23,21 @@
     "update-doc-timestamps": "node scripts/update-doc-timestamps.js"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.6.0",
-    "jira.js": "^4.0.5",
-    "jsdom": "^26.0.0",
+    "@modelcontextprotocol/sdk": "^1.24.3",
+    "jira.js": "^5.2.2",
+    "jsdom": "^27.3.0",
     "markdown-it": "^14.1.0"
   },
   "devDependencies": {
-    "@types/jsdom": "^21.1.7",
+    "@types/jsdom": "^27.0.0",
     "@types/markdown-it": "^14.1.2",
     "@types/node": "^20.11.24",
-    "@typescript-eslint/eslint-plugin": "^5.62.0",
-    "@typescript-eslint/parser": "^5.62.0",
-    "@ysk8hori/typescript-graph": "^0.24.0",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "@ysk8hori/typescript-graph": "^0.26.5",
     "eslint": "^8.57.0",
-    "eslint-plugin-import": "^2.31.0",
-    "typescript": "^5.3.3"
+    "eslint-plugin-import": "^2.32.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
   }
 }

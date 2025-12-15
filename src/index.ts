@@ -34,52 +34,19 @@ class JiraServer {
   private jiraClient: JiraClient;
 
   constructor() {
-    console.error('Loading tool schemas...');
-    console.error('Available schemas:', Object.keys(toolSchemas));
-
-    // Convert tool schemas to the format expected by the MCP SDK
-    const tools = Object.entries(toolSchemas)
-      // Filter out the deprecated search_jira_issues tool
-      .filter(([key]) => key !== 'search_jira_issues')
-      .map(([key, schema]) => {
-        console.error(`Registering tool: ${key}`);
-        const inputSchema = {
-          type: 'object',
-          properties: schema.inputSchema.properties,
-        } as const;
-
-        // Only add required field if it exists in the schema
-        if ('required' in schema.inputSchema) {
-          Object.assign(inputSchema, { required: schema.inputSchema.required });
-        }
-
-        return {
-          name: key,
-          description: schema.description,
-          inputSchema,
-        };
-      });
-
-    console.error('Initializing server with tools:', JSON.stringify(tools, null, 2));
-
     // Use environment-provided name or default to 'jira-cloud'
     const serverName = process.env.MCP_SERVER_NAME || 'jira-cloud';
-    console.error(`Using server name: ${serverName}`);
+    console.error(`Initializing Jira MCP server: ${serverName}`);
 
     this.server = new Server(
       {
         name: serverName,
         version: '0.1.0',
-        description: 'Jira Cloud MCP Server - Provides tools for interacting with any Jira Cloud instance'
       },
       {
         capabilities: {
-          tools: {
-            schemas: tools,
-          },
-          resources: {
-            schemas: [], // Resource schemas are handled by the resource handlers
-          },
+          tools: {},
+          resources: {},
         },
       }
     );
