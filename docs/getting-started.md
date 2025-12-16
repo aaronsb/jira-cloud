@@ -6,14 +6,54 @@
 
 ## Installation
 
-1. Clone the repository:
+### Using npx (Recommended)
+
+No installation required - just add to your MCP settings:
+
+```json
+{
+  "mcpServers": {
+    "jira-cloud": {
+      "command": "npx",
+      "args": ["-y", "jira-cloud"],
+      "env": {
+        "JIRA_API_TOKEN": "your-api-token",
+        "JIRA_EMAIL": "your-email",
+        "JIRA_HOST": "your-instance.atlassian.net"
+      }
+    }
+  }
+}
+```
+
+### Global Installation
+
+```bash
+npm install -g jira-cloud
+```
+
+Then in MCP settings:
+
+```json
+{
+  "mcpServers": {
+    "jira-cloud": {
+      "command": "jira-cloud",
+      "env": {
+        "JIRA_API_TOKEN": "your-api-token",
+        "JIRA_EMAIL": "your-email",
+        "JIRA_HOST": "your-instance.atlassian.net"
+      }
+    }
+  }
+}
+```
+
+### From Source
+
 ```bash
 git clone https://github.com/aaronsb/jira-cloud.git
 cd jira-cloud
-```
-
-2. Install dependencies and build:
-```bash
 npm install
 npm run build
 ```
@@ -36,15 +76,6 @@ JIRA_HOST=your-instance.atlassian.net
    - Name your token and copy it securely
 
 2. Use your Atlassian account email and Jira host (your-instance.atlassian.net)
-
-## Usage
-
-```bash
-export JIRA_API_TOKEN=your-api-token
-export JIRA_EMAIL=your-email
-export JIRA_HOST=your-instance.atlassian.net
-node build/index.js
-```
 
 ## Examples
 

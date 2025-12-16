@@ -1,8 +1,7 @@
 {
   "name": "jira-cloud",
   "version": "0.1.0",
-  "description": "A Model Context Protocol server",
-  "private": true,
+  "description": "Model Context Protocol (MCP) server for Jira Cloud - enables AI assistants to interact with Jira",
   "type": "module",
   "bin": {
     "jira-cloud": "build/index.js"
@@ -10,6 +9,29 @@
   "files": [
     "build"
   ],
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "jira",
+    "jira-cloud",
+    "atlassian",
+    "ai",
+    "claude",
+    "llm"
+  ],
+  "author": "aaronsb",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aaronsb/jira-cloud.git"
+  },
+  "homepage": "https://github.com/aaronsb/jira-cloud#readme",
+  "bugs": {
+    "url": "https://github.com/aaronsb/jira-cloud/issues"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "build": "tsc",
     "postbuild": "node --eval \"import('fs').then(fs => fs.chmodSync('build/index.js', '755'))\"",

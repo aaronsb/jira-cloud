@@ -6,23 +6,14 @@ This guide is specifically designed for Large Language Models (LLMs) like Cline 
 
 ### Recommended Installation Method
 
-Install the MCP server by cloning and building:
-
-```bash
-git clone https://github.com/aaronsb/jira-cloud.git
-cd jira-cloud
-npm install
-npm run build
-```
-
-Then add to your MCP settings:
+Add to MCP settings (no installation required - uses npx):
 
 ```json
 {
   "mcpServers": {
     "jira-cloud": {
-      "command": "node",
-      "args": ["/path/to/jira-cloud/build/index.js"],
+      "command": "npx",
+      "args": ["-y", "jira-cloud"],
       "env": {
         "JIRA_API_TOKEN": "<user-jira-api-token>",
         "JIRA_EMAIL": "<user-jira-email>",
@@ -72,8 +63,8 @@ If the user needs to connect to multiple Jira instances, use a configuration lik
 {
   "mcpServers": {
     "jira-instance1": {
-      "command": "node",
-      "args": ["/path/to/jira-cloud/build/index.js"],
+      "command": "npx",
+      "args": ["-y", "jira-cloud"],
       "env": {
         "JIRA_API_TOKEN": "<user-jira-api-token-1>",
         "JIRA_EMAIL": "<user-jira-email-1>",
@@ -83,8 +74,8 @@ If the user needs to connect to multiple Jira instances, use a configuration lik
       "disabled": false
     },
     "jira-instance2": {
-      "command": "node",
-      "args": ["/path/to/jira-cloud/build/index.js"],
+      "command": "npx",
+      "args": ["-y", "jira-cloud"],
       "env": {
         "JIRA_API_TOKEN": "<user-jira-api-token-2>",
         "JIRA_EMAIL": "<user-jira-email-2>",
@@ -106,10 +97,10 @@ If the user needs to connect to multiple Jira instances, use a configuration lik
    - Check that the email matches the Atlassian account
    - Ensure the host URL is correct (should not include 'https://')
 
-2. **Build Errors**
+2. **npx Errors**
    - Ensure Node.js 20 or higher is installed
-   - Run `npm install` to install dependencies
-   - Run `npm run build` to compile TypeScript
+   - Try clearing npm cache: `npm cache clean --force`
+   - Try installing globally instead: `npm install -g jira-cloud`
 
 3. **Permission Issues**
    - Check Jira permissions for the user account
