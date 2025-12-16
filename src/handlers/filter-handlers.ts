@@ -260,14 +260,14 @@ async function handleGetFilter(jiraClient: JiraClient, args: ManageJiraFilterArg
       }
     }
     
-    // Format the response
-    const formattedResponse = FilterFormatter.formatFilter(filterData, expansionOptions);
-    
+    // Render to markdown
+    const markdown = MarkdownRenderer.renderFilter(filterData);
+
     return {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(formattedResponse, null, 2),
+          text: markdown,
         },
       ],
     };
@@ -275,7 +275,7 @@ async function handleGetFilter(jiraClient: JiraClient, args: ManageJiraFilterArg
     if (error instanceof McpError) {
       throw error;
     }
-    
+
     console.error(`Error getting filter ${filterId}:`, error);
     throw new McpError(
       ErrorCode.InternalError,
@@ -327,29 +327,23 @@ async function handleListFilters(jiraClient: JiraClient, args: ManageJiraFilterA
     }
   }
   
-  // Format the response
-  const formattedFilters = filterDataList.map(filter => 
-    FilterFormatter.formatFilter(filter, expansionOptions)
-  );
-  
-  // Create a response with pagination metadata
-  const response = {
-    data: formattedFilters,
-    _metadata: {
-      pagination: {
-        startAt,
-        maxResults,
-        total: filters.length,
-        hasMore: startAt + maxResults < filters.length,
-      },
-    },
-  };
-  
+  // Render to markdown with pagination info
+  let markdown = MarkdownRenderer.renderFilterList(filterDataList);
+
+  // Add pagination guidance
+  markdown += '\n\n---\n';
+  if (startAt + maxResults < filters.length) {
+    markdown += `Showing ${startAt + 1}-${startAt + filterDataList.length} of ${filters.length}\n`;
+    markdown += `**Next page:** Use startAt=${startAt + maxResults}`;
+  } else {
+    markdown += `Showing all ${filterDataList.length} filter${filterDataList.length !== 1 ? 's' : ''}`;
+  }
+
   return {
     content: [
       {
         type: 'text',
-        text: JSON.stringify(response, null, 2),
+        text: markdown,
       },
     ],
   };
@@ -452,21 +446,27 @@ async function handleDeleteFilter(_jiraClient: JiraClient, _args: ManageJiraFilt
 
 async function handleExecuteFilter(jiraClient: JiraClient, _args: ManageJiraFilterArgs) {
   const filterId = _args.filterId!;
-  
+
   // Get issues for the filter
   const issues = await jiraClient.getFilterIssues(filterId);
-  
+
+  // Render to markdown
+  const markdown = MarkdownRenderer.renderIssueSearchResults(
+    issues,
+    {
+      startAt: 0,
+      maxResults: issues.length,
+      total: issues.length,
+      hasMore: false,
+    },
+    `filter = ${filterId}`
+  );
+
   return {
     content: [
       {
         type: 'text',
-        text: JSON.stringify({
-          data: issues,
-          _metadata: {
-            filter_id: filterId,
-            issue_count: issues.length
-          }
-        }, null, 2),
+        text: markdown,
       },
     ],
   };

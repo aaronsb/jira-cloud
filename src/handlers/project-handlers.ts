@@ -3,6 +3,7 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import { JiraClient } from '../client/jira-client.js';
 import { ProjectData, ProjectExpansionOptions, ProjectFormatter } from '../utils/formatters/index.js';
+import { MarkdownRenderer } from '../mcp/markdown-renderer.js';
 
 /**
  * Project Handlers
@@ -285,14 +286,26 @@ async function handleGetProject(jiraClient: JiraClient, args: ManageJiraProjectA
     }
   }
   
-  // Format the response
-  const formattedResponse = ProjectFormatter.formatProject(projectData, expansionOptions);
-  
+  // Render to markdown
+  const markdown = MarkdownRenderer.renderProject({
+    key: projectData.key,
+    name: projectData.name,
+    description: projectData.description || undefined,
+    lead: projectData.lead || undefined,
+    statusCounts: projectData.status_counts,
+    boards: projectData.boards,
+    recentIssues: projectData.recent_issues?.map(i => ({
+      key: i.key,
+      summary: i.summary,
+      status: i.status
+    })),
+  });
+
   return {
     content: [
       {
         type: 'text',
-        text: JSON.stringify(formattedResponse, null, 2),
+        text: markdown,
       },
     ],
   };
@@ -433,29 +446,32 @@ async function handleListProjects(jiraClient: JiraClient, args: ManageJiraProjec
     }
   }
   
-  // Format the response
-  const formattedProjects = projectDataList.map(project => 
-    ProjectFormatter.formatProject(project)
-  );
-  
-  // Create a response with pagination metadata
-  const response = {
-    data: formattedProjects,
-    _metadata: {
-      pagination: {
-        startAt,
-        maxResults,
-        total: projects.length,
-        hasMore: startAt + maxResults < projects.length,
-      },
-    },
-  };
-  
+  // Convert to markdown renderer format
+  const rendererProjects = projectDataList.map(project => ({
+    key: project.key,
+    name: project.name,
+    description: project.description || undefined,
+    lead: project.lead || undefined,
+    statusCounts: project.status_counts,
+  }));
+
+  // Render to markdown with pagination
+  let markdown = MarkdownRenderer.renderProjectList(rendererProjects);
+
+  // Add pagination guidance
+  markdown += '\n\n---\n';
+  if (startAt + maxResults < projects.length) {
+    markdown += `Showing ${startAt + 1}-${startAt + projectDataList.length} of ${projects.length}\n`;
+    markdown += `**Next page:** Use startAt=${startAt + maxResults}`;
+  } else {
+    markdown += `Showing all ${projectDataList.length} project${projectDataList.length !== 1 ? 's' : ''}`;
+  }
+
   return {
     content: [
       {
         type: 'text',
-        text: JSON.stringify(response, null, 2),
+        text: markdown,
       },
     ],
   };

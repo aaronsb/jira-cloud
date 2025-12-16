@@ -390,6 +390,14 @@ export function renderBoardList(boards: BoardData[]): string {
 // Sprint Rendering
 // ============================================================================
 
+// Simple issue type for sprint display (compatible with SprintIssue)
+export interface SprintIssueData {
+  key: string;
+  summary: string;
+  status: string;
+  assignee?: string | null;
+}
+
 export interface SprintData {
   id: number;
   name: string;
@@ -399,7 +407,7 @@ export interface SprintData {
   startDate?: string;
   endDate?: string;
   completeDate?: string;
-  issues?: JiraIssueDetails[];
+  issues?: SprintIssueData[];
 }
 
 export function renderSprint(sprint: SprintData): string {
@@ -431,7 +439,7 @@ export function renderSprint(sprint: SprintData): string {
     lines.push(`## Issues (${sprint.issues.length})`);
 
     // Group by status
-    const byStatus: Record<string, JiraIssueDetails[]> = {};
+    const byStatus: Record<string, SprintIssueData[]> = {};
     for (const issue of sprint.issues) {
       const status = issue.status || 'Unknown';
       if (!byStatus[status]) byStatus[status] = [];

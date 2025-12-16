@@ -3,6 +3,7 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import { JiraClient } from '../client/jira-client.js';
 import { IssueExpansionOptions, IssueFormatter } from '../utils/formatters/index.js';
+import { MarkdownRenderer } from '../mcp/markdown-renderer.js';
 
 /**
  * Issue Handlers
@@ -247,14 +248,14 @@ async function handleGetIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs)
     transitions = await jiraClient.getTransitions(args.issueKey!);
   }
   
-  // Format the response using the IssueFormatter
-  const formattedResponse = IssueFormatter.formatIssue(issue, expansionOptions, transitions);
+  // Render to markdown
+  const markdown = MarkdownRenderer.renderIssue(issue, transitions);
 
   return {
     content: [
       {
         type: 'text',
-        text: JSON.stringify(formattedResponse, null, 2),
+        text: markdown,
       },
     ],
   };
@@ -272,15 +273,15 @@ async function handleCreateIssue(jiraClient: JiraClient, args: ManageJiraIssueAr
     customFields: args.customFields
   });
   
-  // Get the created issue to return
+  // Get the created issue and render to markdown
   const createdIssue = await jiraClient.getIssue(result.key, false, false);
-  const formattedResponse = IssueFormatter.formatIssue(createdIssue);
+  const markdown = MarkdownRenderer.renderIssue(createdIssue);
 
   return {
     content: [
       {
         type: 'text',
-        text: JSON.stringify(formattedResponse, null, 2),
+        text: `# Issue Created\n\n${markdown}`,
       },
     ],
   };
@@ -294,15 +295,15 @@ async function handleUpdateIssue(jiraClient: JiraClient, args: ManageJiraIssueAr
     args.parent
   );
 
-  // Get the updated issue to return
+  // Get the updated issue and render to markdown
   const updatedIssue = await jiraClient.getIssue(args.issueKey!, false, false);
-  const formattedResponse = IssueFormatter.formatIssue(updatedIssue);
+  const markdown = MarkdownRenderer.renderIssue(updatedIssue);
 
   return {
     content: [
       {
         type: 'text',
-        text: JSON.stringify(formattedResponse, null, 2),
+        text: `# Issue Updated\n\n${markdown}`,
       },
     ],
   };
@@ -341,15 +342,15 @@ async function handleTransitionIssue(jiraClient: JiraClient, args: ManageJiraIss
     args.comment
   );
 
-  // Get the updated issue to return
+  // Get the updated issue and render to markdown
   const updatedIssue = await jiraClient.getIssue(args.issueKey!, false, false);
-  const formattedResponse = IssueFormatter.formatIssue(updatedIssue);
+  const markdown = MarkdownRenderer.renderIssue(updatedIssue);
 
   return {
     content: [
       {
         type: 'text',
-        text: JSON.stringify(formattedResponse, null, 2),
+        text: `# Issue Transitioned\n\n${markdown}`,
       },
     ],
   };
@@ -358,15 +359,15 @@ async function handleTransitionIssue(jiraClient: JiraClient, args: ManageJiraIss
 async function handleCommentIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs) {
   await jiraClient.addComment(args.issueKey!, args.comment!);
 
-  // Get the updated issue with comments to return
+  // Get the updated issue with comments and render to markdown
   const updatedIssue = await jiraClient.getIssue(args.issueKey!, true, false);
-  const formattedResponse = IssueFormatter.formatIssue(updatedIssue, { comments: true });
+  const markdown = MarkdownRenderer.renderIssue(updatedIssue);
 
   return {
     content: [
       {
         type: 'text',
-        text: JSON.stringify(formattedResponse, null, 2),
+        text: `# Comment Added\n\n${markdown}`,
       },
     ],
   };
@@ -374,7 +375,7 @@ async function handleCommentIssue(jiraClient: JiraClient, args: ManageJiraIssueA
 
 async function handleLinkIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs) {
   console.error(`Linking issue ${args.issueKey} to ${args.linkedIssueKey} with type ${args.linkType}`);
-  
+
   // Link the issues
   await jiraClient.linkIssues(
     args.issueKey!,
@@ -383,15 +384,15 @@ async function handleLinkIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs
     args.comment
   );
 
-  // Get the updated issue to return
+  // Get the updated issue and render to markdown
   const updatedIssue = await jiraClient.getIssue(args.issueKey!, false, false);
-  const formattedResponse = IssueFormatter.formatIssue(updatedIssue);
+  const markdown = MarkdownRenderer.renderIssue(updatedIssue);
 
   return {
     content: [
       {
         type: 'text',
-        text: JSON.stringify(formattedResponse, null, 2),
+        text: `# Issue Linked\n\n${markdown}`,
       },
     ],
   };

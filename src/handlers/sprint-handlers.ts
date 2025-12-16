@@ -3,6 +3,7 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import { JiraClient } from '../client/jira-client.js';
 import { SprintData, SprintExpansionOptions, SprintFormatter } from '../utils/formatters/sprint-formatter.js';
+import { MarkdownRenderer } from '../mcp/markdown-renderer.js';
 
 /**
  * Sprint Handlers
@@ -294,21 +295,24 @@ async function handleGetSprint(jiraClient: JiraClient, args: ManageJiraSprintArg
     report = await jiraClient.getSprintReport(sprint.boardId, args.sprintId!);
   }
 
-  // Combine data
-  const sprintData: SprintData = {
-    ...sprint,
-    issues,
-    report,
-  };
-
-  // Format the response
-  const formattedResponse = SprintFormatter.formatSprint(sprintData, expansionOptions);
+  // Render to markdown
+  const markdown = MarkdownRenderer.renderSprint({
+    id: sprint.id,
+    name: sprint.name,
+    state: sprint.state,
+    boardId: sprint.boardId,
+    goal: sprint.goal,
+    startDate: sprint.startDate,
+    endDate: sprint.endDate,
+    completeDate: sprint.completeDate,
+    issues: issues,
+  });
 
   return {
     content: [
       {
         type: 'text',
-        text: JSON.stringify(formattedResponse, null, 2),
+        text: markdown,
       },
     ],
   };
@@ -324,14 +328,22 @@ async function handleCreateSprint(jiraClient: JiraClient, args: ManageJiraSprint
     args.goal
   );
 
-  // Format the response
-  const formattedResponse = SprintFormatter.formatSprint(response);
+  // Render to markdown
+  const markdown = MarkdownRenderer.renderSprint({
+    id: response.id,
+    name: response.name,
+    state: response.state,
+    boardId: response.boardId,
+    goal: response.goal,
+    startDate: response.startDate,
+    endDate: response.endDate,
+  });
 
   return {
     content: [
       {
         type: 'text',
-        text: JSON.stringify(formattedResponse, null, 2),
+        text: `# Sprint Created\n\n${markdown}`,
       },
     ],
   };
@@ -362,15 +374,23 @@ async function handleUpdateSprint(jiraClient: JiraClient, args: ManageJiraSprint
 
     // Get the updated sprint
     const updatedSprint = await jiraClient.getSprint(args.sprintId!);
-    
-    // Format the response
-    const formattedResponse = SprintFormatter.formatSprint(updatedSprint);
+
+    // Render to markdown
+    const markdown = MarkdownRenderer.renderSprint({
+      id: updatedSprint.id,
+      name: updatedSprint.name,
+      state: updatedSprint.state,
+      boardId: updatedSprint.boardId,
+      goal: updatedSprint.goal,
+      startDate: updatedSprint.startDate,
+      endDate: updatedSprint.endDate,
+    });
 
     return {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(formattedResponse, null, 2),
+          text: `# Sprint Updated\n\n${markdown}`,
         },
       ],
     };
@@ -402,10 +422,7 @@ async function handleDeleteSprint(jiraClient: JiraClient, args: ManageJiraSprint
     content: [
       {
         type: 'text',
-        text: JSON.stringify({
-          success: true,
-          message: `Sprint ${args.sprintId} has been deleted successfully.`,
-        }, null, 2),
+        text: `# Sprint Deleted\n\nSprint ${args.sprintId} has been deleted successfully.`,
       },
     ],
   };
@@ -424,18 +441,48 @@ async function handleListSprints(jiraClient: JiraClient, args: ManageJiraSprintA
     maxResults
   );
 
-  // Format the response
-  const formattedResponse = SprintFormatter.formatSprintList(response.sprints, {
-    startAt,
-    maxResults,
-    total: response.total,
-  });
+  // Render sprints to markdown
+  const lines: string[] = [];
+  lines.push(`# Sprints (${response.total})`);
+  if (args.state) {
+    lines.push(`**Filter:** ${args.state}`);
+  }
+  lines.push('');
+
+  // Group by state
+  const byState: Record<string, typeof response.sprints> = {};
+  for (const sprint of response.sprints) {
+    const state = sprint.state || 'unknown';
+    if (!byState[state]) byState[state] = [];
+    byState[state].push(sprint);
+  }
+
+  for (const [state, sprints] of Object.entries(byState)) {
+    const stateIcon = state === 'active' ? '[>]' : state === 'closed' ? '[x]' : '[ ]';
+    lines.push(`## ${state.charAt(0).toUpperCase() + state.slice(1)} ${stateIcon}`);
+    for (const sprint of sprints) {
+      lines.push(`- **${sprint.name}** (id: ${sprint.id})`);
+      if (sprint.goal) {
+        lines.push(`  Goal: ${sprint.goal.substring(0, 80)}${sprint.goal.length > 80 ? '...' : ''}`);
+      }
+    }
+    lines.push('');
+  }
+
+  // Pagination
+  lines.push('---');
+  if (startAt + maxResults < response.total) {
+    lines.push(`Showing ${startAt + 1}-${startAt + response.sprints.length} of ${response.total}`);
+    lines.push(`**Next page:** Use startAt=${startAt + maxResults}`);
+  } else {
+    lines.push(`Showing all ${response.sprints.length} sprint${response.sprints.length !== 1 ? 's' : ''}`);
+  }
 
   return {
     content: [
       {
         type: 'text',
-        text: JSON.stringify(formattedResponse, null, 2),
+        text: lines.join('\n'),
       },
     ],
   };
@@ -471,20 +518,23 @@ async function handleManageIssues(jiraClient: JiraClient, args: ManageJiraSprint
     const sprint = await jiraClient.getSprint(args.sprintId!);
     const issues = await jiraClient.getSprintIssues(args.sprintId!);
 
-    // Combine data
-    const sprintData: SprintData = {
-      ...sprint,
-      issues,
-    };
-
-    // Format the response
-    const formattedResponse = SprintFormatter.formatSprint(sprintData, { issues: true });
+    // Render to markdown
+    const markdown = MarkdownRenderer.renderSprint({
+      id: sprint.id,
+      name: sprint.name,
+      state: sprint.state,
+      boardId: sprint.boardId,
+      goal: sprint.goal,
+      startDate: sprint.startDate,
+      endDate: sprint.endDate,
+      issues: issues,
+    });
 
     return {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(formattedResponse, null, 2),
+          text: `# Sprint Issues Updated\n\n${markdown}`,
         },
       ],
     };
