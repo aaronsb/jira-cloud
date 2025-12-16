@@ -2,7 +2,6 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import { JiraClient } from '../client/jira-client.js';
-import { IssueExpansionOptions, IssueFormatter } from '../utils/formatters/index.js';
 import { MarkdownRenderer } from '../mcp/markdown-renderer.js';
 
 /**
@@ -226,10 +225,10 @@ function validateManageJiraIssueArgs(args: unknown): args is ManageJiraIssueArgs
 // Handler functions for each operation
 async function handleGetIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs) {
   // Parse expansion options
-  const expansionOptions: IssueExpansionOptions = {};
+  const expansionOptions: Record<string, boolean> = {};
   if (args.expand) {
     for (const expansion of args.expand) {
-      expansionOptions[expansion as keyof IssueExpansionOptions] = true;
+      expansionOptions[expansion] = true;
     }
   }
 

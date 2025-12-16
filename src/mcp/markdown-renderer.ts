@@ -12,7 +12,6 @@
  */
 
 import { JiraIssueDetails, TransitionDetails, SearchPagination } from '../types/index.js';
-import { FormattedResponse, ResponseMetadata, ResponseSummary } from '../utils/formatters/base-formatter.js';
 
 // ============================================================================
 // Helper Functions
@@ -535,51 +534,6 @@ export function renderFilterList(filters: FilterData[]): string {
 }
 
 // ============================================================================
-// Generic Response Renderer
-// ============================================================================
-
-/**
- * Render any FormattedResponse to markdown
- * This is a fallback for responses that don't have a specific renderer
- */
-export function renderGenericResponse<T>(response: FormattedResponse<T>): string {
-  const lines: string[] = [];
-
-  lines.push('# Response');
-  lines.push('');
-
-  // Render data as formatted JSON (but more compact)
-  lines.push('```json');
-  lines.push(JSON.stringify(response.data, null, 2));
-  lines.push('```');
-
-  // Metadata
-  if (response._metadata) {
-    if (response._metadata.pagination) {
-      const p = response._metadata.pagination;
-      lines.push('');
-      lines.push(`**Pagination:** ${p.startAt + 1}-${p.startAt + p.maxResults} of ${p.total}${p.hasMore ? ' (more available)' : ''}`);
-    }
-    if (response._metadata.expansions && response._metadata.expansions.length > 0) {
-      lines.push(`**Available expansions:** ${response._metadata.expansions.join(', ')}`);
-    }
-  }
-
-  // Summary
-  if (response._summary) {
-    if (response._summary.suggested_actions && response._summary.suggested_actions.length > 0) {
-      lines.push('');
-      lines.push('## Suggested Actions');
-      for (const action of response._summary.suggested_actions) {
-        lines.push(`- ${action.text}`);
-      }
-    }
-  }
-
-  return lines.join('\n');
-}
-
-// ============================================================================
 // Export convenience object
 // ============================================================================
 
@@ -602,9 +556,6 @@ export const MarkdownRenderer = {
   // Filters
   renderFilter,
   renderFilterList,
-
-  // Generic
-  renderGenericResponse,
 
   // Helpers (exposed for custom use)
   helpers: {

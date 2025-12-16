@@ -2,8 +2,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import { JiraClient } from '../client/jira-client.js';
-import { BoardData, BoardExpansionOptions, BoardFormatter } from '../utils/formatters/index.js';
-import { MarkdownRenderer } from '../mcp/markdown-renderer.js';
+import { MarkdownRenderer, BoardData } from '../mcp/markdown-renderer.js';
 
 /**
  * Board Handlers
@@ -161,10 +160,10 @@ async function handleGetBoard(jiraClient: JiraClient, args: ManageJiraBoardArgs)
   const boardId = args.boardId!;
   
   // Parse expansion options
-  const expansionOptions: BoardExpansionOptions = {};
+  const expansionOptions: Record<string, boolean> = {};
   if (args.expand) {
     for (const expansion of args.expand) {
-      expansionOptions[expansion as keyof BoardExpansionOptions] = true;
+      expansionOptions[expansion] = true;
     }
   }
   
@@ -183,15 +182,18 @@ async function handleGetBoard(jiraClient: JiraClient, args: ManageJiraBoardArgs)
   
   // Convert to BoardData format
   const boardData: BoardData = {
-    ...board
+    id: board.id,
+    name: board.name,
+    type: board.type,
+    projectName: board.location?.projectName,
   };
-  
+
   // Handle expansions
   if (expansionOptions.sprints) {
     try {
       // Get sprints for this board
       const sprints = await jiraClient.listBoardSprints(boardId);
-      
+
       // Add sprints to the response
       boardData.sprints = sprints;
     } catch (error) {
@@ -199,14 +201,14 @@ async function handleGetBoard(jiraClient: JiraClient, args: ManageJiraBoardArgs)
       // Continue even if sprints fail
     }
   }
-  
+
   // Render to markdown
   const markdown = MarkdownRenderer.renderBoard({
     id: boardData.id,
     name: boardData.name,
     type: boardData.type,
-    projectName: boardData.location?.projectName,
-    sprints: boardData.sprints?.map(s => ({
+    projectName: boardData.projectName,
+    sprints: boardData.sprints?.map((s: { id: number; name: string; state: string; goal?: string }) => ({
       id: s.id,
       name: s.name,
       state: s.state,
@@ -238,9 +240,12 @@ async function handleListBoards(jiraClient: JiraClient, args: ManageJiraBoardArg
   
   // Convert to BoardData format
   const boardDataList: BoardData[] = paginatedBoards.map(board => ({
-    ...board
+    id: board.id,
+    name: board.name,
+    type: board.type,
+    projectName: board.location?.projectName,
   }));
-  
+
   // If sprints are requested, get them for each board
   if (includeSprints) {
     // This would be more efficient with a batch API call, but for now we'll do it sequentially
@@ -248,7 +253,7 @@ async function handleListBoards(jiraClient: JiraClient, args: ManageJiraBoardArg
       try {
         // Get active sprints for this board
         const sprints = await jiraClient.listBoardSprints(board.id);
-        
+
         // Add sprints to the board data
         board.sprints = sprints;
       } catch (error) {
@@ -257,14 +262,14 @@ async function handleListBoards(jiraClient: JiraClient, args: ManageJiraBoardArg
       }
     }
   }
-  
+
   // Convert to markdown renderer format
   const rendererBoards = boardDataList.map(board => ({
     id: board.id,
     name: board.name,
     type: board.type,
-    projectName: board.location?.projectName,
-    sprints: board.sprints?.map(s => ({
+    projectName: board.projectName,
+    sprints: board.sprints?.map((s: { id: number; name: string; state: string; goal?: string }) => ({
       id: s.id,
       name: s.name,
       state: s.state,

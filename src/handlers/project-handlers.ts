@@ -2,8 +2,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import { JiraClient } from '../client/jira-client.js';
-import { ProjectData, ProjectExpansionOptions, ProjectFormatter } from '../utils/formatters/index.js';
-import { MarkdownRenderer } from '../mcp/markdown-renderer.js';
+import { MarkdownRenderer, ProjectData } from '../mcp/markdown-renderer.js';
 
 /**
  * Project Handlers
@@ -206,45 +205,43 @@ async function handleGetProject(jiraClient: JiraClient, args: ManageJiraProjectA
   const includeStatusCounts = args.include_status_counts !== false; // Default to true
   
   // Parse expansion options
-  const expansionOptions: ProjectExpansionOptions = {};
+  const expansionOptions: Record<string, boolean> = {};
   if (args.expand) {
     for (const expansion of args.expand) {
-      expansionOptions[expansion as keyof ProjectExpansionOptions] = true;
+      expansionOptions[expansion] = true;
     }
   }
-  
+
   // Get all projects and find the requested one
   const projects = await jiraClient.listProjects();
   const project = projects.find(p => p.key === projectKey);
-  
+
   if (!project) {
     throw new McpError(ErrorCode.InvalidRequest, `Project not found: ${projectKey}`);
   }
-  
+
   // Convert to ProjectData format
   const projectData: ProjectData = {
-    id: project.id,
     key: project.key,
     name: project.name,
-    description: project.description,
-    lead: project.lead,
-    url: project.url
+    description: project.description || undefined,
+    lead: project.lead || undefined,
   };
-  
+
   // If status counts are requested, get them
   if (includeStatusCounts) {
     try {
       // Get issue counts by status for this project
       const searchResult = await jiraClient.searchIssues(`project = ${projectKey}`, 0, 0);
-      
+
       // Count issues by status
       const statusCounts: Record<string, number> = {};
       for (const issue of searchResult.issues) {
         const status = issue.status;
         statusCounts[status] = (statusCounts[status] || 0) + 1;
       }
-      
-      projectData.status_counts = statusCounts;
+
+      projectData.statusCounts = statusCounts;
     } catch (error) {
       console.error(`Error getting status counts for project ${projectKey}:`, error);
       // Continue even if status counts fail
@@ -279,26 +276,26 @@ async function handleGetProject(jiraClient: JiraClient, args: ManageJiraProjectA
       );
       
       // Add recent issues to the response
-      projectData.recent_issues = searchResult.issues;
+      projectData.recentIssues = searchResult.issues.map(issue => ({
+        key: issue.key,
+        summary: issue.summary,
+        status: issue.status
+      }));
     } catch (error) {
       console.error(`Error getting recent issues for project ${projectKey}:`, error);
       // Continue even if recent issues fail
     }
   }
-  
+
   // Render to markdown
   const markdown = MarkdownRenderer.renderProject({
     key: projectData.key,
     name: projectData.name,
-    description: projectData.description || undefined,
-    lead: projectData.lead || undefined,
-    statusCounts: projectData.status_counts,
+    description: projectData.description,
+    lead: projectData.lead,
+    statusCounts: projectData.statusCounts,
     boards: projectData.boards,
-    recentIssues: projectData.recent_issues?.map(i => ({
-      key: i.key,
-      summary: i.summary,
-      status: i.status
-    })),
+    recentIssues: projectData.recentIssues,
   });
 
   return {
@@ -415,14 +412,12 @@ async function handleListProjects(jiraClient: JiraClient, args: ManageJiraProjec
   
   // Convert to ProjectData format
   const projectDataList: ProjectData[] = paginatedProjects.map(project => ({
-    id: project.id,
     key: project.key,
     name: project.name,
-    description: project.description,
-    lead: project.lead,
-    url: project.url
+    description: project.description || undefined,
+    lead: project.lead || undefined,
   }));
-  
+
   // If status counts are requested, get them for each project
   if (includeStatusCounts) {
     // This would be more efficient with a batch API call, but for now we'll do it sequentially
@@ -430,29 +425,29 @@ async function handleListProjects(jiraClient: JiraClient, args: ManageJiraProjec
       try {
         // Get issue counts by status for this project
         const searchResult = await jiraClient.searchIssues(`project = ${project.key}`, 0, 0);
-        
+
         // Count issues by status
         const statusCounts: Record<string, number> = {};
         for (const issue of searchResult.issues) {
           const status = issue.status;
           statusCounts[status] = (statusCounts[status] || 0) + 1;
         }
-        
-        project.status_counts = statusCounts;
+
+        project.statusCounts = statusCounts;
       } catch (error) {
         console.error(`Error getting status counts for project ${project.key}:`, error);
         // Continue with other projects even if one fails
       }
     }
   }
-  
-  // Convert to markdown renderer format
+
+  // Render to markdown with pagination
   const rendererProjects = projectDataList.map(project => ({
     key: project.key,
     name: project.name,
-    description: project.description || undefined,
-    lead: project.lead || undefined,
-    statusCounts: project.status_counts,
+    description: project.description,
+    lead: project.lead,
+    statusCounts: project.statusCounts,
   }));
 
   // Render to markdown with pagination

@@ -2,7 +2,6 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import { JiraClient } from '../client/jira-client.js';
-import { SprintData, SprintExpansionOptions, SprintFormatter } from '../utils/formatters/sprint-formatter.js';
 import { MarkdownRenderer } from '../mcp/markdown-renderer.js';
 
 /**
@@ -271,7 +270,7 @@ function validateManageJiraSprintArgs(args: unknown): args is ManageJiraSprintAr
 // Handler functions for each operation
 async function handleGetSprint(jiraClient: JiraClient, args: ManageJiraSprintArgs) {
   // Parse expansion options
-  const expansionOptions: SprintExpansionOptions = {};
+  const expansionOptions: Record<string, boolean> = {};
   if (args.expand) {
     for (const expansion of args.expand) {
       if (expansion === 'issues' || expansion === 'report') {
