@@ -2,7 +2,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import { JiraClient } from '../client/jira-client.js';
-import { BoardData, BoardExpansionOptions, BoardFormatter } from '../utils/formatters/index.js';
+import { MarkdownRenderer, BoardData } from '../mcp/markdown-renderer.js';
 
 /**
  * Board Handlers
@@ -160,10 +160,10 @@ async function handleGetBoard(jiraClient: JiraClient, args: ManageJiraBoardArgs)
   const boardId = args.boardId!;
   
   // Parse expansion options
-  const expansionOptions: BoardExpansionOptions = {};
+  const expansionOptions: Record<string, boolean> = {};
   if (args.expand) {
     for (const expansion of args.expand) {
-      expansionOptions[expansion as keyof BoardExpansionOptions] = true;
+      expansionOptions[expansion] = true;
     }
   }
   
@@ -182,15 +182,18 @@ async function handleGetBoard(jiraClient: JiraClient, args: ManageJiraBoardArgs)
   
   // Convert to BoardData format
   const boardData: BoardData = {
-    ...board
+    id: board.id,
+    name: board.name,
+    type: board.type,
+    projectName: board.location?.projectName,
   };
-  
+
   // Handle expansions
   if (expansionOptions.sprints) {
     try {
       // Get sprints for this board
       const sprints = await jiraClient.listBoardSprints(boardId);
-      
+
       // Add sprints to the response
       boardData.sprints = sprints;
     } catch (error) {
@@ -198,15 +201,26 @@ async function handleGetBoard(jiraClient: JiraClient, args: ManageJiraBoardArgs)
       // Continue even if sprints fail
     }
   }
-  
-  // Format the response
-  const formattedResponse = BoardFormatter.formatBoard(boardData, expansionOptions);
-  
+
+  // Render to markdown
+  const markdown = MarkdownRenderer.renderBoard({
+    id: boardData.id,
+    name: boardData.name,
+    type: boardData.type,
+    projectName: boardData.projectName,
+    sprints: boardData.sprints?.map((s: { id: number; name: string; state: string; goal?: string }) => ({
+      id: s.id,
+      name: s.name,
+      state: s.state,
+      goal: s.goal,
+    })),
+  });
+
   return {
     content: [
       {
         type: 'text',
-        text: JSON.stringify(formattedResponse, null, 2),
+        text: markdown,
       },
     ],
   };
@@ -226,9 +240,12 @@ async function handleListBoards(jiraClient: JiraClient, args: ManageJiraBoardArg
   
   // Convert to BoardData format
   const boardDataList: BoardData[] = paginatedBoards.map(board => ({
-    ...board
+    id: board.id,
+    name: board.name,
+    type: board.type,
+    projectName: board.location?.projectName,
   }));
-  
+
   // If sprints are requested, get them for each board
   if (includeSprints) {
     // This would be more efficient with a batch API call, but for now we'll do it sequentially
@@ -236,7 +253,7 @@ async function handleListBoards(jiraClient: JiraClient, args: ManageJiraBoardArg
       try {
         // Get active sprints for this board
         const sprints = await jiraClient.listBoardSprints(board.id);
-        
+
         // Add sprints to the board data
         board.sprints = sprints;
       } catch (error) {
@@ -245,30 +262,38 @@ async function handleListBoards(jiraClient: JiraClient, args: ManageJiraBoardArg
       }
     }
   }
-  
-  // Format the response
-  const formattedBoards = boardDataList.map(board => 
-    BoardFormatter.formatBoard(board, { sprints: includeSprints })
-  );
-  
-  // Create a response with pagination metadata
-  const response = {
-    data: formattedBoards,
-    _metadata: {
-      pagination: {
-        startAt,
-        maxResults,
-        total: boards.length,
-        hasMore: startAt + maxResults < boards.length,
-      },
-    },
-  };
-  
+
+  // Convert to markdown renderer format
+  const rendererBoards = boardDataList.map(board => ({
+    id: board.id,
+    name: board.name,
+    type: board.type,
+    projectName: board.projectName,
+    sprints: board.sprints?.map((s: { id: number; name: string; state: string; goal?: string }) => ({
+      id: s.id,
+      name: s.name,
+      state: s.state,
+      goal: s.goal,
+    })),
+  }));
+
+  // Render to markdown with pagination
+  let markdown = MarkdownRenderer.renderBoardList(rendererBoards);
+
+  // Add pagination guidance
+  markdown += '\n\n---\n';
+  if (startAt + maxResults < boards.length) {
+    markdown += `Showing ${startAt + 1}-${startAt + boardDataList.length} of ${boards.length}\n`;
+    markdown += `**Next page:** Use startAt=${startAt + maxResults}`;
+  } else {
+    markdown += `Showing all ${boardDataList.length} board${boardDataList.length !== 1 ? 's' : ''}`;
+  }
+
   return {
     content: [
       {
         type: 'text',
-        text: JSON.stringify(response, null, 2),
+        text: markdown,
       },
     ],
   };

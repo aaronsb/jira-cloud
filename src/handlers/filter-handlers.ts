@@ -2,7 +2,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import { JiraClient } from '../client/jira-client.js';
-import { FilterData, FilterExpansionOptions, FilterFormatter, SearchExpansionOptions, SearchFormatter } from '../utils/formatters/index.js';
+import { MarkdownRenderer, FilterData } from '../mcp/markdown-renderer.js';
 
 /**
  * Filter Handlers
@@ -203,46 +203,41 @@ async function handleGetFilter(jiraClient: JiraClient, args: ManageJiraFilterArg
   const filterId = args.filterId!;
   
   // Parse expansion options
-  const expansionOptions: FilterExpansionOptions = {};
+  const expansionOptions: Record<string, boolean> = {};
   if (args.expand) {
     for (const expansion of args.expand) {
       if (['jql', 'description', 'permissions', 'issue_count'].includes(expansion)) {
-        expansionOptions[expansion as keyof FilterExpansionOptions] = true;
+        expansionOptions[expansion] = true;
       }
     }
   }
-  
+
   try {
     // Get the filter by first getting its issues
     // This is a workaround since we don't have direct access to the filter API
     // The getFilterIssues method internally calls the filter API
     await jiraClient.getFilterIssues(filterId);
-    
+
     // Now get the filter details from the list of all filters
     const allFilters = await jiraClient.listMyFilters(expansionOptions.jql || expansionOptions.description || expansionOptions.permissions);
     const filter = allFilters.find(f => f.id === filterId);
-    
+
     if (!filter) {
       throw new McpError(
         ErrorCode.InvalidParams,
         `Filter with ID ${filterId} not found or not accessible`
       );
     }
-    
+
     // Convert to FilterData format
     const filterData: FilterData = {
       id: filter.id,
       name: filter.name || 'Unnamed Filter',
       owner: filter.owner || 'Unknown',
       favourite: filter.favourite || false,
-      viewUrl: filter.viewUrl || '',
-      description: filter.description || '',
-      jql: filter.jql || '',
-      sharePermissions: filter.sharePermissions?.map(perm => ({
-        type: perm.type,
-        group: perm.group,
-        project: perm.project
-      })) || []
+      viewUrl: filter.viewUrl,
+      description: filter.description,
+      jql: filter.jql,
     };
     
     // Handle expansions
@@ -259,14 +254,14 @@ async function handleGetFilter(jiraClient: JiraClient, args: ManageJiraFilterArg
       }
     }
     
-    // Format the response
-    const formattedResponse = FilterFormatter.formatFilter(filterData, expansionOptions);
-    
+    // Render to markdown
+    const markdown = MarkdownRenderer.renderFilter(filterData);
+
     return {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(formattedResponse, null, 2),
+          text: markdown,
         },
       ],
     };
@@ -274,7 +269,7 @@ async function handleGetFilter(jiraClient: JiraClient, args: ManageJiraFilterArg
     if (error instanceof McpError) {
       throw error;
     }
-    
+
     console.error(`Error getting filter ${filterId}:`, error);
     throw new McpError(
       ErrorCode.InternalError,
@@ -289,15 +284,15 @@ async function handleListFilters(jiraClient: JiraClient, args: ManageJiraFilterA
   const maxResults = args.maxResults !== undefined ? args.maxResults : 50;
   
   // Parse expansion options
-  const expansionOptions: FilterExpansionOptions = {};
+  const expansionOptions: Record<string, boolean> = {};
   if (args.expand) {
     for (const expansion of args.expand) {
       if (['jql', 'description', 'permissions', 'issue_count'].includes(expansion)) {
-        expansionOptions[expansion as keyof FilterExpansionOptions] = true;
+        expansionOptions[expansion] = true;
       }
     }
   }
-  
+
   // Get all filters
   const filters = await jiraClient.listMyFilters(expansionOptions.jql || expansionOptions.description || expansionOptions.permissions);
   
@@ -326,29 +321,23 @@ async function handleListFilters(jiraClient: JiraClient, args: ManageJiraFilterA
     }
   }
   
-  // Format the response
-  const formattedFilters = filterDataList.map(filter => 
-    FilterFormatter.formatFilter(filter, expansionOptions)
-  );
-  
-  // Create a response with pagination metadata
-  const response = {
-    data: formattedFilters,
-    _metadata: {
-      pagination: {
-        startAt,
-        maxResults,
-        total: filters.length,
-        hasMore: startAt + maxResults < filters.length,
-      },
-    },
-  };
-  
+  // Render to markdown with pagination info
+  let markdown = MarkdownRenderer.renderFilterList(filterDataList);
+
+  // Add pagination guidance
+  markdown += '\n\n---\n';
+  if (startAt + maxResults < filters.length) {
+    markdown += `Showing ${startAt + 1}-${startAt + filterDataList.length} of ${filters.length}\n`;
+    markdown += `**Next page:** Use startAt=${startAt + maxResults}`;
+  } else {
+    markdown += `Showing all ${filterDataList.length} filter${filterDataList.length !== 1 ? 's' : ''}`;
+  }
+
   return {
     content: [
       {
         type: 'text',
-        text: JSON.stringify(response, null, 2),
+        text: markdown,
       },
     ],
   };
@@ -451,21 +440,27 @@ async function handleDeleteFilter(_jiraClient: JiraClient, _args: ManageJiraFilt
 
 async function handleExecuteFilter(jiraClient: JiraClient, _args: ManageJiraFilterArgs) {
   const filterId = _args.filterId!;
-  
+
   // Get issues for the filter
   const issues = await jiraClient.getFilterIssues(filterId);
-  
+
+  // Render to markdown
+  const markdown = MarkdownRenderer.renderIssueSearchResults(
+    issues,
+    {
+      startAt: 0,
+      maxResults: issues.length,
+      total: issues.length,
+      hasMore: false,
+    },
+    `filter = ${filterId}`
+  );
+
   return {
     content: [
       {
         type: 'text',
-        text: JSON.stringify({
-          data: issues,
-          _metadata: {
-            filter_id: filterId,
-            issue_count: issues.length
-          }
-        }, null, 2),
+        text: markdown,
       },
     ],
   };
@@ -486,12 +481,12 @@ async function handleExecuteJql(jiraClient: JiraClient, args: ManageJiraFilterAr
   try {
     console.error(`Executing JQL search with args:`, JSON.stringify(args, null, 2));
     
-    // Parse search expansion options
-    const searchExpansionOptions: SearchExpansionOptions = {};
+    // Parse search expansion options (not currently used but reserved for future)
+    const _searchExpansionOptions: Record<string, boolean> = {};
     if (args.expand) {
       for (const expansion of args.expand) {
         if (['issue_details', 'transitions', 'comments_preview'].includes(expansion)) {
-          searchExpansionOptions[expansion as keyof SearchExpansionOptions] = true;
+          _searchExpansionOptions[expansion] = true;
         }
       }
     }
@@ -502,15 +497,19 @@ async function handleExecuteJql(jiraClient: JiraClient, args: ManageJiraFilterAr
       startAt,
       maxResults
     );
-    
-    // Format the response using the SearchFormatter for enhanced results
-    const formattedResponse = SearchFormatter.formatSearchResult(searchResult, searchExpansionOptions);
-    
+
+    // Render directly to markdown for token efficiency
+    const markdown = MarkdownRenderer.renderIssueSearchResults(
+      searchResult.issues,
+      searchResult.pagination,
+      args.jql
+    );
+
     return {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(formattedResponse, null, 2),
+          text: markdown,
         },
       ],
     };

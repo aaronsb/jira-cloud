@@ -2,7 +2,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import { JiraClient } from '../client/jira-client.js';
-import { SearchExpansionOptions, SearchFormatter } from '../utils/formatters/index.js';
+import { MarkdownRenderer } from '../mcp/markdown-renderer.js';
 
 /**
  * Search Handlers
@@ -129,30 +129,34 @@ export async function setupSearchHandlers(
 
         try {
           console.error(`Executing search with args:`, JSON.stringify(normalizedArgs, null, 2));
-          
-          // Parse expansion options
-          const expansionOptions: SearchExpansionOptions = {};
+
+          // Parse expansion options (reserved for future use)
+          const _expansionOptions: Record<string, boolean> = {};
           if (normalizedArgs.expand) {
             for (const expansion of normalizedArgs.expand as string[]) {
-              expansionOptions[expansion as keyof SearchExpansionOptions] = true;
+              _expansionOptions[expansion] = true;
             }
           }
-          
+
           // Execute the search
           const searchResult = await jiraClient.searchIssues(
             normalizedArgs.jql as string,
             normalizedArgs.startAt as number | undefined,
             normalizedArgs.maxResults as number | undefined
           );
-          
-          // Format the response using the SearchFormatter
-          const formattedResponse = SearchFormatter.formatSearchResult(searchResult, expansionOptions);
+
+          // Render to markdown for token efficiency
+          const markdown = MarkdownRenderer.renderIssueSearchResults(
+            searchResult.issues,
+            searchResult.pagination,
+            normalizedArgs.jql as string
+          );
 
           return {
             content: [
               {
                 type: 'text',
-                text: JSON.stringify(formattedResponse, null, 2),
+                text: markdown,
               },
             ],
           };
