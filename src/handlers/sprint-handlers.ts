@@ -288,11 +288,7 @@ async function handleGetSprint(jiraClient: JiraClient, args: ManageJiraSprintArg
     issues = await jiraClient.getSprintIssues(args.sprintId!);
   }
 
-  // Get report if requested
-  let report = undefined;
-  if (expansionOptions.report && sprint.state === 'closed') {
-    report = await jiraClient.getSprintReport(sprint.boardId, args.sprintId!);
-  }
+  // Note: Sprint report expansion not yet supported in markdown renderer
 
   // Render to markdown
   const markdown = MarkdownRenderer.renderSprint({
