@@ -3,6 +3,7 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import { JiraClient } from '../client/jira-client.js';
 import { FilterData, FilterExpansionOptions, FilterFormatter, SearchExpansionOptions, SearchFormatter } from '../utils/formatters/index.js';
+import { MarkdownRenderer } from '../mcp/markdown-renderer.js';
 
 /**
  * Filter Handlers
@@ -502,15 +503,19 @@ async function handleExecuteJql(jiraClient: JiraClient, args: ManageJiraFilterAr
       startAt,
       maxResults
     );
-    
-    // Format the response using the SearchFormatter for enhanced results
-    const formattedResponse = SearchFormatter.formatSearchResult(searchResult, searchExpansionOptions);
-    
+
+    // Render directly to markdown for token efficiency
+    const markdown = MarkdownRenderer.renderIssueSearchResults(
+      searchResult.issues,
+      searchResult.pagination,
+      args.jql
+    );
+
     return {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(formattedResponse, null, 2),
+          text: markdown,
         },
       ],
     };
