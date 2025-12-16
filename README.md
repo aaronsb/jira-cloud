@@ -13,7 +13,7 @@ Add to your MCP settings:
   "mcpServers": {
     "jira-cloud": {
       "command": "npx",
-      "args": ["-y", "jira-cloud"],
+      "args": ["-y", "@aaronsb/jira-cloud-mcp"],
       "env": {
         "JIRA_API_TOKEN": "your-api-token",
         "JIRA_EMAIL": "your-email",
@@ -27,7 +27,7 @@ Add to your MCP settings:
 Or install globally:
 
 ```bash
-npm install -g jira-cloud
+npm install -g @aaronsb/jira-cloud-mcp
 ```
 
 For detailed installation instructions, see the [Getting Started Guide](./docs/getting-started.md).

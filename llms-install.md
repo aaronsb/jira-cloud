@@ -11,9 +11,9 @@ Add to MCP settings (no installation required - uses npx):
 ```json
 {
   "mcpServers": {
-    "jira-cloud": {
+    "@aaronsb/jira-cloud-mcp": {
       "command": "npx",
-      "args": ["-y", "jira-cloud"],
+      "args": ["-y", "@aaronsb/jira-cloud-mcp"],
       "env": {
         "JIRA_API_TOKEN": "<user-jira-api-token>",
         "JIRA_EMAIL": "<user-jira-email>",
@@ -64,7 +64,7 @@ If the user needs to connect to multiple Jira instances, use a configuration lik
   "mcpServers": {
     "jira-instance1": {
       "command": "npx",
-      "args": ["-y", "jira-cloud"],
+      "args": ["-y", "@aaronsb/jira-cloud-mcp"],
       "env": {
         "JIRA_API_TOKEN": "<user-jira-api-token-1>",
         "JIRA_EMAIL": "<user-jira-email-1>",
@@ -75,7 +75,7 @@ If the user needs to connect to multiple Jira instances, use a configuration lik
     },
     "jira-instance2": {
       "command": "npx",
-      "args": ["-y", "jira-cloud"],
+      "args": ["-y", "@aaronsb/jira-cloud-mcp"],
       "env": {
         "JIRA_API_TOKEN": "<user-jira-api-token-2>",
         "JIRA_EMAIL": "<user-jira-email-2>",
@@ -100,7 +100,7 @@ If the user needs to connect to multiple Jira instances, use a configuration lik
 2. **npx Errors**
    - Ensure Node.js 20 or higher is installed
    - Try clearing npm cache: `npm cache clean --force`
-   - Try installing globally instead: `npm install -g jira-cloud`
+   - Try installing globally instead: `npm install -g @aaronsb/jira-cloud-mcp`
 
 3. **Permission Issues**
    - Check Jira permissions for the user account

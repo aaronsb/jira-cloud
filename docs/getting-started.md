@@ -13,9 +13,9 @@ No installation required - just add to your MCP settings:
 ```json
 {
   "mcpServers": {
-    "jira-cloud": {
+    "@aaronsb/jira-cloud-mcp": {
       "command": "npx",
-      "args": ["-y", "jira-cloud"],
+      "args": ["-y", "@aaronsb/jira-cloud-mcp"],
       "env": {
         "JIRA_API_TOKEN": "your-api-token",
         "JIRA_EMAIL": "your-email",
@@ -29,7 +29,7 @@ No installation required - just add to your MCP settings:
 ### Global Installation
 
 ```bash
-npm install -g jira-cloud
+npm install -g @aaronsb/jira-cloud-mcp
 ```
 
 Then in MCP settings:
@@ -37,8 +37,8 @@ Then in MCP settings:
 ```json
 {
   "mcpServers": {
-    "jira-cloud": {
-      "command": "jira-cloud",
+    "@aaronsb/jira-cloud-mcp": {
+      "command": "jira-cloud-mcp",
       "env": {
         "JIRA_API_TOKEN": "your-api-token",
         "JIRA_EMAIL": "your-email",
@@ -84,14 +84,14 @@ JIRA_HOST=your-instance.atlassian.net
 ```typescript
 // List Projects
 await use_mcp_tool({
-  server_name: "jira-cloud",
+  server_name: "@aaronsb/jira-cloud-mcp",
   tool_name: "list_projects",
   arguments: {}
 });
 
 // Create Issue
 await use_mcp_tool({
-  server_name: "jira-cloud",
+  server_name: "@aaronsb/jira-cloud-mcp",
   tool_name: "create_issue",
   arguments: {
     projectKey: "PROJ",
@@ -103,7 +103,7 @@ await use_mcp_tool({
 
 // Search Issues
 await use_mcp_tool({
-  server_name: "jira-cloud",
+  server_name: "@aaronsb/jira-cloud-mcp",
   tool_name: "search_issues",
   arguments: {
     jql: "project = PROJ AND status = 'In Progress'"
