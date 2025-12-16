@@ -245,54 +245,59 @@ export class JiraClient {
       // Remove escaped quotes from JQL
       const cleanJql = jql.replace(/\\"/g, '"');
       console.error(`Executing JQL search with query: ${cleanJql}`);
-      
-      const searchResults = await this.client.issueSearch.searchForIssuesUsingJql({
+
+      // Use the new enhanced search API (old /rest/api/3/search was deprecated Oct 2025)
+      const searchResults = await this.client.issueSearch.searchForIssuesUsingJqlEnhancedSearch({
         jql: cleanJql,
-        startAt,
         maxResults: Math.min(maxResults, 100),
         fields: [
-        'summary',
-        'description',
-        'assignee',
-        'reporter',
-        'status',
-        'resolution',
-        'duedate',
-        this.customFields.startDate,
-        this.customFields.storyPoints,
-        'timeestimate',
-        'issuelinks',
-      ],
-      expand: 'renderedFields'
-    });
+          'summary',
+          'description',
+          'assignee',
+          'reporter',
+          'status',
+          'resolution',
+          'duedate',
+          'parent',
+          this.customFields.startDate,
+          this.customFields.storyPoints,
+          'timeestimate',
+          'issuelinks',
+        ],
+        expand: 'renderedFields',
+      });
 
-    const issues = (searchResults.issues || []).map(issue => ({
-      key: issue.key,
-      summary: issue.fields.summary,
-      description: (issue as any).renderedFields?.description || '',
-      parent: issue.fields.parent?.key || null,
-      assignee: issue.fields.assignee?.displayName || null,
-      reporter: issue.fields.reporter?.displayName || '',
-      status: issue.fields.status?.name || '',
-      resolution: issue.fields.resolution?.name || null,
-      dueDate: issue.fields.duedate || null,
-      startDate: issue.fields[this.customFields.startDate] || null,
-      storyPoints: issue.fields[this.customFields.storyPoints] || null,
-      timeEstimate: issue.fields.timeestimate || null,
-      issueLinks: (issue.fields.issuelinks || []).map(link => ({
-        type: link.type?.name || '',
-        outward: link.outwardIssue?.key || null,
-        inward: link.inwardIssue?.key || null,
-      })),
-    }));
+      const issues = (searchResults.issues || []).map(issue => ({
+        key: issue.key,
+        summary: issue.fields?.summary,
+        description: (issue as any).renderedFields?.description || '',
+        parent: issue.fields?.parent?.key || null,
+        assignee: issue.fields?.assignee?.displayName || null,
+        reporter: issue.fields?.reporter?.displayName || '',
+        status: issue.fields?.status?.name || '',
+        resolution: issue.fields?.resolution?.name || null,
+        dueDate: issue.fields?.duedate || null,
+        startDate: issue.fields?.[this.customFields.startDate] || null,
+        storyPoints: issue.fields?.[this.customFields.storyPoints] || null,
+        timeEstimate: issue.fields?.timeestimate || null,
+        issueLinks: (issue.fields?.issuelinks || []).map(link => ({
+          type: link.type?.name || '',
+          outward: link.outwardIssue?.key || null,
+          inward: link.inwardIssue?.key || null,
+        })),
+      }));
+
+      // Note: Enhanced search API uses token-based pagination, not offset-based
+      // The total count is not available in the new API
+      const hasMore = !!searchResults.nextPageToken;
 
       return {
         issues,
         pagination: {
           startAt,
           maxResults,
-          total: searchResults.total || 0,
-          hasMore: (startAt + issues.length) < (searchResults.total || 0)
+          total: hasMore ? issues.length + 1 : issues.length, // Approximate since total not available
+          hasMore,
         }
       };
     } catch (error) {

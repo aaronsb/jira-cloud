@@ -17,7 +17,7 @@ Add to your MCP settings:
       "env": {
         "JIRA_API_TOKEN": "your-api-token",
         "JIRA_EMAIL": "your-email",
-        "JIRA_HOST": "your-team.atlassian.net"
+        "JIRA_HOST": "https://your-team.atlassian.net"
       }
     }
   }

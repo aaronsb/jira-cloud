@@ -12,7 +12,7 @@ This guide provides solutions for common issues when using the Jira Cloud MCP Se
 1. Verify your API token is correct and not expired
 2. Regenerate a new token from [Atlassian Account Settings](https://id.atlassian.com/manage/api-tokens)
 3. Confirm the email matches your Atlassian account exactly
-4. Verify the Jira host URL (e.g., "your-instance.atlassian.net")
+4. Verify the Jira host URL includes `https://` (e.g., `https://your-instance.atlassian.net`)
 
 ## Permission Errors
 
@@ -53,6 +53,7 @@ This guide provides solutions for common issues when using the Jira Cloud MCP Se
 | 401 | Unauthorized | Verify API token |
 | 403 | Forbidden | Check permissions |
 | 404 | Not Found | Verify resource exists |
+| 410 | Gone | Update to latest version (API deprecated) |
 | 429 | Too Many Requests | Add delays between requests |
 | 500 | Server Error | Try again later |
 

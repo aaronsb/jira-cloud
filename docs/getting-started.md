@@ -19,7 +19,7 @@ No installation required - just add to your MCP settings:
       "env": {
         "JIRA_API_TOKEN": "your-api-token",
         "JIRA_EMAIL": "your-email",
-        "JIRA_HOST": "your-instance.atlassian.net"
+        "JIRA_HOST": "https://your-instance.atlassian.net"
       }
     }
   }
@@ -42,7 +42,7 @@ Then in MCP settings:
       "env": {
         "JIRA_API_TOKEN": "your-api-token",
         "JIRA_EMAIL": "your-email",
-        "JIRA_HOST": "your-instance.atlassian.net"
+        "JIRA_HOST": "https://your-instance.atlassian.net"
       }
     }
   }
@@ -65,7 +65,7 @@ npm run build
 ```bash
 JIRA_API_TOKEN=your-api-token
 JIRA_EMAIL=your-email
-JIRA_HOST=your-instance.atlassian.net
+JIRA_HOST=https://your-instance.atlassian.net
 ```
 
 ### Getting Jira Credentials
@@ -75,7 +75,7 @@ JIRA_HOST=your-instance.atlassian.net
    - Click "Create API token"
    - Name your token and copy it securely
 
-2. Use your Atlassian account email and Jira host (your-instance.atlassian.net)
+2. Use your Atlassian account email and Jira host URL (must include `https://`, e.g., `https://your-instance.atlassian.net`)
 
 ## Examples
 
