@@ -236,8 +236,8 @@ export class JiraClient {
       fields.parent = params.parentKey ? { key: params.parentKey } : null;
     }
     if (params.assignee !== undefined) {
-      // null unassigns, string assigns by account ID or name
-      fields.assignee = params.assignee ? { id: params.assignee } : null;
+      // null unassigns, string assigns by account ID
+      fields.assignee = params.assignee ? { accountId: params.assignee } : null;
     }
     if (params.priority) fields.priority = { id: params.priority };
     if (params.labels) fields.labels = params.labels;
@@ -868,7 +868,7 @@ export class JiraClient {
     }
 
     if (params.priority) fields.priority = { id: params.priority };
-    if (params.assignee) fields.assignee = { name: params.assignee };
+    if (params.assignee) fields.assignee = { accountId: params.assignee };
     if (params.labels) fields.labels = params.labels;
     if (params.customFields) {
       Object.assign(fields, params.customFields);
