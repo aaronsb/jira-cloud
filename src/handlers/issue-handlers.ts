@@ -287,12 +287,16 @@ async function handleCreateIssue(jiraClient: JiraClient, args: ManageJiraIssueAr
 }
 
 async function handleUpdateIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs) {
-  await jiraClient.updateIssue(
-    args.issueKey!,
-    args.summary,
-    args.description,
-    args.parent
-  );
+  await jiraClient.updateIssue({
+    issueKey: args.issueKey!,
+    summary: args.summary,
+    description: args.description,
+    parentKey: args.parent,
+    assignee: args.assignee,
+    priority: args.priority,
+    labels: args.labels,
+    customFields: args.customFields,
+  });
 
   // Get the updated issue and render to markdown
   const updatedIssue = await jiraClient.getIssue(args.issueKey!, false, false);

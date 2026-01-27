@@ -217,18 +217,36 @@ export class JiraClient {
     }));
   }
 
-  async updateIssue(issueKey: string, summary?: string, description?: string, parentKey?: string | null): Promise<void> {
+  async updateIssue(params: {
+    issueKey: string;
+    summary?: string;
+    description?: string;
+    parentKey?: string | null;
+    assignee?: string | null;
+    priority?: string;
+    labels?: string[];
+    customFields?: Record<string, any>;
+  }): Promise<void> {
     const fields: any = {};
-    if (summary) fields.summary = summary;
-    if (description) {
-      fields.description = TextProcessor.markdownToAdf(description);
+    if (params.summary) fields.summary = params.summary;
+    if (params.description) {
+      fields.description = TextProcessor.markdownToAdf(params.description);
     }
-    if (parentKey !== undefined) {
-      fields.parent = parentKey ? { key: parentKey } : null;
+    if (params.parentKey !== undefined) {
+      fields.parent = params.parentKey ? { key: params.parentKey } : null;
+    }
+    if (params.assignee !== undefined) {
+      // null unassigns, string assigns by account ID or name
+      fields.assignee = params.assignee ? { id: params.assignee } : null;
+    }
+    if (params.priority) fields.priority = { id: params.priority };
+    if (params.labels) fields.labels = params.labels;
+    if (params.customFields) {
+      Object.assign(fields, params.customFields);
     }
 
     await this.client.issues.editIssue({
-      issueIdOrKey: issueKey,
+      issueIdOrKey: params.issueKey,
       fields,
     });
   }
