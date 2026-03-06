@@ -252,7 +252,7 @@ async function handleMoveIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs
   // Check bulk-destructive guard
   const deflection = bulkOperationGuard.check('move', issueKey, process.env.JIRA_HOST);
   if (deflection) {
-    return { content: [{ type: 'text', text: deflection }] };
+    return { content: [{ type: 'text', text: deflection }], isError: true };
   }
 
   await jiraClient.moveIssue(issueKey, args.targetProjectKey!, args.targetIssueType!);
@@ -278,7 +278,7 @@ async function handleDeleteIssue(jiraClient: JiraClient, args: ManageJiraIssueAr
   // Check bulk-destructive guard
   const deflection = bulkOperationGuard.check('delete', issueKey, process.env.JIRA_HOST);
   if (deflection) {
-    return { content: [{ type: 'text', text: deflection }] };
+    return { content: [{ type: 'text', text: deflection }], isError: true };
   }
 
   // Get the issue details before deleting for a final snapshot

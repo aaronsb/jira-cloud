@@ -146,6 +146,7 @@ class JiraServer {
                 'or ask them to perform the operation for you.',
               ].join('\n'),
             }],
+            isError: true,
           };
         }
 
@@ -155,6 +156,7 @@ class JiraServer {
               type: 'text',
               text: `**Not found:** ${jiraMessage || 'The requested resource does not exist or you do not have permission to view it.'}`,
             }],
+            isError: true,
           };
         }
 

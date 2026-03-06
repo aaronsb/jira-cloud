@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { bulkOperationGuard } from './bulk-operation-guard.js';
 
 describe('bulkOperationGuard', () => {
@@ -64,6 +64,26 @@ describe('bulkOperationGuard', () => {
     const result = bulkOperationGuard.check('move', 'PROJ-99');
     expect(result).not.toBeNull();
     expect(result).toContain('Bulk move');
+  });
+
+  it('allows operations again after the sliding window expires', () => {
+    vi.useFakeTimers();
+    try {
+      const limit = bulkOperationGuard.getLimit();
+      for (let i = 0; i < limit; i++) {
+        bulkOperationGuard.record('delete', `PROJ-${i}`);
+      }
+      // At limit — should refuse
+      expect(bulkOperationGuard.check('delete', 'PROJ-99')).not.toBeNull();
+
+      // Advance past the 60-second window
+      vi.advanceTimersByTime(61_000);
+
+      // Should allow again
+      expect(bulkOperationGuard.check('delete', 'PROJ-99')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('resets clears the tracker', () => {
