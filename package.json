@@ -46,7 +46,7 @@
     "update-doc-timestamps": "node scripts/update-doc-timestamps.js"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.24.3",
+    "@modelcontextprotocol/sdk": "^1.27.1",
     "jira.js": "5.3.1",
     "jsdom": "^27.3.0",
     "markdown-it": "^14.1.0"

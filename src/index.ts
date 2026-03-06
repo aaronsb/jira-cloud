@@ -30,7 +30,14 @@ const JIRA_API_TOKEN = process.env.JIRA_API_TOKEN;
 const JIRA_HOST = process.env.JIRA_HOST;
 
 if (!JIRA_EMAIL || !JIRA_API_TOKEN || !JIRA_HOST) {
-  throw new Error('Missing required Jira credentials in environment variables');
+  const missing = [
+    !JIRA_API_TOKEN && 'JIRA_API_TOKEN',
+    !JIRA_EMAIL && 'JIRA_EMAIL',
+    !JIRA_HOST && 'JIRA_HOST',
+  ].filter(Boolean).join(', ');
+  console.error(`[jira-cloud] Missing required environment variables: ${missing}`);
+  console.error('[jira-cloud] Set these in your MCP configuration or MCPB extension settings.');
+  process.exit(1);
 }
 
 const require = createRequire(import.meta.url);
