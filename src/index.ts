@@ -125,7 +125,40 @@ class JiraServer {
         if (error instanceof McpError) {
           throw error;
         }
-        throw new McpError(ErrorCode.InternalError, 'Internal server error');
+
+        // Surface Jira permission errors with actionable guidance
+        const status = (error as any)?.response?.status
+          ?? (error as any)?.status;
+        const jiraMessage = (error as any)?.response?.data?.errorMessages?.[0]
+          ?? (error as any)?.response?.data?.message
+          ?? (error as any)?.message
+          ?? '';
+
+        if (status === 403) {
+          return {
+            content: [{
+              type: 'text',
+              text: [
+                `**Jira denied this operation:** ${jiraMessage || 'Insufficient permissions.'}`,
+                '',
+                'This is controlled by your Jira project\'s permission scheme.',
+                'Contact your Jira admin to request the necessary permission,',
+                'or ask them to perform the operation for you.',
+              ].join('\n'),
+            }],
+          };
+        }
+
+        if (status === 404) {
+          return {
+            content: [{
+              type: 'text',
+              text: `**Not found:** ${jiraMessage || 'The requested resource does not exist or you do not have permission to view it.'}`,
+            }],
+          };
+        }
+
+        throw new McpError(ErrorCode.InternalError, jiraMessage || 'Internal server error');
       }
     });
   }
