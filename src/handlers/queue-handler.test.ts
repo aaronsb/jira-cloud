@@ -291,5 +291,46 @@ describe('queue-handler', () => {
       // Should execute, not refuse
       expect(result.isError).toBeUndefined();
     });
+
+    it('records destructive ops in sliding window after execution', async () => {
+      const handler = makeQueue();
+      // Execute a queue with 2 deletes (limit is 3, window is empty)
+      await handler({} as any, makeRequest([
+        { tool: 'manage_jira_issue', args: { operation: 'delete', issueKey: 'Y-1' } },
+        { tool: 'manage_jira_issue', args: { operation: 'delete', issueKey: 'Y-2' } },
+      ]));
+
+      // Window should now have 2 recorded — only 1 more allowed
+      expect(bulkOperationGuard.remainingCapacity()).toBe(1);
+
+      // A third delete should still pass
+      const result2 = await handler({} as any, makeRequest([
+        { tool: 'manage_jira_issue', args: { operation: 'delete', issueKey: 'Y-3' } },
+      ]));
+      expect(result2.isError).toBeUndefined();
+
+      // A fourth should be refused
+      const result3 = await handler({} as any, makeRequest([
+        { tool: 'manage_jira_issue', args: { operation: 'delete', issueKey: 'Y-4' } },
+      ]));
+      expect(result3.isError).toBe(true);
+      expect(result3.content[0].text).toContain('Queue refused');
+    });
+
+    it('refuses queue with cumulative destructive ops exceeding limit', async () => {
+      // Window has 2 recorded, limit is 3 — only 1 more allowed
+      bulkOperationGuard.record('delete', 'Z-1');
+      bulkOperationGuard.record('delete', 'Z-2');
+
+      const handler = makeQueue(undefined, 'test.atlassian.net');
+      // Queue has 2 deletes but only 1 slot — should refuse the entire queue
+      const result = await handler({} as any, makeRequest([
+        { tool: 'manage_jira_issue', args: { operation: 'delete', issueKey: 'Z-3' } },
+        { tool: 'manage_jira_issue', args: { operation: 'delete', issueKey: 'Z-4' } },
+      ]));
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Queue refused');
+    });
   });
 });

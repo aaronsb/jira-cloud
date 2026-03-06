@@ -78,6 +78,12 @@ class BulkOperationGuard {
     this.ops.push({ operation, issueKey, timestamp: Date.now() });
   }
 
+  /** How many more destructive ops are allowed in the current window */
+  remainingCapacity(): number {
+    this.prune();
+    return Math.max(0, this.limit - this.ops.length);
+  }
+
   /** Reset for testing */
   reset(): void {
     this.ops = [];

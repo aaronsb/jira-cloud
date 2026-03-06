@@ -129,6 +129,17 @@ export function createQueueHandler(
 
         results.push({ index: i, status: isError ? 'error' : 'success', text, isError });
 
+        // Record successful destructive ops in the sliding window (ADR-202)
+        if (!isError && op.tool === 'manage_jira_issue') {
+          const opName = (op.args.operation as string) || '';
+          if (DESTRUCTIVE_OPERATIONS.has(opName)) {
+            bulkOperationGuard.record(
+              opName as DestructiveOp,
+              (resolvedArgs.issueKey as string) || `queue-op-${i}`,
+            );
+          }
+        }
+
         if (isError && errorStrategy === 'bail') {
           bailedAt = i;
         }
@@ -169,12 +180,13 @@ function prescanDestructive(operations: QueueOperation[], jiraHost?: string | nu
 
   if (destructiveOps.length === 0) return null;
 
-  // Check each one against the guard — if any would be refused, refuse all
-  for (const dop of destructiveOps) {
-    const refusal = bulkOperationGuard.check(dop.operation, dop.issueKey, jiraHost);
-    if (refusal) {
-      return `**Queue refused** — contains ${destructiveOps.length} destructive operation(s) that would exceed the bulk limit.\n\n${refusal}`;
-    }
+  // Check cumulative count: all destructive ops in the queue vs remaining window capacity
+  const remaining = bulkOperationGuard.remainingCapacity();
+  if (destructiveOps.length > remaining) {
+    // Use the first destructive op to generate a deflection message with JQL
+    const refusal = bulkOperationGuard.check(destructiveOps[0].operation, destructiveOps[0].issueKey, jiraHost);
+    const fallbackMsg = `Bulk destructive limit would be exceeded: ${destructiveOps.length} destructive op(s) in queue, only ${remaining} allowed.`;
+    return `**Queue refused** — contains ${destructiveOps.length} destructive operation(s) that would exceed the bulk limit.\n\n${refusal || fallbackMsg}`;
   }
 
   return null;
