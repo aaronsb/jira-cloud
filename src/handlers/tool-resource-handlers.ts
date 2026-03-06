@@ -1,7 +1,7 @@
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 
-import { toolSchemas } from '../schemas/tool-schemas.js';
 import { formatToolName, generateToolDocumentation } from '../docs/tool-documentation.js';
+import { toolSchemas } from '../schemas/tool-schemas.js';
 
 export function setupToolResourceHandlers() {
   return {
