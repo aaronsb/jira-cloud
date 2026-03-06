@@ -33,6 +33,12 @@ export interface JiraIssueDetails {
     created: string;
   }>;
   attachments?: JiraAttachment[];
+  customFieldValues?: Array<{
+    name: string;
+    value: unknown;
+    type: string;
+    description: string;
+  }>;
 }
 
 export interface AdfNode {

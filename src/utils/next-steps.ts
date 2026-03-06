@@ -23,6 +23,7 @@ export function issueNextSteps(operation: string, issueKey?: string): string {
         { description: 'Transition to a new status', tool: 'manage_jira_issue', example: { operation: 'transition', issueKey, expand: ['transitions'] } },
         { description: 'Add to a sprint', tool: 'manage_jira_sprint', example: { operation: 'manage_issues', sprintId: '<id>', add: [issueKey] } },
         { description: 'Link to a related issue', tool: 'manage_jira_issue', example: { operation: 'link', issueKey, linkedIssueKey: '<key>', linkType: 'relates to' } },
+        { description: 'Read jira://custom-fields to discover available custom fields for this instance' },
       );
       break;
     case 'get':
@@ -36,6 +37,7 @@ export function issueNextSteps(operation: string, issueKey?: string): string {
       steps.push(
         { description: 'View the updated issue', tool: 'manage_jira_issue', example: { operation: 'get', issueKey } },
         { description: 'Transition to a new status', tool: 'manage_jira_issue', example: { operation: 'get', issueKey, expand: ['transitions'] } },
+        { description: 'Read jira://custom-fields to discover available custom fields for this instance' },
       );
       break;
     case 'transition':

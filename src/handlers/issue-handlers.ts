@@ -1,5 +1,7 @@
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
+import { fieldDiscovery } from '../client/field-discovery.js';
+import { categoryLabel } from '../client/field-type-map.js';
 import { JiraClient } from '../client/jira-client.js';
 import { MarkdownRenderer } from '../mcp/markdown-renderer.js';
 import { bulkOperationGuard } from '../utils/bulk-operation-guard.js';
@@ -208,6 +210,42 @@ function validateManageJiraIssueArgs(args: unknown): args is ManageJiraIssueArgs
   return true;
 }
 
+/** Build catalog field metadata for passing to getIssue */
+function getCatalogFieldMeta() {
+  if (!fieldDiscovery.isReady()) return undefined;
+  const catalog = fieldDiscovery.getCatalog();
+  if (catalog.length === 0) return undefined;
+  return catalog.map(f => ({
+    id: f.id,
+    name: f.name,
+    type: categoryLabel(f.category),
+    description: f.description,
+  }));
+}
+
+/** Resolve field names to IDs in customFields, returns resolved object */
+function resolveCustomFieldNames(customFields: Record<string, any>): Record<string, any> {
+  if (!fieldDiscovery.isReady()) return customFields;
+
+  const resolved: Record<string, any> = {};
+  for (const [key, value] of Object.entries(customFields)) {
+    // If the key is already a field ID (customfield_XXXXX), pass through
+    if (key.startsWith('customfield_')) {
+      resolved[key] = value;
+      continue;
+    }
+    // Try to resolve the name to an ID
+    const fieldId = fieldDiscovery.resolveNameToId(key);
+    if (fieldId) {
+      resolved[fieldId] = value;
+    } else {
+      // Unknown field name — pass through as-is (may be a raw ID or system field)
+      resolved[key] = value;
+    }
+  }
+  return resolved;
+}
+
 // Handler functions for each operation
 async function handleGetIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs) {
   // Parse expansion options
@@ -218,13 +256,14 @@ async function handleGetIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs)
     }
   }
 
-  // Get issue with requested expansions
+  // Get issue with requested expansions and catalog custom fields
   const includeComments = expansionOptions.comments || false;
   const includeAttachments = expansionOptions.attachments || false;
   const issue = await jiraClient.getIssue(
-    args.issueKey!, 
-    includeComments, 
-    includeAttachments
+    args.issueKey!,
+    includeComments,
+    includeAttachments,
+    getCatalogFieldMeta(),
   );
   
   // Get transitions if requested
@@ -299,6 +338,8 @@ async function handleDeleteIssue(jiraClient: JiraClient, args: ManageJiraIssueAr
 }
 
 async function handleCreateIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs) {
+  const customFields = args.customFields ? resolveCustomFieldNames(args.customFields) : undefined;
+
   const result = await jiraClient.createIssue({
     projectKey: args.projectKey!,
     summary: args.summary!,
@@ -307,7 +348,7 @@ async function handleCreateIssue(jiraClient: JiraClient, args: ManageJiraIssueAr
     priority: args.priority,
     assignee: args.assignee,
     labels: args.labels,
-    customFields: args.customFields
+    customFields,
   });
   
   // Get the created issue and render to markdown
@@ -325,6 +366,8 @@ async function handleCreateIssue(jiraClient: JiraClient, args: ManageJiraIssueAr
 }
 
 async function handleUpdateIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs) {
+  const customFields = args.customFields ? resolveCustomFieldNames(args.customFields) : undefined;
+
   await jiraClient.updateIssue({
     issueKey: args.issueKey!,
     summary: args.summary,
@@ -333,7 +376,7 @@ async function handleUpdateIssue(jiraClient: JiraClient, args: ManageJiraIssueAr
     assignee: args.assignee,
     priority: args.priority,
     labels: args.labels,
-    customFields: args.customFields,
+    customFields,
   });
 
   // Get the updated issue and render to markdown

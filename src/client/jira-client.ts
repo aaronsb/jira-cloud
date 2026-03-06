@@ -58,6 +58,25 @@ export class JiraClient {
     };
   }
 
+  /** Format a custom field value for display */
+  private formatCustomFieldValue(value: unknown): unknown {
+    if (value === null || value === undefined) return null;
+    // Jira option fields return { value: "..." } or { name: "..." }
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      const obj = value as Record<string, unknown>;
+      if ('value' in obj) return obj.value;
+      if ('name' in obj) return obj.name;
+      if ('displayName' in obj) return obj.displayName;
+      // ADF content — extract text
+      if ('content' in obj && obj.type === 'doc') return TextProcessor.extractTextFromAdf(obj as any);
+    }
+    // Array of options
+    if (Array.isArray(value)) {
+      return value.map(item => this.formatCustomFieldValue(item));
+    }
+    return value;
+  }
+
   /** Shared field list for issue queries */
   private get issueFields(): string[] {
     return [
@@ -100,11 +119,25 @@ export class JiraClient {
     };
   }
 
-  async getIssue(issueKey: string, includeComments = false, includeAttachments = false): Promise<JiraIssueDetails> {
+  async getIssue(
+    issueKey: string,
+    includeComments = false,
+    includeAttachments = false,
+    customFieldMeta?: Array<{ id: string; name: string; type: string; description: string }>,
+  ): Promise<JiraIssueDetails> {
     const fields = [...this.issueFields];
 
     if (includeAttachments) {
       fields.push('attachment');
+    }
+
+    // Include discovered custom field IDs in the fetch
+    if (customFieldMeta) {
+      for (const cf of customFieldMeta) {
+        if (!fields.includes(cf.id)) {
+          fields.push(cf.id);
+        }
+      }
     }
 
     const params: any = {
@@ -115,6 +148,26 @@ export class JiraClient {
 
     const issue = await this.client.issues.getIssue(params);
     const issueDetails = this.mapIssueFields(issue);
+
+    // Extract custom field values using catalog metadata
+    if (customFieldMeta) {
+      const rawFields = issue.fields as Record<string, any>;
+      const customValues: JiraIssueDetails['customFieldValues'] = [];
+      for (const cf of customFieldMeta) {
+        const value = rawFields[cf.id];
+        if (value !== undefined && value !== null) {
+          customValues.push({
+            name: cf.name,
+            value: this.formatCustomFieldValue(value),
+            type: cf.type,
+            description: cf.description,
+          });
+        }
+      }
+      if (customValues.length > 0) {
+        issueDetails.customFieldValues = customValues;
+      }
+    }
 
     if (includeComments && issue.fields.comment?.comments) {
       issueDetails.comments = issue.fields.comment.comments
