@@ -13,6 +13,7 @@ import {
   ReadResourceRequestSchema
 } from '@modelcontextprotocol/sdk/types.js';
 
+import { fieldDiscovery } from './client/field-discovery.js';
 import { JiraClient } from './client/jira-client.js';
 import { handleBoardRequest } from './handlers/board-handlers.js';
 import { handleFilterRequest } from './handlers/filter-handlers.js';
@@ -62,7 +63,10 @@ class JiraServer {
     });
 
     this.setupHandlers();
-    
+
+    // Start async field discovery (non-blocking)
+    fieldDiscovery.startAsync(this.jiraClient.v3Client);
+
     this.server.onerror = (error) => console.error('[MCP Error]', error);
     process.on('SIGINT', async () => {
       await this.server.close();

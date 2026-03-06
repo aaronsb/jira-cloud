@@ -32,6 +32,11 @@ export class JiraClient {
     storyPoints: string;
   };
 
+  /** Expose the underlying Version3Client for field discovery and other direct API access */
+  get v3Client(): Version3Client {
+    return this.client;
+  }
+
   constructor(config: JiraConfig) {
     const clientConfig = {
       host: config.host,
@@ -51,6 +56,41 @@ export class JiraClient {
       startDate: config.customFields?.startDate ?? 'customfield_10015',
       storyPoints: config.customFields?.storyPoints ?? 'customfield_10016',
     };
+  }
+
+  /** Standard Jira fields that require ADF format in v3 API */
+  private static ADF_FIELDS = new Set(['environment']);
+
+  /** Convert any ADF-type fields in customFields from markdown to ADF */
+  private convertAdfFields(customFields: Record<string, any>): Record<string, any> {
+    const result: Record<string, any> = {};
+    for (const [key, value] of Object.entries(customFields)) {
+      if (JiraClient.ADF_FIELDS.has(key) && typeof value === 'string') {
+        result[key] = TextProcessor.markdownToAdf(value);
+      } else {
+        result[key] = value;
+      }
+    }
+    return result;
+  }
+
+  /** Format a custom field value for display */
+  private formatCustomFieldValue(value: unknown): unknown {
+    if (value === null || value === undefined) return null;
+    // Jira option fields return { value: "..." } or { name: "..." }
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      const obj = value as Record<string, unknown>;
+      if ('value' in obj) return obj.value;
+      if ('name' in obj) return obj.name;
+      if ('displayName' in obj) return obj.displayName;
+      // ADF content — extract text
+      if ('content' in obj && obj.type === 'doc') return TextProcessor.extractTextFromAdf(obj as any);
+    }
+    // Array of options
+    if (Array.isArray(value)) {
+      return value.map(item => this.formatCustomFieldValue(item));
+    }
+    return value;
   }
 
   /** Shared field list for issue queries */
@@ -95,11 +135,25 @@ export class JiraClient {
     };
   }
 
-  async getIssue(issueKey: string, includeComments = false, includeAttachments = false): Promise<JiraIssueDetails> {
+  async getIssue(
+    issueKey: string,
+    includeComments = false,
+    includeAttachments = false,
+    customFieldMeta?: Array<{ id: string; name: string; type: string; description: string }>,
+  ): Promise<JiraIssueDetails> {
     const fields = [...this.issueFields];
 
     if (includeAttachments) {
       fields.push('attachment');
+    }
+
+    // Include discovered custom field IDs in the fetch
+    if (customFieldMeta) {
+      for (const cf of customFieldMeta) {
+        if (!fields.includes(cf.id)) {
+          fields.push(cf.id);
+        }
+      }
     }
 
     const params: any = {
@@ -110,6 +164,26 @@ export class JiraClient {
 
     const issue = await this.client.issues.getIssue(params);
     const issueDetails = this.mapIssueFields(issue);
+
+    // Extract custom field values using catalog metadata
+    if (customFieldMeta) {
+      const rawFields = issue.fields as Record<string, any>;
+      const customValues: JiraIssueDetails['customFieldValues'] = [];
+      for (const cf of customFieldMeta) {
+        const value = rawFields[cf.id];
+        if (value !== undefined && value !== null) {
+          customValues.push({
+            name: cf.name,
+            value: this.formatCustomFieldValue(value),
+            type: cf.type,
+            description: cf.description,
+          });
+        }
+      }
+      if (customValues.length > 0) {
+        issueDetails.customFieldValues = customValues;
+      }
+    }
 
     if (includeComments && issue.fields.comment?.comments) {
       issueDetails.comments = issue.fields.comment.comments
@@ -222,7 +296,7 @@ export class JiraClient {
     if (params.priority) fields.priority = { id: params.priority };
     if (params.labels) fields.labels = params.labels;
     if (params.customFields) {
-      Object.assign(fields, params.customFields);
+      Object.assign(fields, this.convertAdfFields(params.customFields));
     }
 
     await this.client.issues.editIssue({
@@ -836,7 +910,7 @@ export class JiraClient {
     if (params.assignee) fields.assignee = { accountId: params.assignee };
     if (params.labels) fields.labels = params.labels;
     if (params.customFields) {
-      Object.assign(fields, params.customFields);
+      Object.assign(fields, this.convertAdfFields(params.customFields));
     }
 
     const response = await this.client.issues.createIssue({ fields });

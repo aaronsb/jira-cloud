@@ -62,7 +62,7 @@ function generateIssueToolDocumentation(schema: any) {
               operation: "create", projectKey: "PROJ", summary: "Search functionality not working",
               issueType: "Bug", description: "The search function returns no results when using special characters.",
               priority: "High", labels: ["search", "frontend"],
-              customFields: { "steps_to_reproduce": "1. Go to search page\n2. Enter search with '%'\n3. Submit search" }
+              customFields: { "Story Points": 5, "Team": "Platform" }
             }
           }
         ]
@@ -145,9 +145,18 @@ function generateIssueToolDocumentation(schema: any) {
         ]
       }
     ],
+    custom_fields: {
+      description: "Custom fields are discovered automatically at startup. Use field names (not IDs) in the customFields parameter.",
+      discovery: "Read jira://custom-fields to see the master catalog of discovered fields with types and descriptions.",
+      context: "Read jira://custom-fields/{projectKey}/{issueType} to see fields valid for a specific project and issue type.",
+      name_resolution: "Field names are resolved to IDs automatically — use human-readable names like 'Story Points', not 'customfield_10035'.",
+      requirement: "Only fields with descriptions in Jira are discoverable. Fields without descriptions must use raw field IDs.",
+    },
     related_resources: [
       { name: "Project Overview", uri: "jira://projects/{projectKey}/overview", description: "Get detailed information about a project" },
-      { name: "Issue Link Types", uri: "jira://issue-link-types", description: "List of all available issue link types" }
+      { name: "Issue Link Types", uri: "jira://issue-link-types", description: "List of all available issue link types" },
+      { name: "Custom Fields Catalog", uri: "jira://custom-fields", description: "Discovered custom fields with types, descriptions, and usage scores" },
+      { name: "Context Custom Fields", uri: "jira://custom-fields/{projectKey}/{issueType}", description: "Custom fields available for a specific project and issue type" }
     ]
   };
 }

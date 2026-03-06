@@ -1,5 +1,7 @@
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
+import { fieldDiscovery } from '../client/field-discovery.js';
+import { categoryLabel } from '../client/field-type-map.js';
 import { JiraClient } from '../client/jira-client.js';
 import { MarkdownRenderer } from '../mcp/markdown-renderer.js';
 import { bulkOperationGuard } from '../utils/bulk-operation-guard.js';
@@ -208,6 +210,69 @@ function validateManageJiraIssueArgs(args: unknown): args is ManageJiraIssueArgs
   return true;
 }
 
+/** Build catalog field metadata for passing to getIssue */
+function getCatalogFieldMeta() {
+  if (!fieldDiscovery.isReady()) return undefined;
+  const catalog = fieldDiscovery.getCatalog();
+  if (catalog.length === 0) return undefined;
+  return catalog.map(f => ({
+    id: f.id,
+    name: f.name,
+    type: categoryLabel(f.category),
+    description: f.description,
+  }));
+}
+
+/** Resolve field names to IDs in customFields, returns resolved object */
+function resolveCustomFieldNames(customFields: Record<string, any>): Record<string, any> {
+  if (!fieldDiscovery.isReady()) return customFields;
+
+  const resolved: Record<string, any> = {};
+  for (const [key, value] of Object.entries(customFields)) {
+    // If the key is already a field ID (customfield_XXXXX), pass through
+    if (key.startsWith('customfield_')) {
+      resolved[key] = value;
+      continue;
+    }
+    // Try to resolve the name to an ID
+    const fieldId = fieldDiscovery.resolveNameToId(key);
+    if (fieldId) {
+      resolved[fieldId] = value;
+    } else {
+      // Unknown field name — pass through as-is (may be a raw ID or system field)
+      resolved[key] = value;
+    }
+  }
+  return resolved;
+}
+
+const UNDESCRIBED_NAG_THRESHOLD = 0.5; // 50% or more
+
+/** Generate a nag message if too many custom fields lack descriptions */
+function getUndescribedFieldNag(): string {
+  if (!fieldDiscovery.isReady()) return '';
+  const stats = fieldDiscovery.getStats();
+  if (!stats || stats.undescribedRatio < UNDESCRIBED_NAG_THRESHOLD) return '';
+  if (stats.totalCustomFields === 0) return '';
+
+  const pct = Math.round(stats.undescribedRatio * 100);
+  const described = stats.catalogSize;
+  const total = stats.totalCustomFields - stats.excludedLocked;
+
+  return [
+    '',
+    '---',
+    `**Custom field coverage:** ${described} of ${total} custom fields have descriptions (${pct}% undescribed).`,
+    'AI tools can only discover and use custom fields that have descriptions in Jira.',
+    'Ask your Jira admin to add descriptions to important custom fields for better AI support.',
+  ].join('\n');
+}
+
+/** Combine next-steps guidance with the undescribed field nag */
+function issueGuidance(operation: string, issueKey?: string): string {
+  return issueNextSteps(operation, issueKey) + getUndescribedFieldNag();
+}
+
 // Handler functions for each operation
 async function handleGetIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs) {
   // Parse expansion options
@@ -218,13 +283,14 @@ async function handleGetIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs)
     }
   }
 
-  // Get issue with requested expansions
+  // Get issue with requested expansions and catalog custom fields
   const includeComments = expansionOptions.comments || false;
   const includeAttachments = expansionOptions.attachments || false;
   const issue = await jiraClient.getIssue(
-    args.issueKey!, 
-    includeComments, 
-    includeAttachments
+    args.issueKey!,
+    includeComments,
+    includeAttachments,
+    getCatalogFieldMeta(),
   );
   
   // Get transitions if requested
@@ -240,7 +306,7 @@ async function handleGetIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs)
     content: [
       {
         type: 'text',
-        text: markdown + issueNextSteps('get', args.issueKey),
+        text: markdown + issueGuidance('get', args.issueKey),
       },
     ],
   };
@@ -266,7 +332,7 @@ async function handleMoveIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs
     content: [
       {
         type: 'text',
-        text: `# Issue Moved\n\n${markdown}${issueNextSteps('move', movedIssue.key)}`,
+        text: `# Issue Moved\n\n${markdown}${issueGuidance('move', movedIssue.key)}`,
       },
     ],
   };
@@ -292,13 +358,15 @@ async function handleDeleteIssue(jiraClient: JiraClient, args: ManageJiraIssueAr
     content: [
       {
         type: 'text',
-        text: `# Issue Deleted\n\nThe following issue has been permanently deleted:\n\n${markdown}${issueNextSteps('delete', issueKey)}`,
+        text: `# Issue Deleted\n\nThe following issue has been permanently deleted:\n\n${markdown}${issueGuidance('delete', issueKey)}`,
       },
     ],
   };
 }
 
 async function handleCreateIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs) {
+  const customFields = args.customFields ? resolveCustomFieldNames(args.customFields) : undefined;
+
   const result = await jiraClient.createIssue({
     projectKey: args.projectKey!,
     summary: args.summary!,
@@ -307,7 +375,7 @@ async function handleCreateIssue(jiraClient: JiraClient, args: ManageJiraIssueAr
     priority: args.priority,
     assignee: args.assignee,
     labels: args.labels,
-    customFields: args.customFields
+    customFields,
   });
   
   // Get the created issue and render to markdown
@@ -318,13 +386,15 @@ async function handleCreateIssue(jiraClient: JiraClient, args: ManageJiraIssueAr
     content: [
       {
         type: 'text',
-        text: `# Issue Created\n\n${markdown}${issueNextSteps('create', result.key)}`,
+        text: `# Issue Created\n\n${markdown}${issueGuidance('create', result.key)}`,
       },
     ],
   };
 }
 
 async function handleUpdateIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs) {
+  const customFields = args.customFields ? resolveCustomFieldNames(args.customFields) : undefined;
+
   await jiraClient.updateIssue({
     issueKey: args.issueKey!,
     summary: args.summary,
@@ -333,7 +403,7 @@ async function handleUpdateIssue(jiraClient: JiraClient, args: ManageJiraIssueAr
     assignee: args.assignee,
     priority: args.priority,
     labels: args.labels,
-    customFields: args.customFields,
+    customFields,
   });
 
   // Get the updated issue and render to markdown
@@ -344,7 +414,7 @@ async function handleUpdateIssue(jiraClient: JiraClient, args: ManageJiraIssueAr
     content: [
       {
         type: 'text',
-        text: `# Issue Updated\n\n${markdown}${issueNextSteps('update', args.issueKey)}`,
+        text: `# Issue Updated\n\n${markdown}${issueGuidance('update', args.issueKey)}`,
       },
     ],
   };
@@ -365,7 +435,7 @@ async function handleTransitionIssue(jiraClient: JiraClient, args: ManageJiraIss
     content: [
       {
         type: 'text',
-        text: `# Issue Transitioned\n\n${markdown}${issueNextSteps('transition', args.issueKey)}`,
+        text: `# Issue Transitioned\n\n${markdown}${issueGuidance('transition', args.issueKey)}`,
       },
     ],
   };
@@ -382,7 +452,7 @@ async function handleCommentIssue(jiraClient: JiraClient, args: ManageJiraIssueA
     content: [
       {
         type: 'text',
-        text: `# Comment Added\n\n${markdown}${issueNextSteps('comment', args.issueKey)}`,
+        text: `# Comment Added\n\n${markdown}${issueGuidance('comment', args.issueKey)}`,
       },
     ],
   };
@@ -407,7 +477,7 @@ async function handleLinkIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs
     content: [
       {
         type: 'text',
-        text: `# Issue Linked\n\n${markdown}${issueNextSteps('link', args.issueKey)}`,
+        text: `# Issue Linked\n\n${markdown}${issueGuidance('link', args.issueKey)}`,
       },
     ],
   };

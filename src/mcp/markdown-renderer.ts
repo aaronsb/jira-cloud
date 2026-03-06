@@ -146,6 +146,18 @@ export function renderIssue(issue: JiraIssueDetails, transitions?: TransitionDet
     }
   }
 
+  // Custom fields (from catalog discovery)
+  if (issue.customFieldValues && issue.customFieldValues.length > 0) {
+    lines.push('');
+    lines.push('## Custom Fields');
+    for (const cf of issue.customFieldValues) {
+      const displayValue = Array.isArray(cf.value)
+        ? (cf.value as unknown[]).join(', ')
+        : String(cf.value);
+      lines.push(`- **${cf.name}** (${cf.type}): ${displayValue}`);
+    }
+  }
+
   // Available transitions
   if (transitions && transitions.length > 0) {
     lines.push('');

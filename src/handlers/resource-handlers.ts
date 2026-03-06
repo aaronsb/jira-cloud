@@ -1,6 +1,8 @@
 import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 
 import { setupToolResourceHandlers } from './tool-resource-handlers.js';
+import { fieldDiscovery } from '../client/field-discovery.js';
+import { categoryLabel } from '../client/field-type-map.js';
 import { JiraClient } from '../client/jira-client.js';
 
 /**
@@ -38,6 +40,12 @@ export function setupResourceHandlers(jiraClient: JiraClient) {
             mimeType: 'application/json',
             description: 'List of all available issue link types in the Jira instance'
           },
+          {
+            uri: 'jira://custom-fields',
+            name: 'Custom Fields Catalog',
+            mimeType: 'application/json',
+            description: 'Discovered custom fields ranked by usage — names, types, descriptions, writability'
+          },
           // Add tool resources
           ...toolResources.resources
         ]
@@ -61,6 +69,12 @@ export function setupResourceHandlers(jiraClient: JiraClient) {
             name: 'Board Overview',
             mimeType: 'application/json',
             description: 'Overview of a specific board including sprints and statistics'
+          },
+          {
+            uriTemplate: 'jira://custom-fields/{projectKey}/{issueType}',
+            name: 'Context-Specific Custom Fields',
+            mimeType: 'application/json',
+            description: 'Custom fields available for a specific project and issue type combination'
           }
         ]
       };
@@ -85,6 +99,10 @@ export function setupResourceHandlers(jiraClient: JiraClient) {
         if (uri === 'jira://issue-link-types') {
           return await getIssueLinkTypes(jiraClient);
         }
+
+        if (uri === 'jira://custom-fields') {
+          return getCustomFieldsCatalog();
+        }
         
         // Handle resource templates
         const projectMatch = uri.match(/^jira:\/\/projects\/([^/]+)\/overview$/);
@@ -99,6 +117,14 @@ export function setupResourceHandlers(jiraClient: JiraClient) {
           return await getBoardOverview(jiraClient, boardId);
         }
         
+        // Handle context-specific custom fields
+        const customFieldsMatch = uri.match(/^jira:\/\/custom-fields\/([^/]+)\/(.+)$/);
+        if (customFieldsMatch) {
+          const projectKey = customFieldsMatch[1];
+          const issueType = decodeURIComponent(customFieldsMatch[2]);
+          return await getContextCustomFields(jiraClient, projectKey, issueType);
+        }
+
         // Handle tool resources
         const toolMatch = uri.match(/^jira:\/\/tools\/([^/]+)\/documentation$/);
         if (toolMatch) {
@@ -297,6 +323,88 @@ async function getBoardOverview(jiraClient: JiraClient, boardId: number) {
     console.error(`Error getting board overview for ${boardId}:`, error);
     throw error;
   }
+}
+
+/**
+ * Gets the master custom fields catalog
+ */
+function getCustomFieldsCatalog() {
+  const catalog = fieldDiscovery.getCatalog();
+  const stats = fieldDiscovery.getStats();
+
+  const fields = catalog.map(f => ({
+    id: f.id,
+    name: f.name,
+    description: f.description,
+    type: categoryLabel(f.category),
+    writable: f.writable,
+    screensCount: f.screensCount,
+    lastUsed: f.lastUsed,
+    score: f.score,
+  }));
+
+  const response: Record<string, unknown> = {
+    status: fieldDiscovery.isReady() ? 'ready' : 'loading',
+    fields,
+    count: fields.length,
+  };
+
+  if (stats) {
+    response.stats = {
+      totalCustomFields: stats.totalCustomFields,
+      catalogSize: stats.catalogSize,
+      excludedNoDescription: stats.excludedNoDescription,
+      excludedNoScreens: stats.excludedNoScreens,
+      excludedUnsupportedType: stats.excludedUnsupportedType,
+      excludedLocked: stats.excludedLocked,
+      undescribedRatio: Math.round(stats.undescribedRatio * 100),
+    };
+  }
+
+  if (fieldDiscovery.getError()) {
+    response.error = fieldDiscovery.getError();
+  }
+
+  return {
+    contents: [{
+      uri: 'jira://custom-fields',
+      mimeType: 'application/json',
+      text: JSON.stringify(response, null, 2),
+    }],
+  };
+}
+
+/**
+ * Gets custom fields available for a specific project + issue type (context intersection)
+ */
+async function getContextCustomFields(jiraClient: JiraClient, projectKey: string, issueType: string) {
+  const fields = await fieldDiscovery.getContextFields(
+    jiraClient.v3Client,
+    projectKey,
+    issueType,
+  );
+
+  const result = fields.map(f => ({
+    id: f.id,
+    name: f.name,
+    description: f.description,
+    type: categoryLabel(f.category),
+    jsonSchema: f.jsonSchema,
+  }));
+
+  return {
+    contents: [{
+      uri: `jira://custom-fields/${projectKey}/${encodeURIComponent(issueType)}`,
+      mimeType: 'application/json',
+      text: JSON.stringify({
+        projectKey,
+        issueType,
+        fields: result,
+        count: result.length,
+        catalogReady: fieldDiscovery.isReady(),
+      }, null, 2),
+    }],
+  };
 }
 
 /**
