@@ -144,13 +144,13 @@ export const toolSchemas = {
 
   manage_jira_issue: {
     name: 'manage_jira_issue',
-    description: 'Get, create, update, delete, move, transition, comment on, or link Jira issues',
+    description: 'Get, create, update, delete, move, transition, comment on, link, or explore hierarchy of Jira issues',
     inputSchema: {
       type: 'object',
       properties: {
         operation: {
           type: 'string',
-          enum: ['create', 'get', 'update', 'delete', 'move', 'transition', 'comment', 'link'],
+          enum: ['create', 'get', 'update', 'delete', 'move', 'transition', 'comment', 'link', 'hierarchy'],
           description: 'Operation to perform',
         },
         issueKey: {
@@ -217,6 +217,14 @@ export const toolSchemas = {
         targetIssueType: {
           type: 'string',
           description: 'Target issue type for move (e.g., Story, Bug). Required for move.',
+        },
+        up: {
+          type: 'number',
+          description: 'Hierarchy: how many levels up to traverse (default 4, max 8).',
+        },
+        down: {
+          type: 'number',
+          description: 'Hierarchy: how many levels down to traverse (default 4, max 8).',
         },
         expand: {
           type: 'array',

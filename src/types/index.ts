@@ -41,6 +41,21 @@ export interface JiraIssueDetails {
   }>;
 }
 
+export interface HierarchyNode {
+  key: string;
+  summary: string;
+  issueType: string;
+  status: string;
+  children: HierarchyNode[];
+}
+
+export interface HierarchyResult {
+  root: HierarchyNode;
+  focusKey: string;
+  upDepth: number;
+  downDepth: number;
+}
+
 export interface AdfNode {
   type: string;
   text?: string;

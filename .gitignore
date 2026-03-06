@@ -51,3 +51,4 @@ mcpb/package-lock.json
 .eslintcache
 .cache/
 .temp/
+mcpb/package.json

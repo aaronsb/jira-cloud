@@ -224,6 +224,134 @@ export class JiraClient {
     return issueDetails;
   }
 
+  /** Lightweight fetch: key, summary, issuetype, status, parent only */
+  private async fetchNodeFields(issueKey: string): Promise<{ key: string; summary: string; issueType: string; status: string; parent: string | null }> {
+    const issue = await this.client.issues.getIssue({
+      issueIdOrKey: issueKey,
+      fields: ['summary', 'issuetype', 'status', 'parent'],
+    });
+    const f = issue.fields as any;
+    return {
+      key: issue.key,
+      summary: f?.summary || '',
+      issueType: f?.issuetype?.name || '',
+      status: f?.status?.name || '',
+      parent: f?.parent?.key || null,
+    };
+  }
+
+  /** Fetch children of given keys in one JQL query */
+  private async fetchChildren(parentKeys: string[]): Promise<Array<{ key: string; summary: string; issueType: string; status: string; parent: string }>> {
+    if (parentKeys.length === 0) return [];
+    const jql = `parent in (${parentKeys.join(', ')})`;
+    const results = await this.client.issueSearch.searchForIssuesUsingJqlEnhancedSearch({
+      jql,
+      maxResults: 100,
+      fields: ['summary', 'issuetype', 'status', 'parent'],
+    });
+    return (results.issues || []).map((issue: any) => ({
+      key: issue.key,
+      summary: issue.fields?.summary || '',
+      issueType: issue.fields?.issuetype?.name || '',
+      status: issue.fields?.status?.name || '',
+      parent: issue.fields?.parent?.key || '',
+    }));
+  }
+
+  /**
+   * Traverse the issue hierarchy: walk up `upHops` levels and down `downHops` levels
+   * from the focus issue, returning a tree with a "you are here" marker.
+   */
+  async getHierarchy(issueKey: string, upHops = 4, downHops = 4): Promise<import('../types/index.js').HierarchyResult> {
+    // 1. Fetch focus node
+    const focus = await this.fetchNodeFields(issueKey);
+
+    // 2. Walk UP the parent chain
+    const ancestors: Array<{ key: string; summary: string; issueType: string; status: string }> = [];
+    let current = focus;
+    for (let i = 0; i < upHops; i++) {
+      if (!current.parent) break;
+      const parentNode = await this.fetchNodeFields(current.parent);
+      ancestors.unshift(parentNode); // prepend — root first
+      current = parentNode;
+    }
+
+    // 3. Walk DOWN via BFS — level by level, batched
+    type NodeWithChildren = import('../types/index.js').HierarchyNode;
+
+    // Build the focus node
+    const focusNode: NodeWithChildren = {
+      key: focus.key,
+      summary: focus.summary,
+      issueType: focus.issueType,
+      status: focus.status,
+      children: [],
+    };
+
+    // BFS: expand children level by level
+    let frontier: NodeWithChildren[] = [focusNode];
+    for (let level = 0; level < downHops; level++) {
+      const parentKeys = frontier.map(n => n.key);
+      const children = await this.fetchChildren(parentKeys);
+      if (children.length === 0) break;
+
+      // Group children by parent
+      const byParent = new Map<string, typeof children>();
+      for (const child of children) {
+        const group = byParent.get(child.parent) || [];
+        group.push(child);
+        byParent.set(child.parent, group);
+      }
+
+      const nextFrontier: NodeWithChildren[] = [];
+      for (const parent of frontier) {
+        const childNodes = (byParent.get(parent.key) || []).map(c => ({
+          key: c.key,
+          summary: c.summary,
+          issueType: c.issueType,
+          status: c.status,
+          children: [],
+        }));
+        parent.children = childNodes;
+        nextFrontier.push(...childNodes);
+      }
+      frontier = nextFrontier;
+    }
+
+    // 4. Build the full tree: ancestors → focus → descendants
+    let root = focusNode;
+    for (const ancestor of [...ancestors].reverse()) {
+      root = {
+        key: ancestor.key,
+        summary: ancestor.summary,
+        issueType: ancestor.issueType,
+        status: ancestor.status,
+        children: [root],
+      };
+    }
+
+    // 5. Expand sibling children for ancestor nodes (so we see the full tree, not just the direct path)
+    // Walk down from root, expanding each ancestor's children
+    let node = root;
+    for (let i = 0; i < ancestors.length; i++) {
+      const siblingChildren = await this.fetchChildren([node.key]);
+      const existingChildKey = node.children[0]?.key;
+      const siblingNodes: NodeWithChildren[] = siblingChildren
+        .filter(c => c.key !== existingChildKey)
+        .map(c => ({ key: c.key, summary: c.summary, issueType: c.issueType, status: c.status, children: [] }));
+      node.children = [...node.children, ...siblingNodes];
+      // Continue down the ancestor path
+      node = node.children.find(c => c.key === existingChildKey) || node.children[0];
+    }
+
+    return {
+      root,
+      focusKey: focus.key,
+      upDepth: ancestors.length,
+      downDepth: downHops,
+    };
+  }
+
   async getIssueAttachments(issueKey: string): Promise<JiraAttachment[]> {
     const issue = await this.client.issues.getIssue({
       issueIdOrKey: issueKey,

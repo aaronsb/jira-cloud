@@ -4,12 +4,13 @@ import { fieldDiscovery } from '../client/field-discovery.js';
 import { categoryLabel } from '../client/field-type-map.js';
 import { JiraClient } from '../client/jira-client.js';
 import { MarkdownRenderer } from '../mcp/markdown-renderer.js';
+import type { HierarchyNode, HierarchyResult } from '../types/index.js';
 import { bulkOperationGuard } from '../utils/bulk-operation-guard.js';
 import { issueNextSteps } from '../utils/next-steps.js';
 import { normalizeArgs } from '../utils/normalize-args.js';
 
 type ManageJiraIssueArgs = {
-  operation: 'create' | 'get' | 'update' | 'delete' | 'move' | 'transition' | 'comment' | 'link';
+  operation: 'create' | 'get' | 'update' | 'delete' | 'move' | 'transition' | 'comment' | 'link' | 'hierarchy';
   issueKey?: string;
   projectKey?: string;
   summary?: string;
@@ -27,6 +28,8 @@ type ManageJiraIssueArgs = {
   targetIssueType?: string;
   expand?: string[];
   parent?: string | null;
+  up?: number;
+  down?: number;
 };
 
 // Validate the manage_jira_issue arguments
@@ -42,10 +45,10 @@ function validateManageJiraIssueArgs(args: unknown): args is ManageJiraIssueArgs
   
   // Validate operation parameter
   if (typeof normalizedArgs.operation !== 'string' || 
-      !['create', 'get', 'update', 'delete', 'move', 'transition', 'comment', 'link'].includes(normalizedArgs.operation as string)) {
+      !['create', 'get', 'update', 'delete', 'move', 'transition', 'comment', 'link', 'hierarchy'].includes(normalizedArgs.operation as string)) {
     throw new McpError(
       ErrorCode.InvalidParams,
-      'Invalid operation parameter. Valid values are: create, get, update, delete, move, transition, comment, link'
+      'Invalid operation parameter. Valid values are: create, get, update, delete, move, transition, comment, link, hierarchy'
     );
   }
 
@@ -182,6 +185,15 @@ function validateManageJiraIssueArgs(args: unknown): args is ManageJiraIssueArgs
         throw new McpError(
           ErrorCode.InvalidParams,
           'Missing or invalid linkType parameter. Please provide a valid link type for the link operation.'
+        );
+      }
+      break;
+
+    case 'hierarchy':
+      if (typeof normalizedArgs.issueKey !== 'string' || normalizedArgs.issueKey.trim() === '') {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          'Missing or invalid issueKey parameter. Please provide a valid issue key for the hierarchy operation.'
         );
       }
       break;
@@ -483,6 +495,41 @@ async function handleLinkIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs
   };
 }
 
+function renderHierarchyTree(node: HierarchyNode, focusKey: string, prefix = '', isLast = true, isRoot = true): string {
+  const connector = isRoot ? '' : (isLast ? '└─ ' : '├─ ');
+  const marker = node.key === focusKey ? '  ← you are here' : '';
+  const line = `${prefix}${connector}**${node.key}** ${node.issueType}: ${node.summary} [${node.status}]${marker}`;
+
+  const childPrefix = isRoot ? '' : (prefix + (isLast ? '   ' : '│  '));
+  const childLines = node.children.map((child, i) =>
+    renderHierarchyTree(child, focusKey, childPrefix, i === node.children.length - 1, false)
+  );
+
+  return [line, ...childLines].join('\n');
+}
+
+async function handleHierarchy(jiraClient: JiraClient, args: ManageJiraIssueArgs) {
+  const up = Math.min(Math.max(args.up ?? 4, 0), 8);
+  const down = Math.min(Math.max(args.down ?? 4, 0), 8);
+
+  console.error(`Fetching hierarchy for ${args.issueKey}: up=${up}, down=${down}`);
+
+  const result: HierarchyResult = await jiraClient.getHierarchy(args.issueKey!, up, down);
+  const tree = renderHierarchyTree(result.root, result.focusKey);
+
+  const summary = [
+    `# Issue Hierarchy: ${result.focusKey}`,
+    '',
+    `Traversed ${result.upDepth} level${result.upDepth !== 1 ? 's' : ''} up, ${down} level${down !== 1 ? 's' : ''} down`,
+    '',
+    tree,
+  ].join('\n');
+
+  return {
+    content: [{ type: 'text', text: summary + issueGuidance('hierarchy', args.issueKey) }],
+  };
+}
+
 // Main handler function
 export async function handleIssueRequest(
   jiraClient: JiraClient,
@@ -555,7 +602,12 @@ export async function handleIssueRequest(
         console.error('Processing link issue operation');
         return await handleLinkIssue(jiraClient, normalizedArgs as ManageJiraIssueArgs);
       }
-      
+
+      case 'hierarchy': {
+        console.error('Processing hierarchy operation');
+        return await handleHierarchy(jiraClient, normalizedArgs as ManageJiraIssueArgs);
+      }
+
       default: {
         console.error(`Unknown operation: ${normalizedArgs.operation}`);
         throw new McpError(ErrorCode.MethodNotFound, `Unknown operation: ${normalizedArgs.operation}`);

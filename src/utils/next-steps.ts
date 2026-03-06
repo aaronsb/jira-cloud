@@ -69,6 +69,12 @@ export function issueNextSteps(operation: string, issueKey?: string): string {
         { description: 'Read available link types from jira://issue-link-types resource' },
       );
       break;
+    case 'hierarchy':
+      steps.push(
+        { description: 'View a specific issue from the tree', tool: 'manage_jira_issue', example: { operation: 'get', issueKey } },
+        { description: 'Search for issues in this project', tool: 'manage_jira_filter', example: { operation: 'execute_jql', jql: `project = "${issueKey?.split('-')[0]}"` } },
+      );
+      break;
   }
   return steps.length > 0 ? formatSteps(steps) : '';
 }
