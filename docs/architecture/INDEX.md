@@ -21,3 +21,6 @@ _MCP tool API surface, LLM interaction patterns, schema design_
 | ADR | Title | Status |
 |-----|-------|--------|
 | [ADR-200](./tools/ADR-200-llm-facing-tool-design-principles.md) | LLM-Facing Tool Design Principles | Proposed |
+| [ADR-201](./tools/ADR-201-dynamic-custom-field-discovery.md) | Dynamic Custom Field Discovery | Draft |
+| [ADR-202](./tools/ADR-202-tool-operation-guardrails-and-permissions.md) | Tool Operation Guardrails and Permissions | Draft |
+| [ADR-203](./tools/ADR-203-tool-batching-and-sequencing.md) | Operation Queue | Draft |
