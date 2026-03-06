@@ -121,7 +121,10 @@ export function renderIssue(issue: JiraIssueDetails, transitions?: TransitionDet
   if (issue.timeEstimate) {
     const hours = Math.floor(issue.timeEstimate / 3600);
     const minutes = Math.floor((issue.timeEstimate % 3600) / 60);
-    lines.push(`**Estimate:** ${hours > 0 ? `${hours}h ` : ''}${minutes > 0 ? `${minutes}m` : hours === 0 ? '0m' : ''}`);
+    const parts: string[] = [];
+    if (hours > 0) parts.push(`${hours}h`);
+    if (minutes > 0) parts.push(`${minutes}m`);
+    lines.push(`**Estimate:** ${parts.length > 0 ? parts.join(' ') : '0m'}`);
   }
 
   if (issue.resolution) {

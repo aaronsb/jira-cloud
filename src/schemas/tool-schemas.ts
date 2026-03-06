@@ -359,7 +359,7 @@ export const toolSchemas = {
             },
             required: ['tool', 'args'],
           },
-          description: 'Ordered list of operations to execute (max 10).',
+          description: 'Ordered list of operations to execute (max 16).',
           maxItems: 16,
         },
         detail: {
