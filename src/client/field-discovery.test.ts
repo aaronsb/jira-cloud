@@ -232,4 +232,162 @@ describe('FieldDiscovery', () => {
     expect(discovery.isReady()).toBe(true);
     expect(discovery.getCatalog()).toEqual([]);
   });
+
+  it('resolves duplicate field names to highest-scored field', async () => {
+    const client = createMockClient([
+      makeField({ id: 'cf_high', name: 'Priority Score', description: 'High use', screensCount: 10 }),
+      makeField({ id: 'cf_low', name: 'Priority Score', description: 'Low use', screensCount: 1 }),
+    ]);
+
+    await discovery.discover(client);
+
+    // Both should be in catalog
+    expect(discovery.getCatalog()).toHaveLength(2);
+    // Name resolution should return the higher-scored field
+    expect(discovery.resolveNameToId('Priority Score')).toBe('cf_high');
+    // Both should be accessible by ID
+    expect(discovery.getFieldById('cf_high')).toBeDefined();
+    expect(discovery.getFieldById('cf_low')).toBeDefined();
+  });
+});
+
+describe('FieldDiscovery.getContextFields', () => {
+  let discovery: FieldDiscovery;
+
+  beforeEach(() => {
+    discovery = new FieldDiscovery();
+  });
+
+  function createFullMockClient(
+    catalogFields: any[],
+    issueTypes: any[],
+    contextFields: any[],
+  ) {
+    return {
+      issueFields: {
+        getFieldsPaginated: async () => ({
+          values: catalogFields,
+          isLast: true,
+        }),
+      },
+      issues: {
+        getCreateIssueMetaIssueTypes: async () => ({ issueTypes }),
+        getCreateIssueMetaIssueTypeId: async () => ({ fields: contextFields }),
+      },
+    } as any;
+  }
+
+  it('returns intersection of catalog and context fields', async () => {
+    const client = createFullMockClient(
+      [
+        makeField({ id: 'cf_1', name: 'In Both', description: 'Desc', screensCount: 5 }),
+        makeField({ id: 'cf_2', name: 'Catalog Only', description: 'Desc', screensCount: 3 }),
+      ],
+      [{ id: '10001', name: 'Story' }],
+      [{ fieldId: 'cf_1' }, { fieldId: 'cf_99' }],
+    );
+
+    await discovery.discover(client);
+    const result = await discovery.getContextFields(client, 'PROJ', 'Story');
+
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('cf_1');
+  });
+
+  it('falls back to all writable fields when issue type not found', async () => {
+    const client = createFullMockClient(
+      [
+        makeField({ id: 'cf_1', name: 'Field A', description: 'Desc', screensCount: 3 }),
+      ],
+      [{ id: '10001', name: 'Bug' }], // No "Story" type
+      [],
+    );
+
+    await discovery.discover(client);
+    const result = await discovery.getContextFields(client, 'PROJ', 'Story');
+
+    // Falls back to all writable catalog fields
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('cf_1');
+  });
+
+  it('falls back to all writable fields when API call fails', async () => {
+    const catalogFields = [
+      makeField({ id: 'cf_1', name: 'Field A', description: 'Desc', screensCount: 3 }),
+    ];
+
+    const client = {
+      issueFields: {
+        getFieldsPaginated: async () => ({
+          values: catalogFields,
+          isLast: true,
+        }),
+      },
+      issues: {
+        getCreateIssueMetaIssueTypes: async () => { throw new Error('API error'); },
+      },
+    } as any;
+
+    await discovery.discover(client);
+    const result = await discovery.getContextFields(client, 'PROJ', 'Story');
+
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('cf_1');
+  });
+
+  it('returns empty when catalog is not ready', async () => {
+    const client = createFullMockClient([], [], []);
+    // Don't call discover — catalog not ready
+    const result = await discovery.getContextFields(client, 'PROJ', 'Story');
+
+    expect(result).toEqual([]);
+  });
+
+  it('matches issue type name case-insensitively', async () => {
+    const client = createFullMockClient(
+      [makeField({ id: 'cf_1', name: 'Field', description: 'Desc', screensCount: 3 })],
+      [{ id: '10001', name: 'Story' }],
+      [{ fieldId: 'cf_1' }],
+    );
+
+    await discovery.discover(client);
+    const result = await discovery.getContextFields(client, 'PROJ', 'story');
+
+    expect(result).toHaveLength(1);
+  });
+
+  it('paginates context field fetch', async () => {
+    const catalogFields = [
+      makeField({ id: 'cf_1', name: 'Field 1', description: 'Desc', screensCount: 3 }),
+      makeField({ id: 'cf_2', name: 'Field 2', description: 'Desc', screensCount: 3 }),
+    ];
+
+    let callCount = 0;
+    const client = {
+      issueFields: {
+        getFieldsPaginated: async () => ({
+          values: catalogFields,
+          isLast: true,
+        }),
+      },
+      issues: {
+        getCreateIssueMetaIssueTypes: async () => ({ issueTypes: [{ id: '10001', name: 'Story' }] }),
+        getCreateIssueMetaIssueTypeId: async ({ startAt }: { startAt: number }) => {
+          callCount++;
+          if (startAt === 0) {
+            // Return full page to trigger pagination
+            return { fields: Array.from({ length: 50 }, (_, i) => ({ fieldId: `cf_page1_${i}` })) };
+          }
+          // Second page with our actual fields
+          return { fields: [{ fieldId: 'cf_1' }, { fieldId: 'cf_2' }] };
+        },
+      },
+    } as any;
+
+    await discovery.discover(client);
+    const result = await discovery.getContextFields(client, 'PROJ', 'Story');
+
+    expect(callCount).toBe(2); // Two pages fetched
+    expect(result).toHaveLength(2);
+  });
 });

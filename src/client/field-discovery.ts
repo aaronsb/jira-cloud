@@ -111,15 +111,28 @@ export class FieldDiscovery {
         return this.catalog.filter(f => f.writable);
       }
 
-      // Step 2: Get fields for this project + issue type
-      const fieldMeta = await client.issues.getCreateIssueMetaIssueTypeId({
-        projectIdOrKey: projectKey,
-        issueTypeId: matchingType.id,
-        maxResults: 100,
-      });
-      const contextFieldIds = new Set(
-        (fieldMeta.fields || fieldMeta.results || []).map(f => f.fieldId)
-      );
+      // Step 2: Get fields for this project + issue type (paginated)
+      const contextFieldIds = new Set<string>();
+      let startAt = 0;
+      const maxResults = 50;
+      let hasMore = true;
+
+      while (hasMore) {
+        const fieldMeta = await client.issues.getCreateIssueMetaIssueTypeId({
+          projectIdOrKey: projectKey,
+          issueTypeId: matchingType.id,
+          startAt,
+          maxResults,
+        });
+        const fields = fieldMeta.fields || fieldMeta.results || [];
+        for (const f of fields) {
+          if (f.fieldId) contextFieldIds.add(f.fieldId);
+        }
+        if (fields.length < maxResults) {
+          hasMore = false;
+        }
+        startAt += fields.length;
+      }
 
       // Step 3: Intersect with master catalog (writable fields only)
       return this.catalog.filter(f => f.writable && contextFieldIds.has(f.id));
@@ -384,7 +397,11 @@ export class FieldDiscovery {
     this.nameToId.clear();
     this.idToField.clear();
     for (const field of this.catalog) {
-      this.nameToId.set(field.name.toLowerCase(), field.id);
+      // First wins — catalog is sorted by score descending, so higher-scored field takes precedence
+      // when multiple Jira custom fields share the same name
+      if (!this.nameToId.has(field.name.toLowerCase())) {
+        this.nameToId.set(field.name.toLowerCase(), field.id);
+      }
       this.idToField.set(field.id, field);
     }
   }
