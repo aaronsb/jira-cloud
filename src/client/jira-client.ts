@@ -98,11 +98,17 @@ export class JiraClient {
     return [
       'summary',
       'description',
+      'issuetype',
+      'priority',
       'parent',
       'assignee',
       'reporter',
       'status',
       'resolution',
+      'labels',
+      'created',
+      'updated',
+      'resolutiondate',
       'duedate',
       this.customFields.startDate,
       this.customFields.storyPoints,
@@ -118,11 +124,17 @@ export class JiraClient {
       key: issue.key,
       summary: fields?.summary,
       description: (issue as any).renderedFields?.description || '',
+      issueType: fields?.issuetype?.name || '',
+      priority: fields?.priority?.name || null,
       parent: fields?.parent?.key || null,
       assignee: fields?.assignee?.displayName || null,
       reporter: fields?.reporter?.displayName || '',
       status: fields?.status?.name || '',
       resolution: fields?.resolution?.name || null,
+      labels: fields?.labels || [],
+      created: fields?.created || '',
+      updated: fields?.updated || '',
+      resolutionDate: fields?.resolutiondate || null,
       dueDate: fields?.duedate || null,
       startDate: fields?.[this.customFields.startDate] || null,
       storyPoints: fields?.[this.customFields.storyPoints] || null,
@@ -437,6 +449,7 @@ export class JiraClient {
     assignee?: string | null;
     priority?: string;
     labels?: string[];
+    dueDate?: string | null;
     customFields?: Record<string, any>;
   }): Promise<void> {
     const fields: any = {};
@@ -453,6 +466,7 @@ export class JiraClient {
     }
     if (params.priority) fields.priority = { id: params.priority };
     if (params.labels) fields.labels = params.labels;
+    if (params.dueDate !== undefined) fields.duedate = params.dueDate;
     if (params.customFields) {
       Object.assign(fields, this.convertAdfFields(params.customFields));
     }
@@ -1052,6 +1066,7 @@ export class JiraClient {
     priority?: string;
     assignee?: string;
     labels?: string[];
+    dueDate?: string;
     customFields?: Record<string, any>;
   }): Promise<{ key: string }> {
     const fields: any = {
@@ -1067,6 +1082,7 @@ export class JiraClient {
     if (params.priority) fields.priority = { id: params.priority };
     if (params.assignee) fields.assignee = { accountId: params.assignee };
     if (params.labels) fields.labels = params.labels;
+    if (params.dueDate) fields.duedate = params.dueDate;
     if (params.customFields) {
       Object.assign(fields, this.convertAdfFields(params.customFields));
     }

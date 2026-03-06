@@ -12,11 +12,17 @@ export interface JiraIssueDetails {
   key: string;
   summary: string;
   description: string;
+  issueType: string;
+  priority: string | null;
   parent: string | null;
   assignee: string | null;
   reporter: string;
   status: string;
   resolution: string | null;
+  labels: string[];
+  created: string;
+  updated: string;
+  resolutionDate: string | null;
   dueDate: string | null;
   startDate: string | null;
   storyPoints: number | null;

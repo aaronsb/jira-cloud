@@ -86,7 +86,7 @@ export function renderIssue(issue: JiraIssueDetails, transitions?: TransitionDet
   lines.push('');
 
   // Core fields
-  lines.push(`**Status:** ${formatStatus(issue.status)}`);
+  lines.push(`**Type:** ${issue.issueType} | **Status:** ${formatStatus(issue.status)}${issue.priority ? ` | **Priority:** ${issue.priority}` : ''}`);
   if (issue.assignee) {
     lines.push(`**Assignee:** ${issue.assignee}`);
   } else {
@@ -98,12 +98,33 @@ export function renderIssue(issue: JiraIssueDetails, transitions?: TransitionDet
     lines.push(`**Parent:** ${issue.parent}`);
   }
 
-  if (issue.dueDate) {
-    lines.push(`**Due:** ${formatDate(issue.dueDate)}`);
+  if (issue.labels && issue.labels.length > 0) {
+    lines.push(`**Labels:** ${issue.labels.join(', ')}`);
   }
+
+  // Dates
+  const dates: string[] = [];
+  if (issue.created) dates.push(`Created ${formatDate(issue.created)}`);
+  if (issue.updated) dates.push(`Updated ${formatDate(issue.updated)}`);
+  if (dates.length > 0) lines.push(`**${dates.join(' | ')}**`);
+
+  const scheduleDates: string[] = [];
+  if (issue.startDate) scheduleDates.push(`Start: ${formatDate(issue.startDate)}`);
+  if (issue.dueDate) scheduleDates.push(`Due: ${formatDate(issue.dueDate)}`);
+  if (issue.resolutionDate) scheduleDates.push(`Resolved: ${formatDate(issue.resolutionDate)}`);
+  if (scheduleDates.length > 0) lines.push(`**${scheduleDates.join(' | ')}**`);
 
   if (issue.storyPoints) {
     lines.push(`**Points:** ${issue.storyPoints}`);
+  }
+
+  if (issue.timeEstimate) {
+    const hours = Math.floor(issue.timeEstimate / 3600);
+    const minutes = Math.floor((issue.timeEstimate % 3600) / 60);
+    const parts: string[] = [];
+    if (hours > 0) parts.push(`${hours}h`);
+    if (minutes > 0) parts.push(`${minutes}m`);
+    lines.push(`**Estimate:** ${parts.length > 0 ? parts.join(' ') : '0m'}`);
   }
 
   if (issue.resolution) {
@@ -207,10 +228,13 @@ export function renderIssueSearchResults(
     const issue = issues[i];
     const num = pagination.startAt + i + 1;
     lines.push(`## ${num}. ${issue.key}: ${issue.summary}`);
-    lines.push(`${formatStatus(issue.status)} | ${issue.assignee || 'Unassigned'}`);
-    if (issue.dueDate) {
-      lines.push(`Due: ${formatDate(issue.dueDate)}`);
-    }
+    const meta = [`${formatStatus(issue.status)}`, issue.assignee || 'Unassigned'];
+    if (issue.priority) meta.push(issue.priority);
+    lines.push(meta.join(' | '));
+    const searchDates: string[] = [];
+    if (issue.dueDate) searchDates.push(`Due: ${formatDate(issue.dueDate)}`);
+    if (issue.startDate) searchDates.push(`Start: ${formatDate(issue.startDate)}`);
+    if (searchDates.length > 0) lines.push(searchDates.join(' | '));
     if (issue.description) {
       const desc = stripHtml(issue.description);
       if (desc.length > 0) {

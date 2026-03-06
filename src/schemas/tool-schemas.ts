@@ -190,6 +190,10 @@ export const toolSchemas = {
           type: 'object',
           description: 'Custom field values as key-value pairs.',
         },
+        dueDate: {
+          type: ['string', 'null'],
+          description: 'Due date in ISO format (e.g., "2025-06-15") or null to clear. For create and update.',
+        },
         parent: {
           type: ['string', 'null'],
           description: 'Parent issue key (e.g., PROJ-100) or null to remove.',
@@ -355,8 +359,8 @@ export const toolSchemas = {
             },
             required: ['tool', 'args'],
           },
-          description: 'Ordered list of operations to execute (max 10).',
-          maxItems: 10,
+          description: 'Ordered list of operations to execute (max 16).',
+          maxItems: 16,
         },
         detail: {
           type: 'string',

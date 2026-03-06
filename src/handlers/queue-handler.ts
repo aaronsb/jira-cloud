@@ -33,7 +33,7 @@ type ToolHandler = (client: JiraClient, request: any) => Promise<{ content: Arra
 
 // ── Constants ──────────────────────────────────────────────────────────
 
-const MAX_OPERATIONS = 10;
+const MAX_OPERATIONS = 16;
 const DESTRUCTIVE_OPERATIONS = new Set<string>(['delete', 'move']);
 
 // ── Queue Handler ──────────────────────────────────────────────────────

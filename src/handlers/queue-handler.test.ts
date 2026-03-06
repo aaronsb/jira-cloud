@@ -53,13 +53,13 @@ describe('queue-handler', () => {
         .rejects.toThrow('empty');
     });
 
-    it('rejects more than 10 operations', async () => {
+    it('rejects more than 16 operations', async () => {
       const handler = makeQueue();
-      const ops = Array.from({ length: 11 }, () => ({
+      const ops = Array.from({ length: 17 }, () => ({
         tool: 'manage_jira_issue', args: { operation: 'get', issueKey: 'X-1' },
       }));
       await expect(handler({} as any, makeRequest(ops)))
-        .rejects.toThrow('Maximum 10');
+        .rejects.toThrow('Maximum 16');
     });
 
     it('rejects unknown tool', async () => {

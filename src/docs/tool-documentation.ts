@@ -410,7 +410,7 @@ function generateQueueToolDocumentation(_schema: any) {
     description: "Execute multiple Jira operations in a single call. Operations run sequentially with result references and per-operation error strategies.",
     parameters: {
       operations: {
-        type: "array (max 10)",
+        type: "array (max 16)",
         description: "Ordered list of operations. Each has: tool (string), args (object), onError ('bail' | 'continue', default 'bail').",
       },
     },
