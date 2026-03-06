@@ -58,6 +58,22 @@ export class JiraClient {
     };
   }
 
+  /** Standard Jira fields that require ADF format in v3 API */
+  private static ADF_FIELDS = new Set(['environment']);
+
+  /** Convert any ADF-type fields in customFields from markdown to ADF */
+  private convertAdfFields(customFields: Record<string, any>): Record<string, any> {
+    const result: Record<string, any> = {};
+    for (const [key, value] of Object.entries(customFields)) {
+      if (JiraClient.ADF_FIELDS.has(key) && typeof value === 'string') {
+        result[key] = TextProcessor.markdownToAdf(value);
+      } else {
+        result[key] = value;
+      }
+    }
+    return result;
+  }
+
   /** Format a custom field value for display */
   private formatCustomFieldValue(value: unknown): unknown {
     if (value === null || value === undefined) return null;
@@ -280,7 +296,7 @@ export class JiraClient {
     if (params.priority) fields.priority = { id: params.priority };
     if (params.labels) fields.labels = params.labels;
     if (params.customFields) {
-      Object.assign(fields, params.customFields);
+      Object.assign(fields, this.convertAdfFields(params.customFields));
     }
 
     await this.client.issues.editIssue({
@@ -894,7 +910,7 @@ export class JiraClient {
     if (params.assignee) fields.assignee = { accountId: params.assignee };
     if (params.labels) fields.labels = params.labels;
     if (params.customFields) {
-      Object.assign(fields, params.customFields);
+      Object.assign(fields, this.convertAdfFields(params.customFields));
     }
 
     const response = await this.client.issues.createIssue({ fields });
