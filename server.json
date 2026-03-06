@@ -1,0 +1,41 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.aaronsb/jira-cloud",
+  "description": "MCP server for Jira Cloud — manage issues, sprints, boards, filters, and custom fields",
+  "title": "Jira Cloud",
+  "websiteUrl": "https://github.com/aaronsb/jira-cloud#readme",
+  "repository": {
+    "url": "https://github.com/aaronsb/jira-cloud",
+    "source": "github"
+  },
+  "version": "0.3.1",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@aaronsb/jira-cloud-mcp",
+      "version": "0.3.1",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "JIRA_API_TOKEN",
+          "description": "Jira API token (generate at https://id.atlassian.com/manage/api-tokens)",
+          "isRequired": true,
+          "isSecret": true
+        },
+        {
+          "name": "JIRA_EMAIL",
+          "description": "Atlassian account email address",
+          "isRequired": true
+        },
+        {
+          "name": "JIRA_HOST",
+          "description": "Jira instance URL (e.g., https://your-team.atlassian.net)",
+          "isRequired": true
+        }
+      ]
+    }
+  ]
+}
