@@ -317,4 +317,42 @@ export const toolSchemas = {
     },
   },
 
+
+  queue_jira_operations: {
+    name: 'queue_jira_operations',
+    description: 'Execute multiple Jira operations in a single call. Operations run sequentially with result references ($0.key) and per-operation error strategies (bail/continue).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        operations: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              tool: {
+                type: 'string',
+                enum: ['manage_jira_issue', 'manage_jira_filter', 'manage_jira_sprint', 'manage_jira_project', 'manage_jira_board'],
+                description: 'Which tool to call.',
+              },
+              args: {
+                type: 'object',
+                description: 'Arguments for the tool call. Use $N.field to reference results from earlier operations (e.g., $0.key for the issue key from operation 0).',
+              },
+              onError: {
+                type: 'string',
+                enum: ['bail', 'continue'],
+                description: 'Error strategy. bail (default): stop queue. continue: log error, proceed to next.',
+                default: 'bail',
+              },
+            },
+            required: ['tool', 'args'],
+          },
+          description: 'Ordered list of operations to execute (max 10).',
+          maxItems: 10,
+        },
+      },
+      required: ['operations'],
+    },
+  },
+
 };

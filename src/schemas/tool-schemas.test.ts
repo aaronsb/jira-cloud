@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { toolSchemas } from './tool-schemas.js';
 
-const EXPECTED_TOOLS = [
+const DOMAIN_TOOLS = [
   'manage_jira_issue',
   'manage_jira_filter',
   'manage_jira_project',
@@ -9,12 +9,14 @@ const EXPECTED_TOOLS = [
   'manage_jira_sprint',
 ];
 
+const ALL_TOOLS = [...DOMAIN_TOOLS, 'queue_jira_operations'];
+
 describe('toolSchemas', () => {
-  it('exports all 5 tools', () => {
-    expect(Object.keys(toolSchemas).sort()).toEqual(EXPECTED_TOOLS.sort());
+  it('exports all 6 tools', () => {
+    expect(Object.keys(toolSchemas).sort()).toEqual(ALL_TOOLS.sort());
   });
 
-  for (const toolName of EXPECTED_TOOLS) {
+  for (const toolName of DOMAIN_TOOLS) {
     describe(toolName, () => {
       const schema = toolSchemas[toolName as keyof typeof toolSchemas];
 
@@ -47,6 +49,32 @@ describe('toolSchemas', () => {
       });
     });
   }
+
+  describe('queue_jira_operations', () => {
+    const schema = toolSchemas.queue_jira_operations;
+
+    it('has name matching its key', () => {
+      expect(schema.name).toBe('queue_jira_operations');
+    });
+
+    it('has operations as the only required field', () => {
+      expect(schema.inputSchema.required).toEqual(['operations']);
+    });
+
+    it('has operations array with maxItems 10', () => {
+      const opsProp = schema.inputSchema.properties.operations as any;
+      expect(opsProp.type).toBe('array');
+      expect(opsProp.maxItems).toBe(10);
+    });
+
+    it('lists all domain tools in the tool enum', () => {
+      const opsProp = schema.inputSchema.properties.operations as any;
+      const toolEnum = opsProp.items.properties.tool.enum;
+      for (const tool of DOMAIN_TOOLS) {
+        expect(toolEnum).toContain(tool);
+      }
+    });
+  });
 
   it('assignee description says accountId, not username', () => {
     const issueSchema = toolSchemas.manage_jira_issue;
