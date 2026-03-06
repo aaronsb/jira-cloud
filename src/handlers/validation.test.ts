@@ -79,6 +79,10 @@ describe('issue handler validation', () => {
       { operation: 'link', issueKey: 'PROJ-1', linkedIssueKey: 'PROJ-2' }, 'linkType');
   });
 
+  it('rejects delete without issueKey', async () => {
+    await expectValidationError(mod, fn, { operation: 'delete' }, 'issueKey');
+  });
+
   it('rejects invalid expand values', async () => {
     await expectValidationError(mod, fn,
       { operation: 'get', issueKey: 'PROJ-1', expand: ['invalid'] }, 'Invalid expansion');

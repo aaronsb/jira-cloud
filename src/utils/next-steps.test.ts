@@ -25,6 +25,11 @@ describe('issueNextSteps', () => {
     expect(result).toContain('issue-link-types');
   });
 
+  it('returns suggestions for delete', () => {
+    const result = issueNextSteps('delete', 'PROJ-1');
+    expect(result).toContain('related issues');
+  });
+
   it('returns empty for unknown operation', () => {
     expect(issueNextSteps('unknown')).toBe('');
   });

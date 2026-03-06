@@ -6,7 +6,7 @@ import { issueNextSteps } from '../utils/next-steps.js';
 import { normalizeArgs } from '../utils/normalize-args.js';
 
 type ManageJiraIssueArgs = {
-  operation: 'create' | 'get' | 'update' | 'transition' | 'comment' | 'link';
+  operation: 'create' | 'get' | 'update' | 'delete' | 'transition' | 'comment' | 'link';
   issueKey?: string;
   projectKey?: string;
   summary?: string;
@@ -37,10 +37,10 @@ function validateManageJiraIssueArgs(args: unknown): args is ManageJiraIssueArgs
   
   // Validate operation parameter
   if (typeof normalizedArgs.operation !== 'string' || 
-      !['create', 'get', 'update', 'transition', 'comment', 'link'].includes(normalizedArgs.operation as string)) {
+      !['create', 'get', 'update', 'delete', 'transition', 'comment', 'link'].includes(normalizedArgs.operation as string)) {
     throw new McpError(
       ErrorCode.InvalidParams,
-      'Invalid operation parameter. Valid values are: create, get, update, transition, comment, link'
+      'Invalid operation parameter. Valid values are: create, get, update, delete, transition, comment, link'
     );
   }
 
@@ -55,6 +55,15 @@ function validateManageJiraIssueArgs(args: unknown): args is ManageJiraIssueArgs
       }
       break;
       
+    case 'delete':
+      if (typeof normalizedArgs.issueKey !== 'string' || normalizedArgs.issueKey.trim() === '') {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          'Missing or invalid issueKey parameter. Please provide a valid issue key for the delete operation.'
+        );
+      }
+      break;
+
     case 'create':
       if (typeof normalizedArgs.projectKey !== 'string' || normalizedArgs.projectKey.trim() === '') {
         throw new McpError(
@@ -208,6 +217,25 @@ async function handleGetIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs)
       {
         type: 'text',
         text: markdown + issueNextSteps('get', args.issueKey),
+      },
+    ],
+  };
+}
+
+async function handleDeleteIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs) {
+  const issueKey = args.issueKey!;
+
+  // Get the issue details before deleting for a final snapshot
+  const issue = await jiraClient.getIssue(issueKey, false, false);
+  const markdown = MarkdownRenderer.renderIssue(issue);
+
+  await jiraClient.deleteIssue(issueKey);
+
+  return {
+    content: [
+      {
+        type: 'text',
+        text: `# Issue Deleted\n\nThe following issue has been permanently deleted:\n\n${markdown}${issueNextSteps('delete', issueKey)}`,
       },
     ],
   };
@@ -369,6 +397,11 @@ export async function handleIssueRequest(
       case 'create': {
         console.error('Processing create issue operation');
         return await handleCreateIssue(jiraClient, normalizedArgs as ManageJiraIssueArgs);
+      }
+
+      case 'delete': {
+        console.error('Processing delete issue operation');
+        return await handleDeleteIssue(jiraClient, normalizedArgs as ManageJiraIssueArgs);
       }
       
       case 'update': {

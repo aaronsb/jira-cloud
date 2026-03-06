@@ -50,6 +50,11 @@ export function issueNextSteps(operation: string, issueKey?: string): string {
         { description: 'Update issue fields', tool: 'manage_jira_issue', example: { operation: 'update', issueKey } },
       );
       break;
+    case 'delete':
+      steps.push(
+        { description: 'Search for related issues', tool: 'manage_jira_filter', example: { operation: 'execute_jql', jql: `issue in linkedIssues("${issueKey}")` } },
+      );
+      break;
     case 'link':
       steps.push(
         { description: 'View the linked issue', tool: 'manage_jira_issue', example: { operation: 'get', issueKey } },

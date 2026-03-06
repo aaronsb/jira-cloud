@@ -144,13 +144,13 @@ export const toolSchemas = {
 
   manage_jira_issue: {
     name: 'manage_jira_issue',
-    description: 'Get, create, update, transition, comment on, or link Jira issues',
+    description: 'Get, create, update, delete, transition, comment on, or link Jira issues',
     inputSchema: {
       type: 'object',
       properties: {
         operation: {
           type: 'string',
-          enum: ['create', 'get', 'update', 'transition', 'comment', 'link'],
+          enum: ['create', 'get', 'update', 'delete', 'transition', 'comment', 'link'],
           description: 'Operation to perform',
         },
         issueKey: {
