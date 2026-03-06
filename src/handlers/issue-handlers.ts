@@ -246,6 +246,33 @@ function resolveCustomFieldNames(customFields: Record<string, any>): Record<stri
   return resolved;
 }
 
+const UNDESCRIBED_NAG_THRESHOLD = 0.5; // 50% or more
+
+/** Generate a nag message if too many custom fields lack descriptions */
+function getUndescribedFieldNag(): string {
+  if (!fieldDiscovery.isReady()) return '';
+  const stats = fieldDiscovery.getStats();
+  if (!stats || stats.undescribedRatio < UNDESCRIBED_NAG_THRESHOLD) return '';
+  if (stats.totalCustomFields === 0) return '';
+
+  const pct = Math.round(stats.undescribedRatio * 100);
+  const described = stats.catalogSize;
+  const total = stats.totalCustomFields - stats.excludedLocked;
+
+  return [
+    '',
+    '---',
+    `**Custom field coverage:** ${described} of ${total} custom fields have descriptions (${pct}% undescribed).`,
+    'AI tools can only discover and use custom fields that have descriptions in Jira.',
+    'Ask your Jira admin to add descriptions to important custom fields for better AI support.',
+  ].join('\n');
+}
+
+/** Combine next-steps guidance with the undescribed field nag */
+function issueGuidance(operation: string, issueKey?: string): string {
+  return issueNextSteps(operation, issueKey) + getUndescribedFieldNag();
+}
+
 // Handler functions for each operation
 async function handleGetIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs) {
   // Parse expansion options
@@ -279,7 +306,7 @@ async function handleGetIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs)
     content: [
       {
         type: 'text',
-        text: markdown + issueNextSteps('get', args.issueKey),
+        text: markdown + issueGuidance('get', args.issueKey),
       },
     ],
   };
@@ -305,7 +332,7 @@ async function handleMoveIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs
     content: [
       {
         type: 'text',
-        text: `# Issue Moved\n\n${markdown}${issueNextSteps('move', movedIssue.key)}`,
+        text: `# Issue Moved\n\n${markdown}${issueGuidance('move', movedIssue.key)}`,
       },
     ],
   };
@@ -331,7 +358,7 @@ async function handleDeleteIssue(jiraClient: JiraClient, args: ManageJiraIssueAr
     content: [
       {
         type: 'text',
-        text: `# Issue Deleted\n\nThe following issue has been permanently deleted:\n\n${markdown}${issueNextSteps('delete', issueKey)}`,
+        text: `# Issue Deleted\n\nThe following issue has been permanently deleted:\n\n${markdown}${issueGuidance('delete', issueKey)}`,
       },
     ],
   };
@@ -359,7 +386,7 @@ async function handleCreateIssue(jiraClient: JiraClient, args: ManageJiraIssueAr
     content: [
       {
         type: 'text',
-        text: `# Issue Created\n\n${markdown}${issueNextSteps('create', result.key)}`,
+        text: `# Issue Created\n\n${markdown}${issueGuidance('create', result.key)}`,
       },
     ],
   };
@@ -387,7 +414,7 @@ async function handleUpdateIssue(jiraClient: JiraClient, args: ManageJiraIssueAr
     content: [
       {
         type: 'text',
-        text: `# Issue Updated\n\n${markdown}${issueNextSteps('update', args.issueKey)}`,
+        text: `# Issue Updated\n\n${markdown}${issueGuidance('update', args.issueKey)}`,
       },
     ],
   };
@@ -408,7 +435,7 @@ async function handleTransitionIssue(jiraClient: JiraClient, args: ManageJiraIss
     content: [
       {
         type: 'text',
-        text: `# Issue Transitioned\n\n${markdown}${issueNextSteps('transition', args.issueKey)}`,
+        text: `# Issue Transitioned\n\n${markdown}${issueGuidance('transition', args.issueKey)}`,
       },
     ],
   };
@@ -425,7 +452,7 @@ async function handleCommentIssue(jiraClient: JiraClient, args: ManageJiraIssueA
     content: [
       {
         type: 'text',
-        text: `# Comment Added\n\n${markdown}${issueNextSteps('comment', args.issueKey)}`,
+        text: `# Comment Added\n\n${markdown}${issueGuidance('comment', args.issueKey)}`,
       },
     ],
   };
@@ -450,7 +477,7 @@ async function handleLinkIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs
     content: [
       {
         type: 'text',
-        text: `# Issue Linked\n\n${markdown}${issueNextSteps('link', args.issueKey)}`,
+        text: `# Issue Linked\n\n${markdown}${issueGuidance('link', args.issueKey)}`,
       },
     ],
   };
