@@ -1,22 +1,9 @@
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import { JiraClient } from '../client/jira-client.js';
 import { MarkdownRenderer, FilterData } from '../mcp/markdown-renderer.js';
+import { normalizeArgs } from '../utils/normalize-args.js';
 
-/**
- * Filter Handlers
- * 
- * This file implements handlers for the manage_jira_filter tool.
- * 
- * Dependency Injection Pattern:
- * - All handler functions receive the jiraClient as their first parameter for consistency
- * - When a parameter is intentionally unused, it is prefixed with an underscore (_jiraClient)
- * - This pattern ensures consistent function signatures and satisfies ESLint rules for unused variables
- * - It also makes the code more maintainable by preserving the dependency injection pattern throughout
- */
-
-// Type definition for the consolidated filter management tool
 type ManageJiraFilterArgs = {
   operation: 'get' | 'create' | 'update' | 'delete' | 'list' | 'execute_filter' | 'execute_jql';
   filterId?: string;
@@ -33,26 +20,6 @@ type ManageJiraFilterArgs = {
   }>;
   expand?: string[];
 };
-
-// Helper function to normalize parameter names (support both snake_case and camelCase)
-function normalizeArgs(args: Record<string, unknown>): Record<string, unknown> {
-  const normalized: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(args)) {
-    // Convert snake_case to camelCase
-    if (key === 'filter_id') {
-      normalized['filterId'] = value;
-    } else if (key === 'share_permissions') {
-      normalized['sharePermissions'] = value;
-    } else if (key === 'start_at') {
-      normalized['startAt'] = value;
-    } else if (key === 'max_results') {
-      normalized['maxResults'] = value;
-    } else {
-      normalized[key] = value;
-    }
-  }
-  return normalized;
-}
 
 // Validate the consolidated filter management arguments
 function validateManageJiraFilterArgs(args: unknown): args is ManageJiraFilterArgs {
@@ -523,8 +490,7 @@ async function handleExecuteJql(jiraClient: JiraClient, args: ManageJiraFilterAr
 }
 
 // Main handler function
-export async function setupFilterHandlers(
-  server: Server,
+export async function handleFilterRequest(
   jiraClient: JiraClient,
   request: {
     params: {

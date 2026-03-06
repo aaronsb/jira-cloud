@@ -1,22 +1,9 @@
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import { JiraClient } from '../client/jira-client.js';
 import { MarkdownRenderer, ProjectData } from '../mcp/markdown-renderer.js';
+import { normalizeArgs } from '../utils/normalize-args.js';
 
-/**
- * Project Handlers
- * 
- * This file implements handlers for the manage_jira_project tool.
- * 
- * Dependency Injection Pattern:
- * - All handler functions receive the jiraClient as their first parameter for consistency
- * - When a parameter is intentionally unused, it is prefixed with an underscore (_jiraClient)
- * - This pattern ensures consistent function signatures and satisfies ESLint rules for unused variables
- * - It also makes the code more maintainable by preserving the dependency injection pattern throughout
- */
-
-// Type definition for the consolidated project management tool
 type ManageJiraProjectArgs = {
   operation: 'get' | 'create' | 'update' | 'delete' | 'list';
   projectKey?: string;
@@ -30,26 +17,6 @@ type ManageJiraProjectArgs = {
   include_status_counts?: boolean;
 };
 
-
-// Helper function to normalize parameter names (support both snake_case and camelCase)
-function normalizeArgs(args: Record<string, unknown>): Record<string, unknown> {
-  const normalized: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(args)) {
-    // Convert snake_case to camelCase
-    if (key === 'project_key') {
-      normalized['projectKey'] = value;
-    } else if (key === 'include_status_counts') {
-      normalized['includeStatusCounts'] = value;
-    } else if (key === 'start_at') {
-      normalized['startAt'] = value;
-    } else if (key === 'max_results') {
-      normalized['maxResults'] = value;
-    } else {
-      normalized[key] = value;
-    }
-  }
-  return normalized;
-}
 
 // Validate the consolidated project management arguments
 function validateManageJiraProjectArgs(args: unknown): args is ManageJiraProjectArgs {
@@ -474,8 +441,7 @@ async function handleListProjects(jiraClient: JiraClient, args: ManageJiraProjec
 
 
 // Main handler function
-export async function setupProjectHandlers(
-  server: Server,
+export async function handleProjectRequest(
   jiraClient: JiraClient,
   request: {
     params: {

@@ -1,22 +1,9 @@
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import { JiraClient } from '../client/jira-client.js';
 import { MarkdownRenderer, BoardData } from '../mcp/markdown-renderer.js';
+import { normalizeArgs } from '../utils/normalize-args.js';
 
-/**
- * Board Handlers
- * 
- * This file implements handlers for the manage_jira_board tool.
- * 
- * Dependency Injection Pattern:
- * - All handler functions receive the jiraClient as their first parameter for consistency
- * - When a parameter is intentionally unused, it is prefixed with an underscore (_jiraClient)
- * - This pattern ensures consistent function signatures and satisfies ESLint rules for unused variables
- * - It also makes the code more maintainable by preserving the dependency injection pattern throughout
- */
-
-// Type definition for the consolidated board management tool
 type ManageJiraBoardArgs = {
   operation: 'get' | 'list' | 'create' | 'update' | 'delete' | 'get_configuration';
   boardId?: number;
@@ -28,28 +15,6 @@ type ManageJiraBoardArgs = {
   expand?: string[];
   include_sprints?: boolean;
 };
-
-// Helper function to normalize parameter names (support both snake_case and camelCase)
-function normalizeArgs(args: Record<string, unknown>): Record<string, unknown> {
-  const normalized: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(args)) {
-    // Convert snake_case to camelCase
-    if (key === 'board_id') {
-      normalized['boardId'] = value;
-    } else if (key === 'include_sprints') {
-      normalized['includeSprints'] = value;
-    } else if (key === 'project_key') {
-      normalized['projectKey'] = value;
-    } else if (key === 'start_at') {
-      normalized['startAt'] = value;
-    } else if (key === 'max_results') {
-      normalized['maxResults'] = value;
-    } else {
-      normalized[key] = value;
-    }
-  }
-  return normalized;
-}
 
 // Validate the consolidated board management arguments
 function validateManageJiraBoardArgs(args: unknown): args is ManageJiraBoardArgs {
@@ -411,8 +376,7 @@ async function handleGetBoardConfiguration(_jiraClient: JiraClient, _args: Manag
 
 
 // Main handler function
-export async function setupBoardHandlers(
-  server: Server,
+export async function handleBoardRequest(
   jiraClient: JiraClient,
   request: {
     params: {

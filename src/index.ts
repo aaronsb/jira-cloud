@@ -11,13 +11,14 @@ import {
   ReadResourceRequestSchema
 } from '@modelcontextprotocol/sdk/types.js';
 
+import { createRequire } from 'module';
 import { JiraClient } from './client/jira-client.js';
-import { setupBoardHandlers } from './handlers/board-handlers.js';
-import { setupFilterHandlers } from './handlers/filter-handlers.js';
-import { setupIssueHandlers } from './handlers/issue-handlers.js';
-import { setupProjectHandlers } from './handlers/project-handlers.js';
+import { handleBoardRequest } from './handlers/board-handlers.js';
+import { handleFilterRequest } from './handlers/filter-handlers.js';
+import { handleIssueRequest } from './handlers/issue-handlers.js';
+import { handleProjectRequest } from './handlers/project-handlers.js';
 import { setupResourceHandlers } from './handlers/resource-handlers.js';
-import { setupSprintHandlers } from './handlers/sprint-handlers.js';
+import { handleSprintRequest } from './handlers/sprint-handlers.js';
 import { toolSchemas } from './schemas/tool-schemas.js';
 
 // Jira credentials from environment variables
@@ -29,19 +30,21 @@ if (!JIRA_EMAIL || !JIRA_API_TOKEN || !JIRA_HOST) {
   throw new Error('Missing required Jira credentials in environment variables');
 }
 
+const require = createRequire(import.meta.url);
+const { version } = require('../package.json');
+
 class JiraServer {
   private server: Server;
   private jiraClient: JiraClient;
 
   constructor() {
-    // Use environment-provided name or default to 'jira-cloud'
     const serverName = process.env.MCP_SERVER_NAME || 'jira-cloud';
     console.error(`Initializing Jira MCP server: ${serverName}`);
 
     this.server = new Server(
       {
         name: serverName,
-        version: '0.1.0',
+        version,
       },
       {
         capabilities: {
@@ -70,8 +73,6 @@ class JiraServer {
     // Set up required MCP protocol handlers
     this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
       tools: Object.entries(toolSchemas)
-        // Filter out the deprecated search_jira_issues tool
-        .filter(([key]) => key !== 'search_jira_issues')
         .map(([key, schema]) => ({
           name: key,
           description: schema.description,
@@ -99,63 +100,24 @@ class JiraServer {
       console.error(`Handling tool request: ${name}`);
 
       try {
-        let response;
-        
-        // Issue-related tools
-        if (['manage_jira_issue'].includes(name)) {
-          response = await setupIssueHandlers(this.server, this.jiraClient, request);
-        }
-        
-        // Project-related tools
-        else if (['manage_jira_project'].includes(name)) {
-          response = await setupProjectHandlers(this.server, this.jiraClient, request);
-        }
+        const handlers: Record<string, (client: JiraClient, req: typeof request) => Promise<any>> = {
+          manage_jira_issue: handleIssueRequest,
+          manage_jira_project: handleProjectRequest,
+          manage_jira_board: handleBoardRequest,
+          manage_jira_sprint: handleSprintRequest,
+          manage_jira_filter: handleFilterRequest,
+        };
 
-        // Board-related tools
-        else if (['manage_jira_board'].includes(name)) {
-          response = await setupBoardHandlers(this.server, this.jiraClient, request);
-        }
-
-        // Sprint-related tools
-        else if (['manage_jira_sprint'].includes(name)) {
-          response = await setupSprintHandlers(this.server, this.jiraClient, request);
-        }
-        
-        // Filter-related tools
-        else if (['manage_jira_filter'].includes(name)) {
-          response = await setupFilterHandlers(this.server, this.jiraClient, request);
-        }
-        
-        // Legacy search tool - redirect to filter handler with execute_jql operation
-        else if (name === 'search_jira_issues') {
-          console.error('Redirecting deprecated search_jira_issues to manage_jira_filter with execute_jql operation');
-          
-          // Transform the request to use manage_jira_filter with execute_jql operation
-          const transformedRequest = {
-            ...request,
-            params: {
-              ...request.params,
-              name: 'manage_jira_filter',
-              arguments: {
-                ...request.params.arguments,
-                operation: 'execute_jql'
-              }
-            }
-          };
-          
-          response = await setupFilterHandlers(this.server, this.jiraClient, transformedRequest);
-        }
-        
-        else {
-          console.error(`Unknown tool requested: ${name}`);
+        const handler = handlers[name];
+        if (!handler) {
           throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
         }
-        
-        // Ensure we always return a valid response
+
+        const response = await handler(this.jiraClient, request);
         if (!response) {
           throw new McpError(ErrorCode.InternalError, `No response from handler for tool: ${name}`);
         }
-        
+
         return response;
       } catch (error) {
         console.error('Error handling request:', error);

@@ -192,7 +192,7 @@ export const toolSchemas = {
       properties: {
         operation: {
           type: 'string',
-          enum: ['create', 'get', 'update', 'delete', 'transition', 'comment', 'link'],
+          enum: ['create', 'get', 'update', 'transition', 'comment', 'link'],
           description: 'Operation to perform on the issue',
         },
         // Parameters for get, update, delete, transition, comment, and link operations
@@ -401,55 +401,4 @@ export const toolSchemas = {
     },
   },
 
-  // Enhanced Search API - will be deprecated after consolidation
-  search_jira_issues: {
-    name: 'search_jira_issues',
-    description: 'Search for issues using JQL with enhanced results and optional expansions',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        jql: {
-          type: 'string',
-          description: 'JQL query string. Supports a wide range of search patterns:\n\n' +
-            '# Portfolio/Plans Queries\n' +
-            '- Find child issues: issue in portfolioChildIssuesOf("PROJ-123")\n' +
-            '- Combined portfolio search: issue in portfolioChildIssuesOf("PROJ-123") AND status = "In Progress"\n' +
-            '- Multiple portfolios: issue in portfolioChildIssuesOf("PROJ-123") OR issue in portfolioChildIssuesOf("PROJ-456")\n\n' +
-            '# Common Search Patterns\n' +
-            '- Assigned issues: assignee = currentUser()\n' +
-            '- Unassigned issues: assignee IS EMPTY\n' +
-            '- Recent changes: status CHANGED AFTER -1w\n' +
-            '- Multiple statuses: status IN ("In Progress", "Under Review", "Testing")\n' +
-            '- Priority tasks: priority = High AND status = Open\n' +
-            '- Component search: component = "User Interface" OR component = "API"\n\n' +
-            '# Advanced Functions\n' +
-            '- Sort results: ORDER BY created DESC\n' +
-            '- Track changes: status WAS "Resolved" AND status = "Open"\n' +
-            '- Team filters: assignee IN MEMBERSOF("developers")\n\n' +
-            'JQL supports complex combinations using AND, OR, NOT operators and parentheses for grouping. ' +
-            'All text values are case-sensitive and must be enclosed in quotes when they contain spaces.',
-        },
-        startAt: {
-          type: 'number',
-          description: 'Index of the first issue to return (0-based). Can also use snake_case "start_at".',
-          default: 0,
-        },
-        maxResults: {
-          type: 'number',
-          description: 'Maximum number of issues to return (default: 25, max: 100). Can also use snake_case "max_results".',
-          default: 25,
-          maximum: 100,
-        },
-        expand: {
-          type: 'array',
-          items: {
-            type: 'string',
-            enum: ['issue_details', 'transitions', 'comments_preview'],
-          },
-          description: 'Optional fields to include in the response',
-        },
-      },
-      required: ['jql'],
-    },
-  },
 };

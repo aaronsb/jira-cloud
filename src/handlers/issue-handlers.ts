@@ -1,24 +1,11 @@
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import { JiraClient } from '../client/jira-client.js';
 import { MarkdownRenderer } from '../mcp/markdown-renderer.js';
+import { normalizeArgs } from '../utils/normalize-args.js';
 
-/**
- * Issue Handlers
- * 
- * This file implements handlers for the manage_jira_issue tool.
- * 
- * Dependency Injection Pattern:
- * - All handler functions receive the jiraClient as their first parameter for consistency
- * - When a parameter is intentionally unused, it is prefixed with an underscore (_jiraClient)
- * - This pattern ensures consistent function signatures and satisfies ESLint rules for unused variables
- * - It also makes the code more maintainable by preserving the dependency injection pattern throughout
- */
-
-// Type definition for the manage_jira_issue tool
 type ManageJiraIssueArgs = {
-  operation: 'create' | 'get' | 'update' | 'delete' | 'transition' | 'comment' | 'link';
+  operation: 'create' | 'get' | 'update' | 'transition' | 'comment' | 'link';
   issueKey?: string;
   projectKey?: string;
   summary?: string;
@@ -36,32 +23,6 @@ type ManageJiraIssueArgs = {
   parent?: string | null;
 };
 
-// Helper function to normalize parameter names (support both snake_case and camelCase)
-function normalizeArgs(args: Record<string, unknown>): Record<string, unknown> {
-  const normalized: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(args)) {
-    // Convert snake_case to camelCase
-    if (key === 'issue_key') {
-      normalized['issueKey'] = value;
-    } else if (key === 'project_key') {
-      normalized['projectKey'] = value;
-    } else if (key === 'issue_type') {
-      normalized['issueType'] = value;
-    } else if (key === 'transition_id') {
-      normalized['transitionId'] = value;
-    } else if (key === 'linked_issue_key') {
-      normalized['linkedIssueKey'] = value;
-    } else if (key === 'link_type') {
-      normalized['linkType'] = value;
-    } else if (key === 'custom_fields') {
-      normalized['customFields'] = value;
-    } else {
-      normalized[key] = value;
-    }
-  }
-  return normalized;
-}
-
 // Validate the manage_jira_issue arguments
 function validateManageJiraIssueArgs(args: unknown): args is ManageJiraIssueArgs {
   if (typeof args !== 'object' || args === null) {
@@ -75,10 +36,10 @@ function validateManageJiraIssueArgs(args: unknown): args is ManageJiraIssueArgs
   
   // Validate operation parameter
   if (typeof normalizedArgs.operation !== 'string' || 
-      !['create', 'get', 'update', 'delete', 'transition', 'comment', 'link'].includes(normalizedArgs.operation as string)) {
+      !['create', 'get', 'update', 'transition', 'comment', 'link'].includes(normalizedArgs.operation as string)) {
     throw new McpError(
       ErrorCode.InvalidParams,
-      'Invalid operation parameter. Valid values are: create, get, update, delete, transition, comment, link'
+      'Invalid operation parameter. Valid values are: create, get, update, transition, comment, link'
     );
   }
 
@@ -134,15 +95,6 @@ function validateManageJiraIssueArgs(args: unknown): args is ManageJiraIssueArgs
         throw new McpError(
           ErrorCode.InvalidParams,
           'At least one update field (summary, description, parent, assignee, priority, labels, or customFields) must be provided for the update operation.'
-        );
-      }
-      break;
-      
-    case 'delete':
-      if (typeof normalizedArgs.issueKey !== 'string' || normalizedArgs.issueKey.trim() === '') {
-        throw new McpError(
-          ErrorCode.InvalidParams,
-          'Missing or invalid issueKey parameter. Please provide a valid issue key for the delete operation.'
         );
       }
       break;
@@ -312,32 +264,6 @@ async function handleUpdateIssue(jiraClient: JiraClient, args: ManageJiraIssueAr
   };
 }
 
-async function handleDeleteIssue(_jiraClient: JiraClient, _args: ManageJiraIssueArgs) {
-  // Note: This is a placeholder. The current JiraClient doesn't have a deleteIssue method.
-  // You would need to implement this in the JiraClient class.
-  throw new McpError(
-    ErrorCode.InternalError,
-    'Delete issue operation is not yet implemented'
-  );
-
-  // When implemented, it would look something like this:
-  /*
-  await _jiraClient.deleteIssue(_args.issueKey!);
-
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify({
-          success: true,
-          message: `Issue ${_args.issueKey} has been deleted successfully.`,
-        }, null, 2),
-      },
-    ],
-  };
-  */
-}
-
 async function handleTransitionIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs) {
   await jiraClient.transitionIssue(
     args.issueKey!,
@@ -402,8 +328,7 @@ async function handleLinkIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs
 }
 
 // Main handler function
-export async function setupIssueHandlers(
-  server: Server,
+export async function handleIssueRequest(
   jiraClient: JiraClient,
   request: {
     params: {
@@ -448,11 +373,6 @@ export async function setupIssueHandlers(
       case 'update': {
         console.error('Processing update issue operation');
         return await handleUpdateIssue(jiraClient, normalizedArgs as ManageJiraIssueArgs);
-      }
-      
-      case 'delete': {
-        console.error('Processing delete issue operation');
-        return await handleDeleteIssue(jiraClient, normalizedArgs as ManageJiraIssueArgs);
       }
       
       case 'transition': {
