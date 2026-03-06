@@ -517,13 +517,16 @@ async function handleHierarchy(jiraClient: JiraClient, args: ManageJiraIssueArgs
   const result: HierarchyResult = await jiraClient.getHierarchy(args.issueKey!, up, down);
   const tree = renderHierarchyTree(result.root, result.focusKey);
 
-  const summary = [
+  const lines = [
     `# Issue Hierarchy: ${result.focusKey}`,
     '',
-    `Traversed ${result.upDepth} level${result.upDepth !== 1 ? 's' : ''} up, ${down} level${down !== 1 ? 's' : ''} down`,
-    '',
-    tree,
-  ].join('\n');
+    `Traversed ${result.upDepth} level${result.upDepth !== 1 ? 's' : ''} up, ${result.downDepth} level${result.downDepth !== 1 ? 's' : ''} down`,
+  ];
+  if (result.truncated) {
+    lines.push('', '⚠️ Results were truncated — some children may not be shown. Narrow the scope with smaller `up`/`down` values or focus on a specific subtree.');
+  }
+  lines.push('', tree);
+  const summary = lines.join('\n');
 
   return {
     content: [{ type: 'text', text: summary + issueGuidance('hierarchy', args.issueKey) }],

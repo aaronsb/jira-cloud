@@ -240,22 +240,27 @@ export class JiraClient {
     };
   }
 
-  /** Fetch children of given keys in one JQL query */
-  private async fetchChildren(parentKeys: string[]): Promise<Array<{ key: string; summary: string; issueType: string; status: string; parent: string }>> {
-    if (parentKeys.length === 0) return [];
+  /** Fetch children of given keys in one JQL query. Returns truncated flag if results hit the limit. */
+  private async fetchChildren(parentKeys: string[]): Promise<{ children: Array<{ key: string; summary: string; issueType: string; status: string; parent: string }>; truncated: boolean }> {
+    if (parentKeys.length === 0) return { children: [], truncated: false };
+    const maxResults = 100;
     const jql = `parent in (${parentKeys.join(', ')})`;
     const results = await this.client.issueSearch.searchForIssuesUsingJqlEnhancedSearch({
       jql,
-      maxResults: 100,
+      maxResults,
       fields: ['summary', 'issuetype', 'status', 'parent'],
     });
-    return (results.issues || []).map((issue: any) => ({
-      key: issue.key,
-      summary: issue.fields?.summary || '',
-      issueType: issue.fields?.issuetype?.name || '',
-      status: issue.fields?.status?.name || '',
-      parent: issue.fields?.parent?.key || '',
-    }));
+    const issues = results.issues || [];
+    return {
+      children: issues.map((issue: any) => ({
+        key: issue.key,
+        summary: issue.fields?.summary || '',
+        issueType: issue.fields?.issuetype?.name || '',
+        status: issue.fields?.status?.name || '',
+        parent: issue.fields?.parent?.key || '',
+      })),
+      truncated: issues.length >= maxResults,
+    };
   }
 
   /**
@@ -266,11 +271,13 @@ export class JiraClient {
     // 1. Fetch focus node
     const focus = await this.fetchNodeFields(issueKey);
 
-    // 2. Walk UP the parent chain
+    // 2. Walk UP the parent chain (with circular reference guard)
     const ancestors: Array<{ key: string; summary: string; issueType: string; status: string }> = [];
+    const visited = new Set<string>([focus.key]);
     let current = focus;
     for (let i = 0; i < upHops; i++) {
-      if (!current.parent) break;
+      if (!current.parent || visited.has(current.parent)) break;
+      visited.add(current.parent);
       const parentNode = await this.fetchNodeFields(current.parent);
       ancestors.unshift(parentNode); // prepend — root first
       current = parentNode;
@@ -289,15 +296,19 @@ export class JiraClient {
     };
 
     // BFS: expand children level by level
+    let truncated = false;
+    let actualDownDepth = 0;
     let frontier: NodeWithChildren[] = [focusNode];
     for (let level = 0; level < downHops; level++) {
       const parentKeys = frontier.map(n => n.key);
-      const children = await this.fetchChildren(parentKeys);
-      if (children.length === 0) break;
+      const result = await this.fetchChildren(parentKeys);
+      if (result.children.length === 0) break;
+      if (result.truncated) truncated = true;
+      actualDownDepth = level + 1;
 
       // Group children by parent
-      const byParent = new Map<string, typeof children>();
-      for (const child of children) {
+      const byParent = new Map<string, typeof result.children>();
+      for (const child of result.children) {
         const group = byParent.get(child.parent) || [];
         group.push(child);
         byParent.set(child.parent, group);
@@ -330,25 +341,44 @@ export class JiraClient {
       };
     }
 
-    // 5. Expand sibling children for ancestor nodes (so we see the full tree, not just the direct path)
-    // Walk down from root, expanding each ancestor's children
-    let node = root;
-    for (let i = 0; i < ancestors.length; i++) {
-      const siblingChildren = await this.fetchChildren([node.key]);
-      const existingChildKey = node.children[0]?.key;
-      const siblingNodes: NodeWithChildren[] = siblingChildren
-        .filter(c => c.key !== existingChildKey)
-        .map(c => ({ key: c.key, summary: c.summary, issueType: c.issueType, status: c.status, children: [] }));
-      node.children = [...node.children, ...siblingNodes];
-      // Continue down the ancestor path
-      node = node.children.find(c => c.key === existingChildKey) || node.children[0];
+    // 5. Expand sibling children for ancestor nodes (batched single call)
+    if (ancestors.length > 0) {
+      // Collect all ancestor keys for a single batched fetch
+      const ancestorKeys: string[] = [];
+      let walkNode = root;
+      for (let i = 0; i < ancestors.length; i++) {
+        ancestorKeys.push(walkNode.key);
+        walkNode = walkNode.children[0];
+      }
+      const siblingResult = await this.fetchChildren(ancestorKeys);
+      if (siblingResult.truncated) truncated = true;
+
+      // Group siblings by parent
+      const siblingsByParent = new Map<string, typeof siblingResult.children>();
+      for (const child of siblingResult.children) {
+        const group = siblingsByParent.get(child.parent) || [];
+        group.push(child);
+        siblingsByParent.set(child.parent, group);
+      }
+
+      // Distribute siblings to each ancestor node
+      let node = root;
+      for (let i = 0; i < ancestors.length; i++) {
+        const existingChildKey = node.children[0]?.key;
+        const siblings = (siblingsByParent.get(node.key) || [])
+          .filter(c => c.key !== existingChildKey)
+          .map(c => ({ key: c.key, summary: c.summary, issueType: c.issueType, status: c.status, children: [] }));
+        node.children = [...node.children, ...siblings];
+        node = node.children.find(c => c.key === existingChildKey) || node.children[0];
+      }
     }
 
     return {
       root,
       focusKey: focus.key,
       upDepth: ancestors.length,
-      downDepth: downHops,
+      downDepth: actualDownDepth,
+      truncated,
     };
   }
 

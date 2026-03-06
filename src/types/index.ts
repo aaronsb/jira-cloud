@@ -54,6 +54,7 @@ export interface HierarchyResult {
   focusKey: string;
   upDepth: number;
   downDepth: number;
+  truncated: boolean;
 }
 
 export interface AdfNode {
