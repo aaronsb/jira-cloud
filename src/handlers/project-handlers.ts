@@ -1,22 +1,10 @@
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import { JiraClient } from '../client/jira-client.js';
 import { MarkdownRenderer, ProjectData } from '../mcp/markdown-renderer.js';
+import { projectNextSteps } from '../utils/next-steps.js';
+import { normalizeArgs } from '../utils/normalize-args.js';
 
-/**
- * Project Handlers
- * 
- * This file implements handlers for the manage_jira_project tool.
- * 
- * Dependency Injection Pattern:
- * - All handler functions receive the jiraClient as their first parameter for consistency
- * - When a parameter is intentionally unused, it is prefixed with an underscore (_jiraClient)
- * - This pattern ensures consistent function signatures and satisfies ESLint rules for unused variables
- * - It also makes the code more maintainable by preserving the dependency injection pattern throughout
- */
-
-// Type definition for the consolidated project management tool
 type ManageJiraProjectArgs = {
   operation: 'get' | 'create' | 'update' | 'delete' | 'list';
   projectKey?: string;
@@ -27,29 +15,9 @@ type ManageJiraProjectArgs = {
   startAt?: number;
   maxResults?: number;
   expand?: string[];
-  include_status_counts?: boolean;
+  includeStatusCounts?: boolean;
 };
 
-
-// Helper function to normalize parameter names (support both snake_case and camelCase)
-function normalizeArgs(args: Record<string, unknown>): Record<string, unknown> {
-  const normalized: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(args)) {
-    // Convert snake_case to camelCase
-    if (key === 'project_key') {
-      normalized['projectKey'] = value;
-    } else if (key === 'include_status_counts') {
-      normalized['includeStatusCounts'] = value;
-    } else if (key === 'start_at') {
-      normalized['startAt'] = value;
-    } else if (key === 'max_results') {
-      normalized['maxResults'] = value;
-    } else {
-      normalized[key] = value;
-    }
-  }
-  return normalized;
-}
 
 // Validate the consolidated project management arguments
 function validateManageJiraProjectArgs(args: unknown): args is ManageJiraProjectArgs {
@@ -202,7 +170,7 @@ function validateManageJiraProjectArgs(args: unknown): args is ManageJiraProject
 // Handler functions for each operation
 async function handleGetProject(jiraClient: JiraClient, args: ManageJiraProjectArgs) {
   const projectKey = args.projectKey!;
-  const includeStatusCounts = args.include_status_counts !== false; // Default to true
+  const includeStatusCounts = args.includeStatusCounts !== false; // Default to true
   
   // Parse expansion options
   const expansionOptions: Record<string, boolean> = {};
@@ -232,7 +200,7 @@ async function handleGetProject(jiraClient: JiraClient, args: ManageJiraProjectA
   if (includeStatusCounts) {
     try {
       // Get issue counts by status for this project
-      const searchResult = await jiraClient.searchIssues(`project = ${projectKey}`, 0, 0);
+      const searchResult = await jiraClient.searchIssues(`project = ${projectKey}`, 0, 100);
 
       // Count issues by status
       const statusCounts: Record<string, number> = {};
@@ -302,107 +270,29 @@ async function handleGetProject(jiraClient: JiraClient, args: ManageJiraProjectA
     content: [
       {
         type: 'text',
-        text: markdown,
+        text: markdown + projectNextSteps('get', projectKey),
       },
     ],
   };
 }
 
 async function handleCreateProject(_jiraClient: JiraClient, _args: ManageJiraProjectArgs) {
-  // Note: This is a placeholder. The current JiraClient doesn't have a createProject method.
-  // You would need to implement this in the JiraClient class.
-  throw new McpError(
-    ErrorCode.InternalError,
-    'Create project operation is not yet implemented'
-  );
-
-  // When implemented, it would look something like this:
-  /*
-  const result = await _jiraClient.createProject({
-    key: _args.key!,
-    name: _args.name!,
-    description: _args.description,
-    lead: _args.lead
-  });
-  
-  // Get the created project to return
-  const createdProject = await _jiraClient.getProject(result.key);
-  const formattedResponse = ProjectFormatter.formatProject(createdProject);
-
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify(formattedResponse, null, 2),
-      },
-    ],
-  };
-  */
+  throw new McpError(ErrorCode.InternalError, 'Create project operation is not yet implemented');
 }
 
 async function handleUpdateProject(_jiraClient: JiraClient, _args: ManageJiraProjectArgs) {
-  // Note: This is a placeholder. The current JiraClient doesn't have an updateProject method.
-  // You would need to implement this in the JiraClient class.
-  throw new McpError(
-    ErrorCode.InternalError,
-    'Update project operation is not yet implemented'
-  );
-
-  // When implemented, it would look something like this:
-  /*
-  await _jiraClient.updateProject(
-    _args.projectKey!,
-    _args.name,
-    _args.description,
-    _args.lead
-  );
-
-  // Get the updated project to return
-  const updatedProject = await _jiraClient.getProject(_args.projectKey!);
-  const formattedResponse = ProjectFormatter.formatProject(updatedProject);
-
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify(formattedResponse, null, 2),
-      },
-    ],
-  };
-  */
+  throw new McpError(ErrorCode.InternalError, 'Update project operation is not yet implemented');
 }
 
 async function handleDeleteProject(_jiraClient: JiraClient, _args: ManageJiraProjectArgs) {
-  // Note: This is a placeholder. The current JiraClient doesn't have a deleteProject method.
-  // You would need to implement this in the JiraClient class.
-  throw new McpError(
-    ErrorCode.InternalError,
-    'Delete project operation is not yet implemented'
-  );
-
-  // When implemented, it would look something like this:
-  /*
-  await _jiraClient.deleteProject(_args.projectKey!);
-
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify({
-          success: true,
-          message: `Project ${_args.projectKey} has been deleted successfully.`,
-        }, null, 2),
-      },
-    ],
-  };
-  */
+  throw new McpError(ErrorCode.InternalError, 'Delete project operation is not yet implemented');
 }
 
 async function handleListProjects(jiraClient: JiraClient, args: ManageJiraProjectArgs) {
   // Set default pagination values
   const startAt = args.startAt !== undefined ? args.startAt : 0;
   const maxResults = args.maxResults !== undefined ? args.maxResults : 50;
-  const includeStatusCounts = args.include_status_counts === true;
+  const includeStatusCounts = args.includeStatusCounts === true;
   
   // Get all projects
   const projects = await jiraClient.listProjects();
@@ -424,7 +314,7 @@ async function handleListProjects(jiraClient: JiraClient, args: ManageJiraProjec
     for (const project of projectDataList) {
       try {
         // Get issue counts by status for this project
-        const searchResult = await jiraClient.searchIssues(`project = ${project.key}`, 0, 0);
+        const searchResult = await jiraClient.searchIssues(`project = ${project.key}`, 0, 100);
 
         // Count issues by status
         const statusCounts: Record<string, number> = {};
@@ -462,6 +352,8 @@ async function handleListProjects(jiraClient: JiraClient, args: ManageJiraProjec
     markdown += `Showing all ${projectDataList.length} project${projectDataList.length !== 1 ? 's' : ''}`;
   }
 
+  markdown += projectNextSteps('list');
+
   return {
     content: [
       {
@@ -474,8 +366,7 @@ async function handleListProjects(jiraClient: JiraClient, args: ManageJiraProjec
 
 
 // Main handler function
-export async function setupProjectHandlers(
-  server: Server,
+export async function handleProjectRequest(
   jiraClient: JiraClient,
   request: {
     params: {

@@ -9,13 +9,13 @@ import { JiraClient } from '../client/jira-client.js';
  * @returns Object containing resource handlers
  */
 export function setupResourceHandlers(jiraClient: JiraClient) {
+  const toolResourceHandler = setupToolResourceHandlers();
+
   return {
     /**
      * Lists available static resources
      */
     async listResources() {
-      // Get tool resources
-      const toolResourceHandler = setupToolResourceHandlers();
       const toolResources = await toolResourceHandler.listToolResources();
       
       return {
@@ -102,7 +102,6 @@ export function setupResourceHandlers(jiraClient: JiraClient) {
         // Handle tool resources
         const toolMatch = uri.match(/^jira:\/\/tools\/([^/]+)\/documentation$/);
         if (toolMatch) {
-          const toolResourceHandler = setupToolResourceHandlers();
           return await toolResourceHandler.readToolResource(uri);
         }
         
@@ -140,19 +139,10 @@ async function getInstanceSummary(jiraClient: JiraClient) {
       )
     )).flat();
     
-    // Get project types distribution
-    const projectTypes: Record<string, number> = {};
-    projects.forEach(project => {
-      const projectType = project.key.includes('SD') ? 'service_desk' : 'software';
-      projectTypes[projectType] = (projectTypes[projectType] || 0) + 1;
-    });
-    
-    // Format the response
     const summary = {
       totalProjects: projects.length,
       totalBoards: boards.length,
       activeSprintsCount: sprints.filter(s => s.state === 'active').length,
-      projectTypes,
       recentActivity: {
         timestamp: new Date().toISOString()
       }
@@ -181,20 +171,11 @@ async function getProjectDistribution(jiraClient: JiraClient) {
     // Get projects
     const projects = await jiraClient.listProjects();
     
-    // Calculate distributions
     const distribution = {
-      byType: {} as Record<string, number>,
       byLead: {} as Record<string, number>,
       total: projects.length
     };
-    
-    // Calculate type distribution
-    projects.forEach(project => {
-      const projectType = project.key.includes('SD') ? 'service_desk' : 'software';
-      distribution.byType[projectType] = (distribution.byType[projectType] || 0) + 1;
-    });
-    
-    // Calculate lead distribution
+
     projects.forEach(project => {
       if (project.lead) {
         distribution.byLead[project.lead] = (distribution.byLead[project.lead] || 0) + 1;

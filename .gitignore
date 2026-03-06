@@ -31,6 +31,14 @@ Thumbs.db
 .directory
 Desktop.ini
 
+# Claude Code
+.claude/
+
+# Cloudflare Workers (experimental)
+wrangler.jsonc
+worker-configuration.d.ts
+tsconfig.worker.json
+
 # Misc
 .eslintcache
 .cache/

@@ -1,22 +1,10 @@
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import { JiraClient } from '../client/jira-client.js';
 import { MarkdownRenderer, FilterData } from '../mcp/markdown-renderer.js';
+import { filterNextSteps } from '../utils/next-steps.js';
+import { normalizeArgs } from '../utils/normalize-args.js';
 
-/**
- * Filter Handlers
- * 
- * This file implements handlers for the manage_jira_filter tool.
- * 
- * Dependency Injection Pattern:
- * - All handler functions receive the jiraClient as their first parameter for consistency
- * - When a parameter is intentionally unused, it is prefixed with an underscore (_jiraClient)
- * - This pattern ensures consistent function signatures and satisfies ESLint rules for unused variables
- * - It also makes the code more maintainable by preserving the dependency injection pattern throughout
- */
-
-// Type definition for the consolidated filter management tool
 type ManageJiraFilterArgs = {
   operation: 'get' | 'create' | 'update' | 'delete' | 'list' | 'execute_filter' | 'execute_jql';
   filterId?: string;
@@ -33,26 +21,6 @@ type ManageJiraFilterArgs = {
   }>;
   expand?: string[];
 };
-
-// Helper function to normalize parameter names (support both snake_case and camelCase)
-function normalizeArgs(args: Record<string, unknown>): Record<string, unknown> {
-  const normalized: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(args)) {
-    // Convert snake_case to camelCase
-    if (key === 'filter_id') {
-      normalized['filterId'] = value;
-    } else if (key === 'share_permissions') {
-      normalized['sharePermissions'] = value;
-    } else if (key === 'start_at') {
-      normalized['startAt'] = value;
-    } else if (key === 'max_results') {
-      normalized['maxResults'] = value;
-    } else {
-      normalized[key] = value;
-    }
-  }
-  return normalized;
-}
 
 // Validate the consolidated filter management arguments
 function validateManageJiraFilterArgs(args: unknown): args is ManageJiraFilterArgs {
@@ -261,7 +229,7 @@ async function handleGetFilter(jiraClient: JiraClient, args: ManageJiraFilterArg
       content: [
         {
           type: 'text',
-          text: markdown,
+          text: markdown + filterNextSteps('get', filterId),
         },
       ],
     };
@@ -333,6 +301,8 @@ async function handleListFilters(jiraClient: JiraClient, args: ManageJiraFilterA
     markdown += `Showing all ${filterDataList.length} filter${filterDataList.length !== 1 ? 's' : ''}`;
   }
 
+  markdown += filterNextSteps('list');
+
   return {
     content: [
       {
@@ -344,98 +314,15 @@ async function handleListFilters(jiraClient: JiraClient, args: ManageJiraFilterA
 }
 
 async function handleCreateFilter(_jiraClient: JiraClient, _args: ManageJiraFilterArgs) {
-  // Note: This is a placeholder. The current JiraClient doesn't have a createFilter method.
-  // You would need to implement this in the JiraClient class.
-  throw new McpError(
-    ErrorCode.InternalError,
-    'Create filter operation is not yet implemented'
-  );
-
-  // When implemented, it would look something like this:
-  /*
-  const result = await _jiraClient.createFilter({
-    name: _args.name!,
-    jql: _args.jql!,
-    description: _args.description,
-    favourite: _args.favourite,
-    sharePermissions: _args.sharePermissions
-  });
-  
-  // Get the created filter to return
-  const createdFilter = await _jiraClient.getFilter(result.id);
-  const formattedResponse = FilterFormatter.formatFilter(createdFilter);
-
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify(formattedResponse, null, 2),
-      },
-    ],
-  };
-  */
+  throw new McpError(ErrorCode.InternalError, 'Create filter operation is not yet implemented');
 }
 
 async function handleUpdateFilter(_jiraClient: JiraClient, _args: ManageJiraFilterArgs) {
-  // Note: This is a placeholder. The current JiraClient doesn't have an updateFilter method.
-  // You would need to implement this in the JiraClient class.
-  throw new McpError(
-    ErrorCode.InternalError,
-    'Update filter operation is not yet implemented'
-  );
-
-  // When implemented, it would look something like this:
-  /*
-  await _jiraClient.updateFilter(
-    _args.filterId!,
-    {
-      name: _args.name,
-      jql: _args.jql,
-      description: _args.description,
-      favourite: _args.favourite,
-      sharePermissions: _args.sharePermissions
-    }
-  );
-
-  // Get the updated filter to return
-  const updatedFilter = await _jiraClient.getFilter(_args.filterId!);
-  const formattedResponse = FilterFormatter.formatFilter(updatedFilter);
-
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify(formattedResponse, null, 2),
-      },
-    ],
-  };
-  */
+  throw new McpError(ErrorCode.InternalError, 'Update filter operation is not yet implemented');
 }
 
 async function handleDeleteFilter(_jiraClient: JiraClient, _args: ManageJiraFilterArgs) {
-  // Note: This is a placeholder. The current JiraClient doesn't have a deleteFilter method.
-  // You would need to implement this in the JiraClient class.
-  throw new McpError(
-    ErrorCode.InternalError,
-    'Delete filter operation is not yet implemented'
-  );
-
-  // When implemented, it would look something like this:
-  /*
-  await _jiraClient.deleteFilter(_args.filterId!);
-
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify({
-          success: true,
-          message: `Filter ${_args.filterId} has been deleted successfully.`,
-        }, null, 2),
-      },
-    ],
-  };
-  */
+  throw new McpError(ErrorCode.InternalError, 'Delete filter operation is not yet implemented');
 }
 
 async function handleExecuteFilter(jiraClient: JiraClient, _args: ManageJiraFilterArgs) {
@@ -460,7 +347,7 @@ async function handleExecuteFilter(jiraClient: JiraClient, _args: ManageJiraFilt
     content: [
       {
         type: 'text',
-        text: markdown,
+        text: markdown + filterNextSteps('execute_filter', filterId),
       },
     ],
   };
@@ -509,7 +396,7 @@ async function handleExecuteJql(jiraClient: JiraClient, args: ManageJiraFilterAr
       content: [
         {
           type: 'text',
-          text: markdown,
+          text: markdown + filterNextSteps('execute_jql', undefined, args.jql),
         },
       ],
     };
@@ -523,8 +410,7 @@ async function handleExecuteJql(jiraClient: JiraClient, args: ManageJiraFilterAr
 }
 
 // Main handler function
-export async function setupFilterHandlers(
-  server: Server,
+export async function handleFilterRequest(
   jiraClient: JiraClient,
   request: {
     params: {

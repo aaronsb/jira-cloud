@@ -1,117 +1,76 @@
 # LLM Installation Guide for Jira Cloud MCP Server
 
-This guide is specifically designed for Large Language Models (LLMs) like Cline to help with automated installation and configuration of the Jira Cloud MCP server.
+Installation and configuration guide for `@aaronsb/jira-cloud-mcp`.
 
-## Quick Installation
+## Installation
 
-### Recommended Installation Method
-
-Add to MCP settings (no installation required - uses npx):
+Add to MCP settings (no install required — uses npx):
 
 ```json
 {
   "mcpServers": {
-    "@aaronsb/jira-cloud-mcp": {
+    "jira-cloud": {
       "command": "npx",
       "args": ["-y", "@aaronsb/jira-cloud-mcp"],
       "env": {
         "JIRA_API_TOKEN": "<user-jira-api-token>",
         "JIRA_EMAIL": "<user-jira-email>",
-        "JIRA_HOST": "<user-jira-host>"
-      },
-      "autoApprove": [],
-      "disabled": false
+        "JIRA_HOST": "https://<instance>.atlassian.net"
+      }
     }
   }
 }
 ```
 
-### Required Environment Variables
+## Required Environment Variables
 
-This MCP server requires the following environment variables:
+| Variable | Description | How to get it |
+|----------|-------------|---------------|
+| `JIRA_API_TOKEN` | Jira API token | https://id.atlassian.com/manage/api-tokens |
+| `JIRA_EMAIL` | Atlassian account email | Your login email |
+| `JIRA_HOST` | Jira instance URL | `https://your-instance.atlassian.net` (include `https://`) |
 
-1. `JIRA_API_TOKEN`: The user's Jira API token
-   - Can be generated at https://id.atlassian.com/manage/api-tokens
-   - Ask the user: "Please provide your Jira API token. You can generate one at https://id.atlassian.com/manage/api-tokens"
+## Tools
 
-2. `JIRA_EMAIL`: The email associated with the user's Jira account
-   - Ask the user: "Please provide the email address associated with your Jira account"
+The server exposes 5 tools, each with an `operation` parameter:
 
-3. `JIRA_HOST`: The Jira instance hostname
-   - Format: "your-instance.atlassian.net" (without https://)
-   - Ask the user: "Please provide your Jira instance hostname (e.g., 'your-instance.atlassian.net' without the 'https://' prefix)"
+| Tool | Operations |
+|------|-----------|
+| `manage_jira_issue` | `get`, `create`, `update`, `transition`, `comment`, `link` |
+| `manage_jira_filter` | `get`, `list`, `create`, `update`, `delete`, `execute_jql`, `execute_filter` |
+| `manage_jira_project` | `get`, `list` |
+| `manage_jira_board` | `get`, `list`, `get_configuration` |
+| `manage_jira_sprint` | `get`, `list`, `create`, `update`, `delete`, `manage_issues` |
 
-## Configuration Locations
+Each tool also has MCP resource documentation at `jira://tools/{tool_name}/documentation`.
 
-The MCP settings file location depends on the user's environment:
-
-### VSCode
-- Windows: `%APPDATA%\Code\User\globalStorage\saoudrizwan.claude-dev\settings\cline_mcp_settings.json`
-- macOS: `~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
-- Linux: `~/.config/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
-
-### Claude Desktop App
-- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
-- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
-- Linux: `~/.config/Claude/claude_desktop_config.json`
-
-## Multiple Jira Instances
-
-If the user needs to connect to multiple Jira instances, use a configuration like this:
+## Multiple Instances
 
 ```json
 {
   "mcpServers": {
-    "jira-instance1": {
+    "jira-prod": {
       "command": "npx",
       "args": ["-y", "@aaronsb/jira-cloud-mcp"],
       "env": {
-        "JIRA_API_TOKEN": "<user-jira-api-token-1>",
-        "JIRA_EMAIL": "<user-jira-email-1>",
-        "JIRA_HOST": "<user-jira-host-1>"
-      },
-      "autoApprove": [],
-      "disabled": false
+        "JIRA_API_TOKEN": "<token-1>",
+        "JIRA_EMAIL": "<email-1>",
+        "JIRA_HOST": "https://prod.atlassian.net"
+      }
     },
-    "jira-instance2": {
+    "jira-dev": {
       "command": "npx",
       "args": ["-y", "@aaronsb/jira-cloud-mcp"],
       "env": {
-        "JIRA_API_TOKEN": "<user-jira-api-token-2>",
-        "JIRA_EMAIL": "<user-jira-email-2>",
-        "JIRA_HOST": "<user-jira-host-2>"
-      },
-      "autoApprove": [],
-      "disabled": false
+        "JIRA_API_TOKEN": "<token-2>",
+        "JIRA_EMAIL": "<email-2>",
+        "JIRA_HOST": "https://dev.atlassian.net"
+      }
     }
   }
 }
 ```
 
-## Troubleshooting
-
-### Common Issues
-
-1. **Authentication Errors**
-   - Verify the API token is correct
-   - Check that the email matches the Atlassian account
-   - Ensure the host URL is correct (should not include 'https://')
-
-2. **npx Errors**
-   - Ensure Node.js 20 or higher is installed
-   - Try clearing npm cache: `npm cache clean --force`
-   - Try installing globally instead: `npm install -g @aaronsb/jira-cloud-mcp`
-
-3. **Permission Issues**
-   - Check Jira permissions for the user account
-   - Verify project access rights
-
 ## Verification
 
-To verify the installation is working correctly, suggest the user try a simple command like listing Jira projects:
-
-```
-Use the jira-cloud MCP server to list all projects in your Jira instance.
-```
-
-This should return a list of projects if the configuration is correct.
+After setup, try: `manage_jira_project` with `operation: "list"` to confirm connectivity.

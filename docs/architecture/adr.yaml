@@ -1,0 +1,33 @@
+# ADR Configuration for @aaronsb/jira-cloud-mcp
+
+project_name: Jira Cloud MCP Server
+
+domains:
+  core:
+    range: [100, 199]
+    name: Core
+    description: Server architecture, handler patterns, client design
+    folder: core
+
+  tools:
+    range: [200, 299]
+    name: Tool Design
+    description: MCP tool API surface, LLM interaction patterns, schema design
+    folder: tools
+
+statuses:
+  - Draft
+  - Proposed
+  - Accepted
+  - Superseded
+  - Deprecated
+
+defaults:
+  deciders: [aaronsb]
+  status: Draft
+
+legacy:
+  range: [1, 99]
+  label: "Legacy"
+
+viewer: cat {file}

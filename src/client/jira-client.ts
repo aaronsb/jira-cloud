@@ -53,8 +53,9 @@ export class JiraClient {
     };
   }
 
-  async getIssue(issueKey: string, includeComments = false, includeAttachments = false): Promise<JiraIssueDetails> {
-    const fields = [
+  /** Shared field list for issue queries */
+  private get issueFields(): string[] {
+    return [
       'summary',
       'description',
       'parent',
@@ -68,6 +69,34 @@ export class JiraClient {
       'timeestimate',
       'issuelinks',
     ];
+  }
+
+  /** Maps a raw Jira API issue to our JiraIssueDetails shape */
+  private mapIssueFields(issue: any): JiraIssueDetails {
+    const fields = issue.fields ?? issue.fields;
+    return {
+      key: issue.key,
+      summary: fields?.summary,
+      description: (issue as any).renderedFields?.description || '',
+      parent: fields?.parent?.key || null,
+      assignee: fields?.assignee?.displayName || null,
+      reporter: fields?.reporter?.displayName || '',
+      status: fields?.status?.name || '',
+      resolution: fields?.resolution?.name || null,
+      dueDate: fields?.duedate || null,
+      startDate: fields?.[this.customFields.startDate] || null,
+      storyPoints: fields?.[this.customFields.storyPoints] || null,
+      timeEstimate: fields?.timeestimate || null,
+      issueLinks: (fields?.issuelinks || []).map((link: any) => ({
+        type: link.type?.name || '',
+        outward: link.outwardIssue?.key || null,
+        inward: link.inwardIssue?.key || null,
+      })),
+    };
+  }
+
+  async getIssue(issueKey: string, includeComments = false, includeAttachments = false): Promise<JiraIssueDetails> {
+    const fields = [...this.issueFields];
 
     if (includeAttachments) {
       fields.push('attachment');
@@ -80,26 +109,7 @@ export class JiraClient {
     };
 
     const issue = await this.client.issues.getIssue(params);
-
-    const issueDetails: JiraIssueDetails = {
-      key: issue.key,
-      summary: issue.fields.summary,
-      description: (issue as any).renderedFields?.description || '',
-      parent: issue.fields.parent?.key || null,
-      assignee: issue.fields.assignee?.displayName || null,
-      reporter: issue.fields.reporter?.displayName || '',
-      status: issue.fields.status?.name || '',
-      resolution: issue.fields.resolution?.name || null,
-      dueDate: issue.fields.duedate || null,
-      startDate: issue.fields[this.customFields.startDate] || null,
-      storyPoints: issue.fields[this.customFields.storyPoints] || null,
-      timeEstimate: issue.fields.timeestimate || null,
-      issueLinks: (issue.fields.issuelinks || []).map(link => ({
-        type: link.type?.name || '',
-        outward: link.outwardIssue?.key || null,
-        inward: link.inwardIssue?.key || null,
-      })),
-    };
+    const issueDetails = this.mapIssueFields(issue);
 
     if (includeComments && issue.fields.comment?.comments) {
       issueDetails.comments = issue.fields.comment.comments
@@ -180,41 +190,11 @@ export class JiraClient {
 
     const searchResults = await this.client.issueSearch.searchForIssuesUsingJql({
       jql: filter.jql,
-      fields: [
-        'summary',
-        'description',
-        'assignee',
-        'reporter',
-        'status',
-        'resolution',
-        'duedate',
-        this.customFields.startDate,
-        this.customFields.storyPoints,
-        'timeestimate',
-        'issuelinks',
-      ],
+      fields: this.issueFields,
       expand: 'renderedFields'
     });
 
-    return (searchResults.issues || []).map(issue => ({
-      key: issue.key,
-      summary: issue.fields.summary,
-      description: (issue as any).renderedFields?.description || '',
-      parent: issue.fields.parent?.key || null,
-      assignee: issue.fields.assignee?.displayName || null,
-      reporter: issue.fields.reporter?.displayName || '',
-      status: issue.fields.status?.name || '',
-      resolution: issue.fields.resolution?.name || null,
-      dueDate: issue.fields.duedate || null,
-      startDate: issue.fields[this.customFields.startDate] || null,
-      storyPoints: issue.fields[this.customFields.storyPoints] || null,
-      timeEstimate: issue.fields.timeestimate || null,
-      issueLinks: (issue.fields.issuelinks || []).map(link => ({
-        type: link.type?.name || '',
-        outward: link.outwardIssue?.key || null,
-        inward: link.inwardIssue?.key || null,
-      })),
-    }));
+    return (searchResults.issues || []).map(issue => this.mapIssueFields(issue));
   }
 
   async updateIssue(params: {
@@ -268,42 +248,11 @@ export class JiraClient {
       const searchResults = await this.client.issueSearch.searchForIssuesUsingJqlEnhancedSearch({
         jql: cleanJql,
         maxResults: Math.min(maxResults, 100),
-        fields: [
-          'summary',
-          'description',
-          'assignee',
-          'reporter',
-          'status',
-          'resolution',
-          'duedate',
-          'parent',
-          this.customFields.startDate,
-          this.customFields.storyPoints,
-          'timeestimate',
-          'issuelinks',
-        ],
+        fields: this.issueFields,
         expand: 'renderedFields',
       });
 
-      const issues = (searchResults.issues || []).map(issue => ({
-        key: issue.key,
-        summary: issue.fields?.summary,
-        description: (issue as any).renderedFields?.description || '',
-        parent: issue.fields?.parent?.key || null,
-        assignee: issue.fields?.assignee?.displayName || null,
-        reporter: issue.fields?.reporter?.displayName || '',
-        status: issue.fields?.status?.name || '',
-        resolution: issue.fields?.resolution?.name || null,
-        dueDate: issue.fields?.duedate || null,
-        startDate: issue.fields?.[this.customFields.startDate] || null,
-        storyPoints: issue.fields?.[this.customFields.storyPoints] || null,
-        timeEstimate: issue.fields?.timeestimate || null,
-        issueLinks: (issue.fields?.issuelinks || []).map(link => ({
-          type: link.type?.name || '',
-          outward: link.outwardIssue?.key || null,
-          inward: link.inwardIssue?.key || null,
-        })),
-      }));
+      const issues = (searchResults.issues || []).map(issue => this.mapIssueFields(issue));
 
       // Note: Enhanced search API uses token-based pagination, not offset-based
       // The total count is not available in the new API

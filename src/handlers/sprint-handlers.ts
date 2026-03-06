@@ -1,22 +1,10 @@
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import { JiraClient } from '../client/jira-client.js';
 import { MarkdownRenderer } from '../mcp/markdown-renderer.js';
+import { sprintNextSteps } from '../utils/next-steps.js';
+import { normalizeArgs } from '../utils/normalize-args.js';
 
-/**
- * Sprint Handlers
- * 
- * This file implements handlers for the manage_jira_sprint tool.
- * 
- * Dependency Injection Pattern:
- * - All handler functions receive the jiraClient as their first parameter for consistency
- * - When a parameter is intentionally unused, it is prefixed with an underscore (_jiraClient)
- * - This pattern ensures consistent function signatures and satisfies ESLint rules for unused variables
- * - It also makes the code more maintainable by preserving the dependency injection pattern throughout
- */
-
-// Type definition for the consolidated sprint management tool
 type ManageJiraSprintArgs = {
   operation: 'get' | 'create' | 'update' | 'delete' | 'list' | 'manage_issues';
   sprintId?: number;
@@ -32,30 +20,6 @@ type ManageJiraSprintArgs = {
   remove?: string[];
   expand?: string[];
 };
-
-// Helper function to normalize parameter names (support both snake_case and camelCase)
-function normalizeArgs(args: Record<string, unknown>): Record<string, unknown> {
-  const normalized: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(args)) {
-    // Convert snake_case to camelCase
-    if (key === 'sprint_id') {
-      normalized['sprintId'] = value;
-    } else if (key === 'board_id') {
-      normalized['boardId'] = value;
-    } else if (key === 'start_date') {
-      normalized['startDate'] = value;
-    } else if (key === 'end_date') {
-      normalized['endDate'] = value;
-    } else if (key === 'max_results') {
-      normalized['maxResults'] = value;
-    } else if (key === 'start_at') {
-      normalized['startAt'] = value;
-    } else {
-      normalized[key] = value;
-    }
-  }
-  return normalized;
-}
 
 // Validate the consolidated sprint management arguments
 function validateManageJiraSprintArgs(args: unknown): args is ManageJiraSprintArgs {
@@ -307,7 +271,7 @@ async function handleGetSprint(jiraClient: JiraClient, args: ManageJiraSprintArg
     content: [
       {
         type: 'text',
-        text: markdown,
+        text: markdown + sprintNextSteps('get', args.sprintId, sprint.boardId, sprint.state),
       },
     ],
   };
@@ -338,7 +302,7 @@ async function handleCreateSprint(jiraClient: JiraClient, args: ManageJiraSprint
     content: [
       {
         type: 'text',
-        text: `# Sprint Created\n\n${markdown}`,
+        text: `# Sprint Created\n\n${markdown}${sprintNextSteps('create', response.id, args.boardId)}`,
       },
     ],
   };
@@ -385,7 +349,7 @@ async function handleUpdateSprint(jiraClient: JiraClient, args: ManageJiraSprint
       content: [
         {
           type: 'text',
-          text: `# Sprint Updated\n\n${markdown}`,
+          text: `# Sprint Updated\n\n${markdown}${sprintNextSteps('update', args.sprintId, updatedSprint.boardId, updatedSprint.state)}`,
         },
       ],
     };
@@ -417,7 +381,7 @@ async function handleDeleteSprint(jiraClient: JiraClient, args: ManageJiraSprint
     content: [
       {
         type: 'text',
-        text: `# Sprint Deleted\n\nSprint ${args.sprintId} has been deleted successfully.`,
+        text: `# Sprint Deleted\n\nSprint ${args.sprintId} has been deleted successfully.${sprintNextSteps('delete', undefined, args.boardId)}`,
       },
     ],
   };
@@ -472,6 +436,8 @@ async function handleListSprints(jiraClient: JiraClient, args: ManageJiraSprintA
   } else {
     lines.push(`Showing all ${response.sprints.length} sprint${response.sprints.length !== 1 ? 's' : ''}`);
   }
+
+  lines.push(sprintNextSteps('list', undefined, args.boardId));
 
   return {
     content: [
@@ -529,7 +495,7 @@ async function handleManageIssues(jiraClient: JiraClient, args: ManageJiraSprint
       content: [
         {
           type: 'text',
-          text: `# Sprint Issues Updated\n\n${markdown}`,
+          text: `# Sprint Issues Updated\n\n${markdown}${sprintNextSteps('manage_issues', args.sprintId, sprint.boardId, sprint.state)}`,
         },
       ],
     };
@@ -553,58 +519,8 @@ async function handleManageIssues(jiraClient: JiraClient, args: ManageJiraSprint
   }
 }
 
-// Legacy handler function for backward compatibility
-async function handleLegacySprintTools(name: string, args: Record<string, unknown>, jiraClient: JiraClient) {
-  console.error(`Handling legacy sprint tool: ${name}`);
-  const normalizedArgs = normalizeArgs(args);
-
-  // Map legacy tool to consolidated tool operation
-  let operation: ManageJiraSprintArgs['operation'];
-  
-  if (name === 'create_jira_sprint') {
-    operation = 'create';
-  } else if (name === 'get_jira_sprint') {
-    operation = 'get';
-  } else if (name === 'list_jira_sprints') {
-    operation = 'list';
-  } else if (name === 'update_jira_sprint') {
-    operation = 'update';
-  } else if (name === 'delete_jira_sprint') {
-    operation = 'delete';
-  } else if (name === 'update_sprint_issues') {
-    operation = 'manage_issues';
-  } else {
-    throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
-  }
-
-  // Create consolidated args
-  const consolidatedArgs: ManageJiraSprintArgs = {
-    operation,
-    ...normalizedArgs as any
-  };
-
-  // Process the operation
-  switch (operation) {
-    case 'get':
-      return await handleGetSprint(jiraClient, consolidatedArgs);
-    case 'create':
-      return await handleCreateSprint(jiraClient, consolidatedArgs);
-    case 'update':
-      return await handleUpdateSprint(jiraClient, consolidatedArgs);
-    case 'delete':
-      return await handleDeleteSprint(jiraClient, consolidatedArgs);
-    case 'list':
-      return await handleListSprints(jiraClient, consolidatedArgs);
-    case 'manage_issues':
-      return await handleManageIssues(jiraClient, consolidatedArgs);
-    default:
-      throw new McpError(ErrorCode.MethodNotFound, `Unknown operation: ${operation}`);
-  }
-}
-
 // Main handler function
-export async function setupSprintHandlers(
-  server: Server,
+export async function handleSprintRequest(
   jiraClient: JiraClient,
   request: {
     params: {
@@ -622,16 +538,6 @@ export async function setupSprintHandlers(
       ErrorCode.InvalidParams,
       'Missing arguments. Please provide the required parameters for this operation.'
     );
-  }
-
-  // Handle legacy sprint tools for backward compatibility
-  if (name === 'create_jira_sprint' || 
-      name === 'get_jira_sprint' || 
-      name === 'list_jira_sprints' || 
-      name === 'update_jira_sprint' || 
-      name === 'delete_jira_sprint' || 
-      name === 'update_sprint_issues') {
-    return await handleLegacySprintTools(name, args, jiraClient);
   }
 
   // Handle the consolidated sprint management tool

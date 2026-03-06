@@ -1,22 +1,10 @@
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import { JiraClient } from '../client/jira-client.js';
 import { MarkdownRenderer, BoardData } from '../mcp/markdown-renderer.js';
+import { boardNextSteps } from '../utils/next-steps.js';
+import { normalizeArgs } from '../utils/normalize-args.js';
 
-/**
- * Board Handlers
- * 
- * This file implements handlers for the manage_jira_board tool.
- * 
- * Dependency Injection Pattern:
- * - All handler functions receive the jiraClient as their first parameter for consistency
- * - When a parameter is intentionally unused, it is prefixed with an underscore (_jiraClient)
- * - This pattern ensures consistent function signatures and satisfies ESLint rules for unused variables
- * - It also makes the code more maintainable by preserving the dependency injection pattern throughout
- */
-
-// Type definition for the consolidated board management tool
 type ManageJiraBoardArgs = {
   operation: 'get' | 'list' | 'create' | 'update' | 'delete' | 'get_configuration';
   boardId?: number;
@@ -26,30 +14,8 @@ type ManageJiraBoardArgs = {
   startAt?: number;
   maxResults?: number;
   expand?: string[];
-  include_sprints?: boolean;
+  includeSprints?: boolean;
 };
-
-// Helper function to normalize parameter names (support both snake_case and camelCase)
-function normalizeArgs(args: Record<string, unknown>): Record<string, unknown> {
-  const normalized: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(args)) {
-    // Convert snake_case to camelCase
-    if (key === 'board_id') {
-      normalized['boardId'] = value;
-    } else if (key === 'include_sprints') {
-      normalized['includeSprints'] = value;
-    } else if (key === 'project_key') {
-      normalized['projectKey'] = value;
-    } else if (key === 'start_at') {
-      normalized['startAt'] = value;
-    } else if (key === 'max_results') {
-      normalized['maxResults'] = value;
-    } else {
-      normalized[key] = value;
-    }
-  }
-  return normalized;
-}
 
 // Validate the consolidated board management arguments
 function validateManageJiraBoardArgs(args: unknown): args is ManageJiraBoardArgs {
@@ -168,7 +134,7 @@ async function handleGetBoard(jiraClient: JiraClient, args: ManageJiraBoardArgs)
   }
   
   // If include_sprints is true, add sprints to expansions
-  if (args.include_sprints === true) {
+  if (args.includeSprints === true) {
     expansionOptions.sprints = true;
   }
   
@@ -220,7 +186,7 @@ async function handleGetBoard(jiraClient: JiraClient, args: ManageJiraBoardArgs)
     content: [
       {
         type: 'text',
-        text: markdown,
+        text: markdown + boardNextSteps('get', boardId),
       },
     ],
   };
@@ -230,7 +196,7 @@ async function handleListBoards(jiraClient: JiraClient, args: ManageJiraBoardArg
   // Set default pagination values
   const startAt = args.startAt !== undefined ? args.startAt : 0;
   const maxResults = args.maxResults !== undefined ? args.maxResults : 50;
-  const includeSprints = args.include_sprints === true;
+  const includeSprints = args.includeSprints === true;
   
   // Get all boards
   const boards = await jiraClient.listBoards();
@@ -289,6 +255,8 @@ async function handleListBoards(jiraClient: JiraClient, args: ManageJiraBoardArg
     markdown += `Showing all ${boardDataList.length} board${boardDataList.length !== 1 ? 's' : ''}`;
   }
 
+  markdown += boardNextSteps('list');
+
   return {
     content: [
       {
@@ -300,119 +268,24 @@ async function handleListBoards(jiraClient: JiraClient, args: ManageJiraBoardArg
 }
 
 async function handleCreateBoard(_jiraClient: JiraClient, _args: ManageJiraBoardArgs) {
-  // Note: This is a placeholder. The current JiraClient doesn't have a createBoard method.
-  // You would need to implement this in the JiraClient class.
-  throw new McpError(
-    ErrorCode.InternalError,
-    'Create board operation is not yet implemented'
-  );
-
-  // When implemented, it would look something like this:
-  /*
-  const result = await _jiraClient.createBoard({
-    name: _args.name!,
-    type: _args.type!,
-    projectKey: _args.projectKey!
-  });
-  
-  // Get the created board to return
-  const createdBoard = await _jiraClient.getBoard(result.id);
-  const formattedResponse = BoardFormatter.formatBoard(createdBoard);
-
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify(formattedResponse, null, 2),
-      },
-    ],
-  };
-  */
+  throw new McpError(ErrorCode.InternalError, 'Create board operation is not yet implemented');
 }
 
 async function handleUpdateBoard(_jiraClient: JiraClient, _args: ManageJiraBoardArgs) {
-  // Note: This is a placeholder. The current JiraClient doesn't have an updateBoard method.
-  // You would need to implement this in the JiraClient class.
-  throw new McpError(
-    ErrorCode.InternalError,
-    'Update board operation is not yet implemented'
-  );
-
-  // When implemented, it would look something like this:
-  /*
-  await _jiraClient.updateBoard(
-    _args.boardId!,
-    _args.name
-  );
-
-  // Get the updated board to return
-  const updatedBoard = await _jiraClient.getBoard(_args.boardId!);
-  const formattedResponse = BoardFormatter.formatBoard(updatedBoard);
-
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify(formattedResponse, null, 2),
-      },
-    ],
-  };
-  */
+  throw new McpError(ErrorCode.InternalError, 'Update board operation is not yet implemented');
 }
 
 async function handleDeleteBoard(_jiraClient: JiraClient, _args: ManageJiraBoardArgs) {
-  // Note: This is a placeholder. The current JiraClient doesn't have a deleteBoard method.
-  // You would need to implement this in the JiraClient class.
-  throw new McpError(
-    ErrorCode.InternalError,
-    'Delete board operation is not yet implemented'
-  );
-
-  // When implemented, it would look something like this:
-  /*
-  await _jiraClient.deleteBoard(_args.boardId!);
-
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify({
-          success: true,
-          message: `Board ${_args.boardId} has been deleted successfully.`,
-        }, null, 2),
-      },
-    ],
-  };
-  */
+  throw new McpError(ErrorCode.InternalError, 'Delete board operation is not yet implemented');
 }
 
 async function handleGetBoardConfiguration(_jiraClient: JiraClient, _args: ManageJiraBoardArgs) {
-  // Note: This is a placeholder. The current JiraClient doesn't have a getBoardConfiguration method.
-  // You would need to implement this in the JiraClient class.
-  throw new McpError(
-    ErrorCode.InternalError,
-    'Get board configuration operation is not yet implemented'
-  );
-
-  // When implemented, it would look something like this:
-  /*
-  const configuration = await _jiraClient.getBoardConfiguration(_args.boardId!);
-  
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify(configuration, null, 2),
-      },
-    ],
-  };
-  */
+  throw new McpError(ErrorCode.InternalError, 'Get board configuration operation is not yet implemented');
 }
 
 
 // Main handler function
-export async function setupBoardHandlers(
-  server: Server,
+export async function handleBoardRequest(
   jiraClient: JiraClient,
   request: {
     params: {
