@@ -52,6 +52,7 @@ export function createQueueHandler(
     }
 
     const operations = args.operations as QueueOperation[];
+    const detail = (args.detail as string) === 'full' ? 'full' : 'summary';
 
     if (operations.length === 0) {
       throw new McpError(ErrorCode.InvalidParams, 'Operations list is empty.');
@@ -153,7 +154,7 @@ export function createQueueHandler(
     }
 
     return {
-      content: [{ type: 'text', text: formatResults(results, operations.length, bailedAt) }],
+      content: [{ type: 'text', text: formatResults(results, operations.length, bailedAt, detail) }],
     };
   };
 }
@@ -295,8 +296,8 @@ function firstLine(text: string): string {
   return stripped.slice(0, 100);
 }
 
-/** Format the queue results into a compact response */
-function formatResults(results: OperationResult[], total: number, bailedAt: number): string {
+/** Format the queue results */
+function formatResults(results: OperationResult[], total: number, bailedAt: number, detail: 'full' | 'summary' = 'summary'): string {
   const success = results.filter(r => r.status === 'success').length;
   const errors = results.filter(r => r.status === 'error').length;
   const skipped = results.filter(r => r.status === 'skipped').length;
@@ -309,12 +310,27 @@ function formatResults(results: OperationResult[], total: number, bailedAt: numb
     lines.push(`Stopped at operation ${bailedAt + 1} due to error.`);
   }
 
-  lines.push('');
-
-  for (const r of results) {
-    const icon = r.status === 'success' ? 'ok' : r.status === 'error' ? 'ERR' : 'SKIP';
-    const summary = r.status === 'skipped' ? r.text : firstLine(r.text);
-    lines.push(`  [${r.index + 1}] ${icon}: ${summary}`);
+  if (detail === 'full') {
+    for (const r of results) {
+      const icon = r.status === 'success' ? 'ok' : r.status === 'error' ? 'ERR' : 'SKIP';
+      lines.push('');
+      lines.push(`---`);
+      lines.push(`**[${r.index + 1}] ${icon}**`);
+      if (r.status === 'skipped') {
+        lines.push(r.text);
+      } else {
+        lines.push(stripNextSteps(r.text));
+      }
+    }
+  } else {
+    lines.push('');
+    for (const r of results) {
+      const icon = r.status === 'success' ? 'ok' : r.status === 'error' ? 'ERR' : 'SKIP';
+      const summary = r.status === 'skipped' ? r.text : firstLine(r.text);
+      lines.push(`  [${r.index + 1}] ${icon}: ${summary}`);
+    }
+    lines.push('');
+    lines.push('_Use `detail: "full"` for complete output from each operation._');
   }
 
   // Consolidated next-step: use the last successful operation's context

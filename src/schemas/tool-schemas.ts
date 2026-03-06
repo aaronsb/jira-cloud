@@ -358,6 +358,12 @@ export const toolSchemas = {
           description: 'Ordered list of operations to execute (max 10).',
           maxItems: 10,
         },
+        detail: {
+          type: 'string',
+          enum: ['full', 'summary'],
+          description: 'Result detail level. summary (default): one-line status per operation. full: complete output matching individual tool calls. Use full when summary lacks needed detail.',
+          default: 'summary',
+        },
       },
       required: ['operations'],
     },

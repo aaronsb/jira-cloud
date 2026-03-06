@@ -26,11 +26,11 @@ function makeQueue(handlers?: Record<string, any>, jiraHost?: string) {
   return createQueueHandler(h, jiraHost);
 }
 
-function makeRequest(operations: any[]) {
+function makeRequest(operations: any[], detail?: 'full' | 'summary') {
   return {
     params: {
       name: 'queue_jira_operations',
-      arguments: { operations },
+      arguments: { operations, ...(detail ? { detail } : {}) },
     },
   };
 }
@@ -125,6 +125,30 @@ describe('queue-handler', () => {
       const text = result.content[0].text;
       // Should have next steps at the end from the last successful op
       expect(text).toContain('**Next steps:**');
+    });
+
+    it('defaults to summary mode with hint about full', async () => {
+      const handler = makeQueue();
+      const result = await handler({} as any, makeRequest([
+        { tool: 'manage_jira_issue', args: { operation: 'get', issueKey: 'PROJ-123' } },
+      ]));
+
+      const text = result.content[0].text;
+      expect(text).toContain('[1] ok:');
+      expect(text).toContain('detail: "full"');
+    });
+
+    it('returns full detail when detail=full', async () => {
+      const handler = makeQueue();
+      const result = await handler({} as any, makeRequest([
+        { tool: 'manage_jira_issue', args: { operation: 'get', issueKey: 'PROJ-123' } },
+      ], 'full'));
+
+      const text = result.content[0].text;
+      expect(text).toContain('**[1] ok**');
+      expect(text).toContain('PROJ-123');
+      expect(text).toContain('**Status:** Open');
+      expect(text).not.toContain('detail: "full"');
     });
   });
 
