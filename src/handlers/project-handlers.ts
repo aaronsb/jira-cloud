@@ -2,8 +2,8 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import { JiraClient } from '../client/jira-client.js';
 import { MarkdownRenderer, ProjectData } from '../mcp/markdown-renderer.js';
-import { normalizeArgs } from '../utils/normalize-args.js';
 import { projectNextSteps } from '../utils/next-steps.js';
+import { normalizeArgs } from '../utils/normalize-args.js';
 
 type ManageJiraProjectArgs = {
   operation: 'get' | 'create' | 'update' | 'delete' | 'list';

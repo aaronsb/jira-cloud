@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { createRequire } from 'module';
+
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { 
@@ -11,7 +13,6 @@ import {
   ReadResourceRequestSchema
 } from '@modelcontextprotocol/sdk/types.js';
 
-import { createRequire } from 'module';
 import { JiraClient } from './client/jira-client.js';
 import { handleBoardRequest } from './handlers/board-handlers.js';
 import { handleFilterRequest } from './handlers/filter-handlers.js';

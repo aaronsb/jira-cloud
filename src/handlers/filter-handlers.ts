@@ -2,8 +2,8 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import { JiraClient } from '../client/jira-client.js';
 import { MarkdownRenderer, FilterData } from '../mcp/markdown-renderer.js';
-import { normalizeArgs } from '../utils/normalize-args.js';
 import { filterNextSteps } from '../utils/next-steps.js';
+import { normalizeArgs } from '../utils/normalize-args.js';
 
 type ManageJiraFilterArgs = {
   operation: 'get' | 'create' | 'update' | 'delete' | 'list' | 'execute_filter' | 'execute_jql';

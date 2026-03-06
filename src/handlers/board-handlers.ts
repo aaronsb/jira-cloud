@@ -2,8 +2,8 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import { JiraClient } from '../client/jira-client.js';
 import { MarkdownRenderer, BoardData } from '../mcp/markdown-renderer.js';
-import { normalizeArgs } from '../utils/normalize-args.js';
 import { boardNextSteps } from '../utils/next-steps.js';
+import { normalizeArgs } from '../utils/normalize-args.js';
 
 type ManageJiraBoardArgs = {
   operation: 'get' | 'list' | 'create' | 'update' | 'delete' | 'get_configuration';

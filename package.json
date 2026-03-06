@@ -36,7 +36,7 @@
     "build": "tsc",
     "postbuild": "node --eval \"import('fs').then(fs => fs.chmodSync('build/index.js', '755'))\"",
     "prepare": "npm run build",
-    "test": "echo \"Tests will be implemented in the future\" && exit 0",
+    "test": "vitest run",
     "lint": "eslint --ext .ts src/",
     "lint:fix": "eslint --ext .ts src/ --fix",
     "watch": "tsc --watch",
@@ -60,6 +60,7 @@
     "eslint": "^8.57.0",
     "eslint-plugin-import": "^2.32.0",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
   }
 }

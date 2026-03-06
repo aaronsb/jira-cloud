@@ -42,7 +42,7 @@
     "node": true,
     "es6": true
   },
-  "ignorePatterns": ["build", "node_modules", "*.js"],
+  "ignorePatterns": ["build", "node_modules", "*.js", "*.test.ts", "vitest.config.ts"],
   "settings": {
     "import/resolver": {
       "node": {
