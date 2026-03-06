@@ -6,7 +6,11 @@ export class TextProcessor {
   private static md = new MarkdownIt();
   
   static markdownToAdf(markdown: string): any {
-    const tokens = TextProcessor.md.parse(markdown, {});
+    // Replace literal \n sequences with actual newlines so markdown-it
+    // correctly splits paragraphs. MCP JSON transport may deliver these
+    // as escaped two-character sequences rather than real newline chars.
+    const normalized = markdown.replace(/\\n/g, '\n');
+    const tokens = TextProcessor.md.parse(normalized, {});
     const content: any[] = [];
     let currentListItems: any[] = [];
     let isInList = false;
