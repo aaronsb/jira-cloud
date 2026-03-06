@@ -1,0 +1,17 @@
+package.json
+package-lock.json
+**/*.md
+**/*.txt
+**/LICENSE*
+**/CHANGELOG*
+**/HISTORY*
+**/*.map
+**/*.ts
+!**/*.d.ts
+**/*.test.*
+**/__tests__/
+**/test/
+**/tests/
+**/docs/
+**/examples/
+**/.github/

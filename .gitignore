@@ -39,6 +39,16 @@ wrangler.jsonc
 worker-configuration.d.ts
 tsconfig.worker.json
 
+# MCP Registry tokens
+.mcpregistry_*
+
+# MCPB build artifacts
+mcpb/server/
+mcpb/node_modules/
+mcpb/package.json
+mcpb/package-lock.json
+*.mcpb
+
 # Misc
 .eslintcache
 .cache/

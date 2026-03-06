@@ -1,0 +1,64 @@
+{
+  "manifest_version": "0.3",
+  "name": "jira-cloud-mcp",
+  "display_name": "Jira Cloud",
+  "version": "0.3.1",
+  "description": "Manage Jira Cloud issues, sprints, boards, filters, and custom fields",
+  "author": {
+    "name": "aaronsb",
+    "url": "https://github.com/aaronsb"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aaronsb/jira-cloud.git"
+  },
+  "homepage": "https://github.com/aaronsb/jira-cloud#readme",
+  "support": "https://github.com/aaronsb/jira-cloud/issues",
+  "license": "MIT",
+  "keywords": ["jira", "atlassian", "project-management", "issues", "sprints"],
+  "server": {
+    "type": "node",
+    "entry_point": "server/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/server/index.js"],
+      "env": {
+        "JIRA_API_TOKEN": "${user_config.jira_api_token}",
+        "JIRA_EMAIL": "${user_config.jira_email}",
+        "JIRA_HOST": "${user_config.jira_host}"
+      }
+    }
+  },
+  "tools": [
+    { "name": "manage_jira_issue", "description": "Get, create, update, delete, move, transition, comment on, or link Jira issues" },
+    { "name": "manage_jira_filter", "description": "Search for issues using JQL queries, or manage saved filters" },
+    { "name": "manage_jira_project", "description": "List projects or get project details" },
+    { "name": "manage_jira_board", "description": "List boards or get board details" },
+    { "name": "manage_jira_sprint", "description": "Manage sprints and assign issues to sprints" },
+    { "name": "queue_jira_operations", "description": "Execute multiple Jira operations in a single call" }
+  ],
+  "user_config": {
+    "jira_api_token": {
+      "type": "string",
+      "title": "Jira API Token",
+      "description": "Generate at https://id.atlassian.com/manage/api-tokens",
+      "sensitive": true,
+      "required": true
+    },
+    "jira_email": {
+      "type": "string",
+      "title": "Jira Email",
+      "description": "Your Atlassian account email address",
+      "required": true
+    },
+    "jira_host": {
+      "type": "string",
+      "title": "Jira Host",
+      "description": "Your Jira instance URL (e.g., https://your-team.atlassian.net)",
+      "required": true
+    }
+  },
+  "compatibility": {
+    "platforms": ["darwin", "win32", "linux"]
+  }
+}

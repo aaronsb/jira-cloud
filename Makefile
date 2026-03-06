@@ -1,4 +1,4 @@
-.PHONY: build test lint fix clean check inspect publish release-patch release-minor release-major help
+.PHONY: build test lint fix clean check inspect publish mcpb release-patch release-minor release-major help
 
 build:          ## Build TypeScript
 	npm run build
@@ -58,6 +58,15 @@ release-major: check  ## Bump major version (breaking changes)
 	@echo "  3. git tag v$$(node -p 'require("./package.json").version')"
 	@echo "  4. git push && git push --tags"
 	@echo "  5. make publish  (or let the GitHub Action handle it)"
+
+mcpb: build     ## Build .mcpb desktop extension bundle
+	rm -rf mcpb/server mcpb/node_modules mcpb/package.json mcpb/package-lock.json
+	cp -r build mcpb/server
+	cp package.json mcpb/package.json
+	cd mcpb && npm install --production --ignore-scripts --silent
+	mcpb pack mcpb jira-cloud-mcp.mcpb
+	@echo ""
+	@echo "Built: jira-cloud-mcp.mcpb ($$(du -h jira-cloud-mcp.mcpb | cut -f1))"
 
 publish:        ## Publish to npm (use after release-*)
 	npm publish --access public
