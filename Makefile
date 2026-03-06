@@ -60,10 +60,12 @@ release-major: check  ## Bump major version (breaking changes)
 	@echo "  5. make publish  (or let the GitHub Action handle it)"
 
 mcpb: build     ## Build .mcpb desktop extension bundle
-	rm -rf mcpb/server mcpb/node_modules mcpb/package.json mcpb/package-lock.json
-	cp -r build mcpb/server
-	cp package.json mcpb/package.json
-	cd mcpb && npm install --production --ignore-scripts --silent
+	rm -rf mcpb/server mcpb/package-lock.json
+	mkdir -p mcpb/server
+	cp -r build/* mcpb/server/
+	cp package.json mcpb/server/package.json
+	cd mcpb/server && npm install --production --ignore-scripts --silent
+	rm -f mcpb/server/package.json mcpb/server/package-lock.json
 	mcpb pack mcpb jira-cloud-mcp.mcpb
 	@echo ""
 	@echo "Built: jira-cloud-mcp.mcpb ($$(du -h jira-cloud-mcp.mcpb | cut -f1))"

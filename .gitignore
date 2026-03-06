@@ -44,8 +44,6 @@ tsconfig.worker.json
 
 # MCPB build artifacts
 mcpb/server/
-mcpb/node_modules/
-mcpb/package.json
 mcpb/package-lock.json
 *.mcpb
 
