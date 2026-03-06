@@ -50,6 +50,17 @@ export function issueNextSteps(operation: string, issueKey?: string): string {
         { description: 'Update issue fields', tool: 'manage_jira_issue', example: { operation: 'update', issueKey } },
       );
       break;
+    case 'delete':
+      steps.push(
+        { description: 'Search for related issues', tool: 'manage_jira_filter', example: { operation: 'execute_jql', jql: `issue in linkedIssues("${issueKey}")` } },
+      );
+      break;
+    case 'move':
+      steps.push(
+        { description: 'View the moved issue', tool: 'manage_jira_issue', example: { operation: 'get', issueKey } },
+        { description: 'Update fields for the new project context', tool: 'manage_jira_issue', example: { operation: 'update', issueKey } },
+      );
+      break;
     case 'link':
       steps.push(
         { description: 'View the linked issue', tool: 'manage_jira_issue', example: { operation: 'get', issueKey } },
@@ -176,13 +187,7 @@ export function boardNextSteps(operation: string, boardId?: number): string {
     case 'get':
       steps.push(
         { description: 'View board sprints', tool: 'manage_jira_sprint', example: { operation: 'list', boardId } },
-        { description: 'Get board configuration', tool: 'manage_jira_board', example: { operation: 'get_configuration', boardId } },
         { description: `Read board overview resource at jira://boards/${boardId}/overview` },
-      );
-      break;
-    case 'get_configuration':
-      steps.push(
-        { description: 'View or create sprints', tool: 'manage_jira_sprint', example: { operation: 'list', boardId } },
       );
       break;
   }

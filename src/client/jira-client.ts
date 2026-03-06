@@ -796,6 +796,22 @@ export class JiraClient {
       }));
   }
 
+  async deleteIssue(issueKey: string): Promise<void> {
+    console.error(`Deleting issue ${issueKey}...`);
+    await this.client.issues.deleteIssue({ issueIdOrKey: issueKey });
+  }
+
+  async moveIssue(issueKey: string, targetProjectKey: string, targetIssueType: string): Promise<void> {
+    console.error(`Moving issue ${issueKey} to ${targetProjectKey} as ${targetIssueType}...`);
+    await this.client.issues.editIssue({
+      issueIdOrKey: issueKey,
+      fields: {
+        project: { key: targetProjectKey },
+        issuetype: { name: targetIssueType },
+      },
+    });
+  }
+
   async createIssue(params: {
     projectKey: string;
     summary: string;

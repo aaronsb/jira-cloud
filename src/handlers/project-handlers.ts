@@ -6,12 +6,8 @@ import { projectNextSteps } from '../utils/next-steps.js';
 import { normalizeArgs } from '../utils/normalize-args.js';
 
 type ManageJiraProjectArgs = {
-  operation: 'get' | 'create' | 'update' | 'delete' | 'list';
+  operation: 'get' | 'list';
   projectKey?: string;
-  name?: string;
-  key?: string;
-  description?: string;
-  lead?: string;
   startAt?: number;
   maxResults?: number;
   expand?: string[];
@@ -32,10 +28,10 @@ function validateManageJiraProjectArgs(args: unknown): args is ManageJiraProject
   
   // Validate operation parameter
   if (typeof normalizedArgs.operation !== 'string' || 
-      !['get', 'create', 'update', 'delete', 'list'].includes(normalizedArgs.operation as string)) {
+      !['get', 'list'].includes(normalizedArgs.operation as string)) {
     throw new McpError(
       ErrorCode.InvalidParams,
-      'Invalid operation parameter. Valid values are: get, create, update, delete, list'
+      'Invalid operation parameter. Valid values are: get, list'
     );
   }
 
@@ -46,75 +42,6 @@ function validateManageJiraProjectArgs(args: unknown): args is ManageJiraProject
         throw new McpError(
           ErrorCode.InvalidParams,
           'Missing or invalid projectKey parameter. Please provide a valid project key for the get operation.'
-        );
-      }
-      
-      // Validate project key format (e.g., PROJ)
-      if (!/^[A-Z][A-Z0-9_]+$/.test(normalizedArgs.projectKey as string)) {
-        throw new McpError(
-          ErrorCode.InvalidParams,
-          `Invalid project key format. Expected format: PROJ`
-        );
-      }
-      break;
-      
-    case 'create':
-      if (typeof normalizedArgs.name !== 'string' || normalizedArgs.name.trim() === '') {
-        throw new McpError(
-          ErrorCode.InvalidParams,
-          'Missing or invalid name parameter. Please provide a valid project name for the create operation.'
-        );
-      }
-      if (typeof normalizedArgs.key !== 'string' || normalizedArgs.key.trim() === '') {
-        throw new McpError(
-          ErrorCode.InvalidParams,
-          'Missing or invalid key parameter. Please provide a valid project key for the create operation.'
-        );
-      }
-      
-      // Validate project key format (e.g., PROJ)
-      if (!/^[A-Z][A-Z0-9_]+$/.test(normalizedArgs.key as string)) {
-        throw new McpError(
-          ErrorCode.InvalidParams,
-          `Invalid project key format. Expected format: PROJ`
-        );
-      }
-      break;
-      
-    case 'update':
-      if (typeof normalizedArgs.projectKey !== 'string' || normalizedArgs.projectKey.trim() === '') {
-        throw new McpError(
-          ErrorCode.InvalidParams,
-          'Missing or invalid projectKey parameter. Please provide a valid project key for the update operation.'
-        );
-      }
-      
-      // Validate project key format (e.g., PROJ)
-      if (!/^[A-Z][A-Z0-9_]+$/.test(normalizedArgs.projectKey as string)) {
-        throw new McpError(
-          ErrorCode.InvalidParams,
-          `Invalid project key format. Expected format: PROJ`
-        );
-      }
-      
-      // Ensure at least one update field is provided
-      if (
-        normalizedArgs.name === undefined &&
-        normalizedArgs.description === undefined &&
-        normalizedArgs.lead === undefined
-      ) {
-        throw new McpError(
-          ErrorCode.InvalidParams,
-          'At least one update field (name, description, or lead) must be provided for the update operation.'
-        );
-      }
-      break;
-      
-    case 'delete':
-      if (typeof normalizedArgs.projectKey !== 'string' || normalizedArgs.projectKey.trim() === '') {
-        throw new McpError(
-          ErrorCode.InvalidParams,
-          'Missing or invalid projectKey parameter. Please provide a valid project key for the delete operation.'
         );
       }
       
@@ -276,17 +203,6 @@ async function handleGetProject(jiraClient: JiraClient, args: ManageJiraProjectA
   };
 }
 
-async function handleCreateProject(_jiraClient: JiraClient, _args: ManageJiraProjectArgs) {
-  throw new McpError(ErrorCode.InternalError, 'Create project operation is not yet implemented');
-}
-
-async function handleUpdateProject(_jiraClient: JiraClient, _args: ManageJiraProjectArgs) {
-  throw new McpError(ErrorCode.InternalError, 'Update project operation is not yet implemented');
-}
-
-async function handleDeleteProject(_jiraClient: JiraClient, _args: ManageJiraProjectArgs) {
-  throw new McpError(ErrorCode.InternalError, 'Delete project operation is not yet implemented');
-}
 
 async function handleListProjects(jiraClient: JiraClient, args: ManageJiraProjectArgs) {
   // Set default pagination values
@@ -394,21 +310,6 @@ export async function handleProjectRequest(
       case 'get': {
         console.error('Processing get project operation');
         return await handleGetProject(jiraClient, normalizedArgs as ManageJiraProjectArgs);
-      }
-      
-      case 'create': {
-        console.error('Processing create project operation');
-        return await handleCreateProject(jiraClient, normalizedArgs as ManageJiraProjectArgs);
-      }
-      
-      case 'update': {
-        console.error('Processing update project operation');
-        return await handleUpdateProject(jiraClient, normalizedArgs as ManageJiraProjectArgs);
-      }
-      
-      case 'delete': {
-        console.error('Processing delete project operation');
-        return await handleDeleteProject(jiraClient, normalizedArgs as ManageJiraProjectArgs);
       }
       
       case 'list': {

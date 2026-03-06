@@ -99,6 +99,20 @@ function generateIssueToolDocumentation(schema: any) {
         required_parameters: ["issueKey", "comment"],
         examples: [{ description: "Add a comment to an issue", code: { operation: "comment", issueKey: "PROJ-123", comment: "This has been reviewed and looks good." } }]
       },
+      delete: {
+        description: "Permanently deletes an issue",
+        required_parameters: ["issueKey"],
+        examples: [
+          { description: "Delete an issue", code: { operation: "delete", issueKey: "PROJ-123" } }
+        ]
+      },
+      move: {
+        description: "Moves an issue to a different project and/or issue type",
+        required_parameters: ["issueKey", "targetProjectKey", "targetIssueType"],
+        examples: [
+          { description: "Move issue to another project", code: { operation: "move", issueKey: "PROJ-123", targetProjectKey: "NEWPROJ", targetIssueType: "Task" } }
+        ]
+      },
       link: {
         description: "Creates a link between two issues",
         required_parameters: ["issueKey", "linkedIssueKey", "linkType"],
@@ -140,7 +154,7 @@ function generateIssueToolDocumentation(schema: any) {
 
 function generateBoardToolDocumentation(schema: any) {
   return {
-    name: "Board Management",
+    name: "Board Management (Read-Only)",
     description: schema.description,
     operations: {
       get: {
@@ -159,40 +173,9 @@ function generateBoardToolDocumentation(schema: any) {
           { description: "List all boards", code: { operation: "list" } },
           { description: "List boards with pagination", code: { operation: "list", startAt: 10, maxResults: 20 } }
         ]
-      },
-      create: {
-        description: "Creates a new board",
-        required_parameters: ["name", "type", "projectKey"],
-        examples: [
-          { description: "Create a scrum board", code: { operation: "create", name: "Development Board", type: "scrum", projectKey: "PROJ" } },
-          { description: "Create a kanban board", code: { operation: "create", name: "Support Board", type: "kanban", projectKey: "PROJ" } }
-        ]
-      },
-      update: {
-        description: "Updates a board",
-        required_parameters: ["boardId", "name"],
-        examples: [{ description: "Update board name", code: { operation: "update", boardId: 123, name: "Updated Board Name" } }]
-      },
-      delete: {
-        description: "Deletes a board",
-        required_parameters: ["boardId"],
-        examples: [{ description: "Delete a board", code: { operation: "delete", boardId: 123 } }]
-      },
-      get_configuration: {
-        description: "Gets board configuration",
-        required_parameters: ["boardId"],
-        examples: [{ description: "Get board configuration", code: { operation: "get_configuration", boardId: 123 } }]
       }
     },
     common_use_cases: [
-      {
-        title: "Setting up a new project board",
-        description: "To create and configure a new board for a project:",
-        steps: [
-          { description: "Create a new scrum board", code: { operation: "create", name: "Development Board", type: "scrum", projectKey: "PROJ" } },
-          { description: "Get the board configuration", code: { operation: "get_configuration", boardId: 123 } }
-        ]
-      },
       {
         title: "Working with board sprints",
         description: "To manage sprints on a board:",
@@ -374,7 +357,7 @@ function generateFilterToolDocumentation(schema: any) {
 
 function generateProjectToolDocumentation(schema: any) {
   return {
-    name: "Project Management",
+    name: "Project Management (Read-Only)",
     description: schema.description,
     operations: {
       get: {
@@ -385,27 +368,6 @@ function generateProjectToolDocumentation(schema: any) {
           { description: "Get basic project details", code: { operation: "get", projectKey: "PROJ" } },
           { description: "Get project with boards and components", code: { operation: "get", projectKey: "PROJ", expand: ["boards", "components"] } }
         ]
-      },
-      create: {
-        description: "Creates a new project",
-        required_parameters: ["key", "name"], optional_parameters: ["description", "lead"],
-        examples: [
-          { description: "Create a basic project", code: { operation: "create", key: "NEW", name: "New Project" } },
-          { description: "Create a project with description and lead", code: { operation: "create", key: "FEAT", name: "Feature Development", description: "Project for new feature development", lead: "jsmith" } }
-        ]
-      },
-      update: {
-        description: "Updates a project",
-        required_parameters: ["projectKey"], optional_parameters: ["name", "description", "lead"],
-        examples: [
-          { description: "Update project name", code: { operation: "update", projectKey: "PROJ", name: "Updated Project Name" } },
-          { description: "Update project lead and description", code: { operation: "update", projectKey: "PROJ", description: "Updated project description", lead: "newlead" } }
-        ]
-      },
-      delete: {
-        description: "Deletes a project",
-        required_parameters: ["projectKey"],
-        examples: [{ description: "Delete a project", code: { operation: "delete", projectKey: "PROJ" } }]
       },
       list: {
         description: "Lists all projects",
@@ -418,18 +380,10 @@ function generateProjectToolDocumentation(schema: any) {
     },
     common_use_cases: [
       {
-        title: "Setting up a new project",
-        description: "To create and configure a new project:",
-        steps: [
-          { description: "Create a new project", code: { operation: "create", key: "NEW", name: "New Project", description: "Project for new feature development", lead: "jsmith" } },
-          { description: "Create a board for the project", tool: "manage_jira_board", code: { operation: "create", name: "NEW Board", type: "scrum", projectKey: "NEW" } }
-        ]
-      },
-      {
         title: "Project reporting",
         description: "To get project statistics and reports:",
         steps: [
-          { description: "Get project details with recent issues", code: { operation: "get", projectKey: "PROJ", expand: ["recent_issues"], include_status_counts: true } },
+          { description: "Get project details with status counts", code: { operation: "get", projectKey: "PROJ", include_status_counts: true } },
           { description: "Get all issues in a project", tool: "manage_jira_filter", code: { operation: "execute_jql", jql: "project = PROJ ORDER BY created DESC" } }
         ]
       }

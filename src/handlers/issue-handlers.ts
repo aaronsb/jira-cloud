@@ -2,11 +2,12 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import { JiraClient } from '../client/jira-client.js';
 import { MarkdownRenderer } from '../mcp/markdown-renderer.js';
+import { bulkOperationGuard } from '../utils/bulk-operation-guard.js';
 import { issueNextSteps } from '../utils/next-steps.js';
 import { normalizeArgs } from '../utils/normalize-args.js';
 
 type ManageJiraIssueArgs = {
-  operation: 'create' | 'get' | 'update' | 'transition' | 'comment' | 'link';
+  operation: 'create' | 'get' | 'update' | 'delete' | 'move' | 'transition' | 'comment' | 'link';
   issueKey?: string;
   projectKey?: string;
   summary?: string;
@@ -20,6 +21,8 @@ type ManageJiraIssueArgs = {
   comment?: string;
   linkType?: string;
   linkedIssueKey?: string;
+  targetProjectKey?: string;
+  targetIssueType?: string;
   expand?: string[];
   parent?: string | null;
 };
@@ -37,10 +40,10 @@ function validateManageJiraIssueArgs(args: unknown): args is ManageJiraIssueArgs
   
   // Validate operation parameter
   if (typeof normalizedArgs.operation !== 'string' || 
-      !['create', 'get', 'update', 'transition', 'comment', 'link'].includes(normalizedArgs.operation as string)) {
+      !['create', 'get', 'update', 'delete', 'move', 'transition', 'comment', 'link'].includes(normalizedArgs.operation as string)) {
     throw new McpError(
       ErrorCode.InvalidParams,
-      'Invalid operation parameter. Valid values are: create, get, update, transition, comment, link'
+      'Invalid operation parameter. Valid values are: create, get, update, delete, move, transition, comment, link'
     );
   }
 
@@ -55,6 +58,36 @@ function validateManageJiraIssueArgs(args: unknown): args is ManageJiraIssueArgs
       }
       break;
       
+    case 'delete':
+      if (typeof normalizedArgs.issueKey !== 'string' || normalizedArgs.issueKey.trim() === '') {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          'Missing or invalid issueKey parameter. Please provide a valid issue key for the delete operation.'
+        );
+      }
+      break;
+
+    case 'move':
+      if (typeof normalizedArgs.issueKey !== 'string' || normalizedArgs.issueKey.trim() === '') {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          'Missing or invalid issueKey parameter. Please provide a valid issue key for the move operation.'
+        );
+      }
+      if (typeof normalizedArgs.targetProjectKey !== 'string' || normalizedArgs.targetProjectKey.trim() === '') {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          'Missing or invalid targetProjectKey parameter. Please provide the target project key for the move operation.'
+        );
+      }
+      if (typeof normalizedArgs.targetIssueType !== 'string' || normalizedArgs.targetIssueType.trim() === '') {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          'Missing or invalid targetIssueType parameter. Please provide the target issue type for the move operation.'
+        );
+      }
+      break;
+
     case 'create':
       if (typeof normalizedArgs.projectKey !== 'string' || normalizedArgs.projectKey.trim() === '') {
         throw new McpError(
@@ -208,6 +241,58 @@ async function handleGetIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs)
       {
         type: 'text',
         text: markdown + issueNextSteps('get', args.issueKey),
+      },
+    ],
+  };
+}
+
+async function handleMoveIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs) {
+  const issueKey = args.issueKey!;
+
+  // Check bulk-destructive guard
+  const deflection = bulkOperationGuard.check('move', issueKey, process.env.JIRA_HOST);
+  if (deflection) {
+    return { content: [{ type: 'text', text: deflection }], isError: true };
+  }
+
+  await jiraClient.moveIssue(issueKey, args.targetProjectKey!, args.targetIssueType!);
+  bulkOperationGuard.record('move', issueKey);
+
+  // Get the moved issue (it now has a new key in the target project)
+  const movedIssue = await jiraClient.getIssue(issueKey, false, false);
+  const markdown = MarkdownRenderer.renderIssue(movedIssue);
+
+  return {
+    content: [
+      {
+        type: 'text',
+        text: `# Issue Moved\n\n${markdown}${issueNextSteps('move', movedIssue.key)}`,
+      },
+    ],
+  };
+}
+
+async function handleDeleteIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs) {
+  const issueKey = args.issueKey!;
+
+  // Check bulk-destructive guard
+  const deflection = bulkOperationGuard.check('delete', issueKey, process.env.JIRA_HOST);
+  if (deflection) {
+    return { content: [{ type: 'text', text: deflection }], isError: true };
+  }
+
+  // Get the issue details before deleting for a final snapshot
+  const issue = await jiraClient.getIssue(issueKey, false, false);
+  const markdown = MarkdownRenderer.renderIssue(issue);
+
+  await jiraClient.deleteIssue(issueKey);
+  bulkOperationGuard.record('delete', issueKey);
+
+  return {
+    content: [
+      {
+        type: 'text',
+        text: `# Issue Deleted\n\nThe following issue has been permanently deleted:\n\n${markdown}${issueNextSteps('delete', issueKey)}`,
       },
     ],
   };
@@ -369,6 +454,16 @@ export async function handleIssueRequest(
       case 'create': {
         console.error('Processing create issue operation');
         return await handleCreateIssue(jiraClient, normalizedArgs as ManageJiraIssueArgs);
+      }
+
+      case 'delete': {
+        console.error('Processing delete issue operation');
+        return await handleDeleteIssue(jiraClient, normalizedArgs as ManageJiraIssueArgs);
+      }
+
+      case 'move': {
+        console.error('Processing move issue operation');
+        return await handleMoveIssue(jiraClient, normalizedArgs as ManageJiraIssueArgs);
       }
       
       case 'update': {

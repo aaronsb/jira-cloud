@@ -25,6 +25,16 @@ describe('issueNextSteps', () => {
     expect(result).toContain('issue-link-types');
   });
 
+  it('returns suggestions for delete', () => {
+    const result = issueNextSteps('delete', 'PROJ-1');
+    expect(result).toContain('related issues');
+  });
+
+  it('returns suggestions for move', () => {
+    const result = issueNextSteps('move', 'PROJ-1');
+    expect(result).toContain('moved issue');
+  });
+
   it('returns empty for unknown operation', () => {
     expect(issueNextSteps('unknown')).toBe('');
   });
@@ -109,9 +119,10 @@ describe('boardNextSteps', () => {
     expect(result).toContain('jira://boards/42/overview');
   });
 
-  it('returns suggestions for get_configuration', () => {
-    const result = boardNextSteps('get_configuration', 42);
-    expect(result).toContain('sprint');
+  it('returns empty for removed admin operations', () => {
+    expect(boardNextSteps('create', 42)).toBe('');
+    expect(boardNextSteps('delete', 42)).toBe('');
+    expect(boardNextSteps('get_configuration', 42)).toBe('');
   });
 
   it('returns empty for unknown operation', () => {

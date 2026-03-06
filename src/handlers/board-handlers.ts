@@ -6,11 +6,8 @@ import { boardNextSteps } from '../utils/next-steps.js';
 import { normalizeArgs } from '../utils/normalize-args.js';
 
 type ManageJiraBoardArgs = {
-  operation: 'get' | 'list' | 'create' | 'update' | 'delete' | 'get_configuration';
+  operation: 'get' | 'list';
   boardId?: number;
-  name?: string;
-  type?: 'scrum' | 'kanban';
-  projectKey?: string;
   startAt?: number;
   maxResults?: number;
   expand?: string[];
@@ -30,44 +27,20 @@ function validateManageJiraBoardArgs(args: unknown): args is ManageJiraBoardArgs
   
   // Validate operation parameter
   if (typeof normalizedArgs.operation !== 'string' || 
-      !['get', 'list', 'create', 'update', 'delete', 'get_configuration'].includes(normalizedArgs.operation as string)) {
+      !['get', 'list'].includes(normalizedArgs.operation as string)) {
     throw new McpError(
       ErrorCode.InvalidParams,
-      'Invalid operation parameter. Valid values are: get, list, create, update, delete, get_configuration'
+      'Invalid operation parameter. Valid values are: get, list'
     );
   }
 
   // Validate parameters based on operation
   switch (normalizedArgs.operation) {
     case 'get':
-    case 'update':
-    case 'delete':
-    case 'get_configuration':
       if (typeof normalizedArgs.boardId !== 'number') {
         throw new McpError(
           ErrorCode.InvalidParams,
-          `Missing or invalid boardId parameter. Please provide a valid board ID as a number for the ${normalizedArgs.operation} operation.`
-        );
-      }
-      break;
-      
-    case 'create':
-      if (typeof normalizedArgs.name !== 'string' || normalizedArgs.name.trim() === '') {
-        throw new McpError(
-          ErrorCode.InvalidParams,
-          'Missing or invalid name parameter. Please provide a valid board name for the create operation.'
-        );
-      }
-      if (typeof normalizedArgs.type !== 'string' || !['scrum', 'kanban'].includes(normalizedArgs.type)) {
-        throw new McpError(
-          ErrorCode.InvalidParams,
-          'Missing or invalid type parameter. Please provide a valid board type (scrum or kanban) for the create operation.'
-        );
-      }
-      if (typeof normalizedArgs.projectKey !== 'string' || normalizedArgs.projectKey.trim() === '') {
-        throw new McpError(
-          ErrorCode.InvalidParams,
-          'Missing or invalid projectKey parameter. Please provide a valid project key for the create operation.'
+          'Missing or invalid boardId parameter. Please provide a valid board ID as a number for the get operation.'
         );
       }
       break;
@@ -267,22 +240,6 @@ async function handleListBoards(jiraClient: JiraClient, args: ManageJiraBoardArg
   };
 }
 
-async function handleCreateBoard(_jiraClient: JiraClient, _args: ManageJiraBoardArgs) {
-  throw new McpError(ErrorCode.InternalError, 'Create board operation is not yet implemented');
-}
-
-async function handleUpdateBoard(_jiraClient: JiraClient, _args: ManageJiraBoardArgs) {
-  throw new McpError(ErrorCode.InternalError, 'Update board operation is not yet implemented');
-}
-
-async function handleDeleteBoard(_jiraClient: JiraClient, _args: ManageJiraBoardArgs) {
-  throw new McpError(ErrorCode.InternalError, 'Delete board operation is not yet implemented');
-}
-
-async function handleGetBoardConfiguration(_jiraClient: JiraClient, _args: ManageJiraBoardArgs) {
-  throw new McpError(ErrorCode.InternalError, 'Get board configuration operation is not yet implemented');
-}
-
 
 // Main handler function
 export async function handleBoardRequest(
@@ -319,26 +276,6 @@ export async function handleBoardRequest(
       case 'list': {
         console.error('Processing list boards operation');
         return await handleListBoards(jiraClient, normalizedArgs as ManageJiraBoardArgs);
-      }
-      
-      case 'create': {
-        console.error('Processing create board operation');
-        return await handleCreateBoard(jiraClient, normalizedArgs as ManageJiraBoardArgs);
-      }
-      
-      case 'update': {
-        console.error('Processing update board operation');
-        return await handleUpdateBoard(jiraClient, normalizedArgs as ManageJiraBoardArgs);
-      }
-      
-      case 'delete': {
-        console.error('Processing delete board operation');
-        return await handleDeleteBoard(jiraClient, normalizedArgs as ManageJiraBoardArgs);
-      }
-      
-      case 'get_configuration': {
-        console.error('Processing get board configuration operation');
-        return await handleGetBoardConfiguration(jiraClient, normalizedArgs as ManageJiraBoardArgs);
       }
       
       default: {
