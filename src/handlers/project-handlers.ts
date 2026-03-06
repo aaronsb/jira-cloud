@@ -3,6 +3,7 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { JiraClient } from '../client/jira-client.js';
 import { MarkdownRenderer, ProjectData } from '../mcp/markdown-renderer.js';
 import { normalizeArgs } from '../utils/normalize-args.js';
+import { projectNextSteps } from '../utils/next-steps.js';
 
 type ManageJiraProjectArgs = {
   operation: 'get' | 'create' | 'update' | 'delete' | 'list';
@@ -269,7 +270,7 @@ async function handleGetProject(jiraClient: JiraClient, args: ManageJiraProjectA
     content: [
       {
         type: 'text',
-        text: markdown,
+        text: markdown + projectNextSteps('get', projectKey),
       },
     ],
   };
@@ -428,6 +429,8 @@ async function handleListProjects(jiraClient: JiraClient, args: ManageJiraProjec
   } else {
     markdown += `Showing all ${projectDataList.length} project${projectDataList.length !== 1 ? 's' : ''}`;
   }
+
+  markdown += projectNextSteps('list');
 
   return {
     content: [

@@ -3,6 +3,7 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { JiraClient } from '../client/jira-client.js';
 import { MarkdownRenderer, FilterData } from '../mcp/markdown-renderer.js';
 import { normalizeArgs } from '../utils/normalize-args.js';
+import { filterNextSteps } from '../utils/next-steps.js';
 
 type ManageJiraFilterArgs = {
   operation: 'get' | 'create' | 'update' | 'delete' | 'list' | 'execute_filter' | 'execute_jql';
@@ -228,7 +229,7 @@ async function handleGetFilter(jiraClient: JiraClient, args: ManageJiraFilterArg
       content: [
         {
           type: 'text',
-          text: markdown,
+          text: markdown + filterNextSteps('get', filterId),
         },
       ],
     };
@@ -299,6 +300,8 @@ async function handleListFilters(jiraClient: JiraClient, args: ManageJiraFilterA
   } else {
     markdown += `Showing all ${filterDataList.length} filter${filterDataList.length !== 1 ? 's' : ''}`;
   }
+
+  markdown += filterNextSteps('list');
 
   return {
     content: [
@@ -427,7 +430,7 @@ async function handleExecuteFilter(jiraClient: JiraClient, _args: ManageJiraFilt
     content: [
       {
         type: 'text',
-        text: markdown,
+        text: markdown + filterNextSteps('execute_filter', filterId),
       },
     ],
   };
@@ -476,7 +479,7 @@ async function handleExecuteJql(jiraClient: JiraClient, args: ManageJiraFilterAr
       content: [
         {
           type: 'text',
-          text: markdown,
+          text: markdown + filterNextSteps('execute_jql', undefined, args.jql),
         },
       ],
     };

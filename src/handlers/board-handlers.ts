@@ -3,6 +3,7 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { JiraClient } from '../client/jira-client.js';
 import { MarkdownRenderer, BoardData } from '../mcp/markdown-renderer.js';
 import { normalizeArgs } from '../utils/normalize-args.js';
+import { boardNextSteps } from '../utils/next-steps.js';
 
 type ManageJiraBoardArgs = {
   operation: 'get' | 'list' | 'create' | 'update' | 'delete' | 'get_configuration';
@@ -185,7 +186,7 @@ async function handleGetBoard(jiraClient: JiraClient, args: ManageJiraBoardArgs)
     content: [
       {
         type: 'text',
-        text: markdown,
+        text: markdown + boardNextSteps('get', boardId),
       },
     ],
   };
@@ -253,6 +254,8 @@ async function handleListBoards(jiraClient: JiraClient, args: ManageJiraBoardArg
   } else {
     markdown += `Showing all ${boardDataList.length} board${boardDataList.length !== 1 ? 's' : ''}`;
   }
+
+  markdown += boardNextSteps('list');
 
   return {
     content: [

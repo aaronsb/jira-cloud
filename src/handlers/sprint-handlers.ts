@@ -3,6 +3,7 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { JiraClient } from '../client/jira-client.js';
 import { MarkdownRenderer } from '../mcp/markdown-renderer.js';
 import { normalizeArgs } from '../utils/normalize-args.js';
+import { sprintNextSteps } from '../utils/next-steps.js';
 
 type ManageJiraSprintArgs = {
   operation: 'get' | 'create' | 'update' | 'delete' | 'list' | 'manage_issues';
@@ -270,7 +271,7 @@ async function handleGetSprint(jiraClient: JiraClient, args: ManageJiraSprintArg
     content: [
       {
         type: 'text',
-        text: markdown,
+        text: markdown + sprintNextSteps('get', args.sprintId, sprint.boardId, sprint.state),
       },
     ],
   };
@@ -301,7 +302,7 @@ async function handleCreateSprint(jiraClient: JiraClient, args: ManageJiraSprint
     content: [
       {
         type: 'text',
-        text: `# Sprint Created\n\n${markdown}`,
+        text: `# Sprint Created\n\n${markdown}${sprintNextSteps('create', response.id, args.boardId)}`,
       },
     ],
   };
@@ -348,7 +349,7 @@ async function handleUpdateSprint(jiraClient: JiraClient, args: ManageJiraSprint
       content: [
         {
           type: 'text',
-          text: `# Sprint Updated\n\n${markdown}`,
+          text: `# Sprint Updated\n\n${markdown}${sprintNextSteps('update', args.sprintId, updatedSprint.boardId, updatedSprint.state)}`,
         },
       ],
     };
@@ -380,7 +381,7 @@ async function handleDeleteSprint(jiraClient: JiraClient, args: ManageJiraSprint
     content: [
       {
         type: 'text',
-        text: `# Sprint Deleted\n\nSprint ${args.sprintId} has been deleted successfully.`,
+        text: `# Sprint Deleted\n\nSprint ${args.sprintId} has been deleted successfully.${sprintNextSteps('delete', undefined, args.boardId)}`,
       },
     ],
   };
@@ -435,6 +436,8 @@ async function handleListSprints(jiraClient: JiraClient, args: ManageJiraSprintA
   } else {
     lines.push(`Showing all ${response.sprints.length} sprint${response.sprints.length !== 1 ? 's' : ''}`);
   }
+
+  lines.push(sprintNextSteps('list', undefined, args.boardId));
 
   return {
     content: [
@@ -492,7 +495,7 @@ async function handleManageIssues(jiraClient: JiraClient, args: ManageJiraSprint
       content: [
         {
           type: 'text',
-          text: `# Sprint Issues Updated\n\n${markdown}`,
+          text: `# Sprint Issues Updated\n\n${markdown}${sprintNextSteps('manage_issues', args.sprintId, sprint.boardId, sprint.state)}`,
         },
       ],
     };

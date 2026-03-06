@@ -3,6 +3,7 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { JiraClient } from '../client/jira-client.js';
 import { MarkdownRenderer } from '../mcp/markdown-renderer.js';
 import { normalizeArgs } from '../utils/normalize-args.js';
+import { issueNextSteps } from '../utils/next-steps.js';
 
 type ManageJiraIssueArgs = {
   operation: 'create' | 'get' | 'update' | 'transition' | 'comment' | 'link';
@@ -206,7 +207,7 @@ async function handleGetIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs)
     content: [
       {
         type: 'text',
-        text: markdown,
+        text: markdown + issueNextSteps('get', args.issueKey),
       },
     ],
   };
@@ -232,7 +233,7 @@ async function handleCreateIssue(jiraClient: JiraClient, args: ManageJiraIssueAr
     content: [
       {
         type: 'text',
-        text: `# Issue Created\n\n${markdown}`,
+        text: `# Issue Created\n\n${markdown}${issueNextSteps('create', result.key)}`,
       },
     ],
   };
@@ -258,7 +259,7 @@ async function handleUpdateIssue(jiraClient: JiraClient, args: ManageJiraIssueAr
     content: [
       {
         type: 'text',
-        text: `# Issue Updated\n\n${markdown}`,
+        text: `# Issue Updated\n\n${markdown}${issueNextSteps('update', args.issueKey)}`,
       },
     ],
   };
@@ -279,7 +280,7 @@ async function handleTransitionIssue(jiraClient: JiraClient, args: ManageJiraIss
     content: [
       {
         type: 'text',
-        text: `# Issue Transitioned\n\n${markdown}`,
+        text: `# Issue Transitioned\n\n${markdown}${issueNextSteps('transition', args.issueKey)}`,
       },
     ],
   };
@@ -296,7 +297,7 @@ async function handleCommentIssue(jiraClient: JiraClient, args: ManageJiraIssueA
     content: [
       {
         type: 'text',
-        text: `# Comment Added\n\n${markdown}`,
+        text: `# Comment Added\n\n${markdown}${issueNextSteps('comment', args.issueKey)}`,
       },
     ],
   };
@@ -321,7 +322,7 @@ async function handleLinkIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs
     content: [
       {
         type: 'text',
-        text: `# Issue Linked\n\n${markdown}`,
+        text: `# Issue Linked\n\n${markdown}${issueNextSteps('link', args.issueKey)}`,
       },
     ],
   };
