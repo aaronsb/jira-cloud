@@ -22,12 +22,18 @@ import { JiraIssueDetails, TransitionDetails, SearchPagination } from '../types/
  */
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return 'Not set';
+  // Date-only strings (YYYY-MM-DD) are parsed as UTC midnight by Date constructor,
+  // then toLocaleDateString shifts them by local TZ offset — causing off-by-one.
+  // Parse date-only values directly to avoid timezone shifting.
+  const dateOnly = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateOnly) {
+    const [, y, m, d] = dateOnly;
+    const date = new Date(Number(y), Number(m) - 1, Number(d));
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+  // Full datetime strings include timezone info, so they render correctly.
   const date = new Date(dateStr);
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  });
+  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 /**
