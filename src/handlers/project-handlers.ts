@@ -15,7 +15,7 @@ type ManageJiraProjectArgs = {
   startAt?: number;
   maxResults?: number;
   expand?: string[];
-  include_status_counts?: boolean;
+  includeStatusCounts?: boolean;
 };
 
 
@@ -170,7 +170,7 @@ function validateManageJiraProjectArgs(args: unknown): args is ManageJiraProject
 // Handler functions for each operation
 async function handleGetProject(jiraClient: JiraClient, args: ManageJiraProjectArgs) {
   const projectKey = args.projectKey!;
-  const includeStatusCounts = args.include_status_counts !== false; // Default to true
+  const includeStatusCounts = args.includeStatusCounts !== false; // Default to true
   
   // Parse expansion options
   const expansionOptions: Record<string, boolean> = {};
@@ -200,7 +200,7 @@ async function handleGetProject(jiraClient: JiraClient, args: ManageJiraProjectA
   if (includeStatusCounts) {
     try {
       // Get issue counts by status for this project
-      const searchResult = await jiraClient.searchIssues(`project = ${projectKey}`, 0, 0);
+      const searchResult = await jiraClient.searchIssues(`project = ${projectKey}`, 0, 100);
 
       // Count issues by status
       const statusCounts: Record<string, number> = {};
@@ -292,7 +292,7 @@ async function handleListProjects(jiraClient: JiraClient, args: ManageJiraProjec
   // Set default pagination values
   const startAt = args.startAt !== undefined ? args.startAt : 0;
   const maxResults = args.maxResults !== undefined ? args.maxResults : 50;
-  const includeStatusCounts = args.include_status_counts === true;
+  const includeStatusCounts = args.includeStatusCounts === true;
   
   // Get all projects
   const projects = await jiraClient.listProjects();
@@ -314,7 +314,7 @@ async function handleListProjects(jiraClient: JiraClient, args: ManageJiraProjec
     for (const project of projectDataList) {
       try {
         // Get issue counts by status for this project
-        const searchResult = await jiraClient.searchIssues(`project = ${project.key}`, 0, 0);
+        const searchResult = await jiraClient.searchIssues(`project = ${project.key}`, 0, 100);
 
         // Count issues by status
         const statusCounts: Record<string, number> = {};

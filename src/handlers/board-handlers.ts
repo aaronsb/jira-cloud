@@ -14,7 +14,7 @@ type ManageJiraBoardArgs = {
   startAt?: number;
   maxResults?: number;
   expand?: string[];
-  include_sprints?: boolean;
+  includeSprints?: boolean;
 };
 
 // Validate the consolidated board management arguments
@@ -134,7 +134,7 @@ async function handleGetBoard(jiraClient: JiraClient, args: ManageJiraBoardArgs)
   }
   
   // If include_sprints is true, add sprints to expansions
-  if (args.include_sprints === true) {
+  if (args.includeSprints === true) {
     expansionOptions.sprints = true;
   }
   
@@ -196,7 +196,7 @@ async function handleListBoards(jiraClient: JiraClient, args: ManageJiraBoardArg
   // Set default pagination values
   const startAt = args.startAt !== undefined ? args.startAt : 0;
   const maxResults = args.maxResults !== undefined ? args.maxResults : 50;
-  const includeSprints = args.include_sprints === true;
+  const includeSprints = args.includeSprints === true;
   
   // Get all boards
   const boards = await jiraClient.listBoards();
