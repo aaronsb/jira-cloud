@@ -32,17 +32,20 @@ Add to MCP settings (no install required — uses npx):
 
 ## Tools
 
-The server exposes 5 tools, each with an `operation` parameter:
+The server exposes 6 tools:
 
 | Tool | Operations |
 |------|-----------|
-| `manage_jira_issue` | `get`, `create`, `update`, `transition`, `comment`, `link` |
+| `manage_jira_issue` | `get`, `create`, `update`, `delete`, `move`, `transition`, `comment`, `link` |
 | `manage_jira_filter` | `get`, `list`, `create`, `update`, `delete`, `execute_jql`, `execute_filter` |
 | `manage_jira_project` | `get`, `list` |
-| `manage_jira_board` | `get`, `list`, `get_configuration` |
+| `manage_jira_board` | `get`, `list` |
 | `manage_jira_sprint` | `get`, `list`, `create`, `update`, `delete`, `manage_issues` |
+| `queue_jira_operations` | Execute multiple operations in one call with result references (`$0.key`) and error strategies (`bail`/`continue`) |
 
-Each tool also has MCP resource documentation at `jira://tools/{tool_name}/documentation`.
+Each tool has MCP resource documentation at `jira://tools/{tool_name}/documentation`.
+
+Custom field discovery runs at startup — use `jira://custom-fields` to browse the catalog or `jira://custom-fields/{projectKey}/{issueType}` for context-specific fields.
 
 ## Multiple Instances
 
