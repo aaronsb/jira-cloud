@@ -2,9 +2,19 @@
 
 A Model Context Protocol server for interacting with Jira Cloud instances.
 
-## Quick Start
+## Install
 
-Add to your MCP settings:
+### Claude Desktop (one-click)
+
+Download [`jira-cloud-mcp.mcpb`](https://github.com/aaronsb/jira-cloud/releases/latest) and open it — Claude Desktop will prompt for your Jira credentials.
+
+### Claude Code
+
+```bash
+claude mcp add jira-cloud -e JIRA_API_TOKEN=your-token -e JIRA_EMAIL=your-email -e JIRA_HOST=https://your-team.atlassian.net -- npx -y @aaronsb/jira-cloud-mcp
+```
+
+### Manual (any MCP client)
 
 ```json
 {
@@ -20,12 +30,6 @@ Add to your MCP settings:
     }
   }
 }
-```
-
-Or install globally:
-
-```bash
-npm install -g @aaronsb/jira-cloud-mcp
 ```
 
 ### Credentials
