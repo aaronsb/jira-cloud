@@ -268,113 +268,19 @@ async function handleListBoards(jiraClient: JiraClient, args: ManageJiraBoardArg
 }
 
 async function handleCreateBoard(_jiraClient: JiraClient, _args: ManageJiraBoardArgs) {
-  // Note: This is a placeholder. The current JiraClient doesn't have a createBoard method.
-  // You would need to implement this in the JiraClient class.
-  throw new McpError(
-    ErrorCode.InternalError,
-    'Create board operation is not yet implemented'
-  );
-
-  // When implemented, it would look something like this:
-  /*
-  const result = await _jiraClient.createBoard({
-    name: _args.name!,
-    type: _args.type!,
-    projectKey: _args.projectKey!
-  });
-  
-  // Get the created board to return
-  const createdBoard = await _jiraClient.getBoard(result.id);
-  const formattedResponse = BoardFormatter.formatBoard(createdBoard);
-
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify(formattedResponse, null, 2),
-      },
-    ],
-  };
-  */
+  throw new McpError(ErrorCode.InternalError, 'Create board operation is not yet implemented');
 }
 
 async function handleUpdateBoard(_jiraClient: JiraClient, _args: ManageJiraBoardArgs) {
-  // Note: This is a placeholder. The current JiraClient doesn't have an updateBoard method.
-  // You would need to implement this in the JiraClient class.
-  throw new McpError(
-    ErrorCode.InternalError,
-    'Update board operation is not yet implemented'
-  );
-
-  // When implemented, it would look something like this:
-  /*
-  await _jiraClient.updateBoard(
-    _args.boardId!,
-    _args.name
-  );
-
-  // Get the updated board to return
-  const updatedBoard = await _jiraClient.getBoard(_args.boardId!);
-  const formattedResponse = BoardFormatter.formatBoard(updatedBoard);
-
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify(formattedResponse, null, 2),
-      },
-    ],
-  };
-  */
+  throw new McpError(ErrorCode.InternalError, 'Update board operation is not yet implemented');
 }
 
 async function handleDeleteBoard(_jiraClient: JiraClient, _args: ManageJiraBoardArgs) {
-  // Note: This is a placeholder. The current JiraClient doesn't have a deleteBoard method.
-  // You would need to implement this in the JiraClient class.
-  throw new McpError(
-    ErrorCode.InternalError,
-    'Delete board operation is not yet implemented'
-  );
-
-  // When implemented, it would look something like this:
-  /*
-  await _jiraClient.deleteBoard(_args.boardId!);
-
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify({
-          success: true,
-          message: `Board ${_args.boardId} has been deleted successfully.`,
-        }, null, 2),
-      },
-    ],
-  };
-  */
+  throw new McpError(ErrorCode.InternalError, 'Delete board operation is not yet implemented');
 }
 
 async function handleGetBoardConfiguration(_jiraClient: JiraClient, _args: ManageJiraBoardArgs) {
-  // Note: This is a placeholder. The current JiraClient doesn't have a getBoardConfiguration method.
-  // You would need to implement this in the JiraClient class.
-  throw new McpError(
-    ErrorCode.InternalError,
-    'Get board configuration operation is not yet implemented'
-  );
-
-  // When implemented, it would look something like this:
-  /*
-  const configuration = await _jiraClient.getBoardConfiguration(_args.boardId!);
-  
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify(configuration, null, 2),
-      },
-    ],
-  };
-  */
+  throw new McpError(ErrorCode.InternalError, 'Get board configuration operation is not yet implemented');
 }
 
 

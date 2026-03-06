@@ -277,93 +277,15 @@ async function handleGetProject(jiraClient: JiraClient, args: ManageJiraProjectA
 }
 
 async function handleCreateProject(_jiraClient: JiraClient, _args: ManageJiraProjectArgs) {
-  // Note: This is a placeholder. The current JiraClient doesn't have a createProject method.
-  // You would need to implement this in the JiraClient class.
-  throw new McpError(
-    ErrorCode.InternalError,
-    'Create project operation is not yet implemented'
-  );
-
-  // When implemented, it would look something like this:
-  /*
-  const result = await _jiraClient.createProject({
-    key: _args.key!,
-    name: _args.name!,
-    description: _args.description,
-    lead: _args.lead
-  });
-  
-  // Get the created project to return
-  const createdProject = await _jiraClient.getProject(result.key);
-  const formattedResponse = ProjectFormatter.formatProject(createdProject);
-
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify(formattedResponse, null, 2),
-      },
-    ],
-  };
-  */
+  throw new McpError(ErrorCode.InternalError, 'Create project operation is not yet implemented');
 }
 
 async function handleUpdateProject(_jiraClient: JiraClient, _args: ManageJiraProjectArgs) {
-  // Note: This is a placeholder. The current JiraClient doesn't have an updateProject method.
-  // You would need to implement this in the JiraClient class.
-  throw new McpError(
-    ErrorCode.InternalError,
-    'Update project operation is not yet implemented'
-  );
-
-  // When implemented, it would look something like this:
-  /*
-  await _jiraClient.updateProject(
-    _args.projectKey!,
-    _args.name,
-    _args.description,
-    _args.lead
-  );
-
-  // Get the updated project to return
-  const updatedProject = await _jiraClient.getProject(_args.projectKey!);
-  const formattedResponse = ProjectFormatter.formatProject(updatedProject);
-
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify(formattedResponse, null, 2),
-      },
-    ],
-  };
-  */
+  throw new McpError(ErrorCode.InternalError, 'Update project operation is not yet implemented');
 }
 
 async function handleDeleteProject(_jiraClient: JiraClient, _args: ManageJiraProjectArgs) {
-  // Note: This is a placeholder. The current JiraClient doesn't have a deleteProject method.
-  // You would need to implement this in the JiraClient class.
-  throw new McpError(
-    ErrorCode.InternalError,
-    'Delete project operation is not yet implemented'
-  );
-
-  // When implemented, it would look something like this:
-  /*
-  await _jiraClient.deleteProject(_args.projectKey!);
-
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify({
-          success: true,
-          message: `Project ${_args.projectKey} has been deleted successfully.`,
-        }, null, 2),
-      },
-    ],
-  };
-  */
+  throw new McpError(ErrorCode.InternalError, 'Delete project operation is not yet implemented');
 }
 
 async function handleListProjects(jiraClient: JiraClient, args: ManageJiraProjectArgs) {

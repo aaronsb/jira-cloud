@@ -314,98 +314,15 @@ async function handleListFilters(jiraClient: JiraClient, args: ManageJiraFilterA
 }
 
 async function handleCreateFilter(_jiraClient: JiraClient, _args: ManageJiraFilterArgs) {
-  // Note: This is a placeholder. The current JiraClient doesn't have a createFilter method.
-  // You would need to implement this in the JiraClient class.
-  throw new McpError(
-    ErrorCode.InternalError,
-    'Create filter operation is not yet implemented'
-  );
-
-  // When implemented, it would look something like this:
-  /*
-  const result = await _jiraClient.createFilter({
-    name: _args.name!,
-    jql: _args.jql!,
-    description: _args.description,
-    favourite: _args.favourite,
-    sharePermissions: _args.sharePermissions
-  });
-  
-  // Get the created filter to return
-  const createdFilter = await _jiraClient.getFilter(result.id);
-  const formattedResponse = FilterFormatter.formatFilter(createdFilter);
-
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify(formattedResponse, null, 2),
-      },
-    ],
-  };
-  */
+  throw new McpError(ErrorCode.InternalError, 'Create filter operation is not yet implemented');
 }
 
 async function handleUpdateFilter(_jiraClient: JiraClient, _args: ManageJiraFilterArgs) {
-  // Note: This is a placeholder. The current JiraClient doesn't have an updateFilter method.
-  // You would need to implement this in the JiraClient class.
-  throw new McpError(
-    ErrorCode.InternalError,
-    'Update filter operation is not yet implemented'
-  );
-
-  // When implemented, it would look something like this:
-  /*
-  await _jiraClient.updateFilter(
-    _args.filterId!,
-    {
-      name: _args.name,
-      jql: _args.jql,
-      description: _args.description,
-      favourite: _args.favourite,
-      sharePermissions: _args.sharePermissions
-    }
-  );
-
-  // Get the updated filter to return
-  const updatedFilter = await _jiraClient.getFilter(_args.filterId!);
-  const formattedResponse = FilterFormatter.formatFilter(updatedFilter);
-
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify(formattedResponse, null, 2),
-      },
-    ],
-  };
-  */
+  throw new McpError(ErrorCode.InternalError, 'Update filter operation is not yet implemented');
 }
 
 async function handleDeleteFilter(_jiraClient: JiraClient, _args: ManageJiraFilterArgs) {
-  // Note: This is a placeholder. The current JiraClient doesn't have a deleteFilter method.
-  // You would need to implement this in the JiraClient class.
-  throw new McpError(
-    ErrorCode.InternalError,
-    'Delete filter operation is not yet implemented'
-  );
-
-  // When implemented, it would look something like this:
-  /*
-  await _jiraClient.deleteFilter(_args.filterId!);
-
-  return {
-    content: [
-      {
-        type: 'text',
-        text: JSON.stringify({
-          success: true,
-          message: `Filter ${_args.filterId} has been deleted successfully.`,
-        }, null, 2),
-      },
-    ],
-  };
-  */
+  throw new McpError(ErrorCode.InternalError, 'Delete filter operation is not yet implemented');
 }
 
 async function handleExecuteFilter(jiraClient: JiraClient, _args: ManageJiraFilterArgs) {

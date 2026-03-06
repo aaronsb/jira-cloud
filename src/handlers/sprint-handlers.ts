@@ -519,55 +519,6 @@ async function handleManageIssues(jiraClient: JiraClient, args: ManageJiraSprint
   }
 }
 
-// Legacy handler function for backward compatibility
-async function handleLegacySprintTools(name: string, args: Record<string, unknown>, jiraClient: JiraClient) {
-  console.error(`Handling legacy sprint tool: ${name}`);
-  const normalizedArgs = normalizeArgs(args);
-
-  // Map legacy tool to consolidated tool operation
-  let operation: ManageJiraSprintArgs['operation'];
-  
-  if (name === 'create_jira_sprint') {
-    operation = 'create';
-  } else if (name === 'get_jira_sprint') {
-    operation = 'get';
-  } else if (name === 'list_jira_sprints') {
-    operation = 'list';
-  } else if (name === 'update_jira_sprint') {
-    operation = 'update';
-  } else if (name === 'delete_jira_sprint') {
-    operation = 'delete';
-  } else if (name === 'update_sprint_issues') {
-    operation = 'manage_issues';
-  } else {
-    throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
-  }
-
-  // Create consolidated args
-  const consolidatedArgs: ManageJiraSprintArgs = {
-    operation,
-    ...normalizedArgs as any
-  };
-
-  // Process the operation
-  switch (operation) {
-    case 'get':
-      return await handleGetSprint(jiraClient, consolidatedArgs);
-    case 'create':
-      return await handleCreateSprint(jiraClient, consolidatedArgs);
-    case 'update':
-      return await handleUpdateSprint(jiraClient, consolidatedArgs);
-    case 'delete':
-      return await handleDeleteSprint(jiraClient, consolidatedArgs);
-    case 'list':
-      return await handleListSprints(jiraClient, consolidatedArgs);
-    case 'manage_issues':
-      return await handleManageIssues(jiraClient, consolidatedArgs);
-    default:
-      throw new McpError(ErrorCode.MethodNotFound, `Unknown operation: ${operation}`);
-  }
-}
-
 // Main handler function
 export async function handleSprintRequest(
   jiraClient: JiraClient,
@@ -587,16 +538,6 @@ export async function handleSprintRequest(
       ErrorCode.InvalidParams,
       'Missing arguments. Please provide the required parameters for this operation.'
     );
-  }
-
-  // Handle legacy sprint tools for backward compatibility
-  if (name === 'create_jira_sprint' || 
-      name === 'get_jira_sprint' || 
-      name === 'list_jira_sprints' || 
-      name === 'update_jira_sprint' || 
-      name === 'delete_jira_sprint' || 
-      name === 'update_sprint_issues') {
-    return await handleLegacySprintTools(name, args, jiraClient);
   }
 
   // Handle the consolidated sprint management tool
