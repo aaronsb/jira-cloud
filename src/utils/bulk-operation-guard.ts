@@ -61,7 +61,8 @@ class BulkOperationGuard {
     ];
 
     if (jiraHost) {
-      lines.push(`**Review in Jira:** https://${jiraHost}/issues/?jql=${encodedJql}`);
+      const host = jiraHost.replace(/^https?:\/\//, '');
+      lines.push(`**Review in Jira:** https://${host}/issues/?jql=${encodedJql}`);
     }
 
     lines.push('');
