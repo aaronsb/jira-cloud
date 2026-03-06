@@ -4,8 +4,6 @@ A Model Context Protocol server for interacting with Jira Cloud instances.
 
 ## Quick Start
 
-### Installation
-
 Add to your MCP settings:
 
 ```json
@@ -30,40 +28,31 @@ Or install globally:
 npm install -g @aaronsb/jira-cloud-mcp
 ```
 
-For detailed installation instructions, see the [Getting Started Guide](./docs/getting-started.md).
+### Credentials
 
-## Key Features
+Generate an API token at [Atlassian Account Settings](https://id.atlassian.com/manage/api-tokens).
 
-- **Issue Management**: Create, retrieve, update, and comment on Jira issues
-- **Search Capabilities**: JQL search with filtering
-- **Project & Board Management**: List and manage projects, boards, and sprints
-- **MCP Resources**: Access Jira data as context through MCP resources
-- **Tool Documentation**: Comprehensive documentation for each tool available as MCP resources
-- **Customization**: Support for custom fields and workflows
+## Tools
 
-## Architecture
+| Tool | Description |
+|------|-------------|
+| `manage_jira_issue` | Get, create, update, transition, comment on, or link Jira issues |
+| `manage_jira_filter` | Search for issues using JQL queries, or manage saved filters |
+| `manage_jira_project` | List projects or get project details including status counts |
+| `manage_jira_board` | List boards or get board details and configuration |
+| `manage_jira_sprint` | Manage sprints: create, start, close, and assign issues to sprints |
 
-The server is built with a modular architecture:
+Each tool accepts an `operation` parameter. Detailed documentation is available as MCP resources at `jira://tools/{tool_name}/documentation`.
 
-```
-src/
-├── client/       # Core Jira API client
-├── handlers/     # MCP tool handlers
-├── schemas/      # JSON schemas for tools
-├── types/        # TypeScript definitions
-├── utils/        # Utility functions
-└── index.ts      # Server entry point
-```
+## MCP Resources
 
-## Documentation
-
-Essential documentation is available in the `docs/` directory:
-
-- [Getting Started](./docs/getting-started.md) - Setup and installation
-- [API Reference](./docs/api-reference.md) - Available tools and usage
-- [Resources](./docs/resources.md) - Available MCP resources
-- [Troubleshooting](./docs/troubleshooting.md) - Common issues and solutions
-- [Development](./docs/development.md) - Development guide
+| Resource | Description |
+|----------|-------------|
+| `jira://instance/summary` | Instance-level statistics |
+| `jira://projects/{key}/overview` | Project overview with status counts |
+| `jira://boards/{id}/overview` | Board overview with sprint info |
+| `jira://issue-link-types` | Available issue link types |
+| `jira://tools/{name}/documentation` | Tool documentation |
 
 ## License
 
