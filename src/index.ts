@@ -19,6 +19,7 @@ import { handleBoardRequest } from './handlers/board-handlers.js';
 import { handleFilterRequest } from './handlers/filter-handlers.js';
 import { handleIssueRequest } from './handlers/issue-handlers.js';
 import { handleProjectRequest } from './handlers/project-handlers.js';
+import { createQueueHandler } from './handlers/queue-handler.js';
 import { setupResourceHandlers } from './handlers/resource-handlers.js';
 import { handleSprintRequest } from './handlers/sprint-handlers.js';
 import { toolSchemas } from './schemas/tool-schemas.js';
@@ -105,12 +106,17 @@ class JiraServer {
       console.error(`Handling tool request: ${name}`);
 
       try {
-        const handlers: Record<string, (client: JiraClient, req: typeof request) => Promise<any>> = {
+        const toolHandlers: Record<string, (client: JiraClient, req: typeof request) => Promise<any>> = {
           manage_jira_issue: handleIssueRequest,
           manage_jira_project: handleProjectRequest,
           manage_jira_board: handleBoardRequest,
           manage_jira_sprint: handleSprintRequest,
           manage_jira_filter: handleFilterRequest,
+        };
+
+        const handlers: Record<string, (client: JiraClient, req: typeof request) => Promise<any>> = {
+          ...toolHandlers,
+          queue_jira_operations: createQueueHandler(toolHandlers, JIRA_HOST),
         };
 
         const handler = handlers[name];

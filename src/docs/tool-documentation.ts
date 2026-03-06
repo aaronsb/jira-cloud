@@ -16,6 +16,7 @@ const documentationGenerators: Record<string, (schema: any) => any> = {
   manage_jira_sprint: generateSprintToolDocumentation,
   manage_jira_filter: generateFilterToolDocumentation,
   manage_jira_project: generateProjectToolDocumentation,
+  queue_jira_operations: generateQueueToolDocumentation,
 };
 
 export function generateToolDocumentation(toolName: string, schema: any): any {
@@ -400,6 +401,72 @@ function generateProjectToolDocumentation(schema: any) {
     related_resources: [
       { name: "Project Overview", uri: "jira://projects/{projectKey}/overview", description: "Get detailed information about a project" }
     ]
+  };
+}
+
+function generateQueueToolDocumentation(_schema: any) {
+  return {
+    name: "Queue Jira Operations",
+    description: "Execute multiple Jira operations in a single call. Operations run sequentially with result references and per-operation error strategies.",
+    parameters: {
+      operations: {
+        type: "array (max 10)",
+        description: "Ordered list of operations. Each has: tool (string), args (object), onError ('bail' | 'continue', default 'bail').",
+      },
+    },
+    error_strategies: {
+      bail: "Stop the queue on error. Remaining operations are skipped. This is the default.",
+      continue: "Log the error, proceed to the next operation.",
+    },
+    result_references: {
+      description: "Reference results from earlier operations using $N.field syntax (0-based index).",
+      supported_fields: {
+        key: "Issue key (e.g., PROJ-123) — extracted from markdown output",
+        id: "Numeric ID — extracted from response",
+        filterId: "Filter ID",
+        sprintId: "Sprint ID",
+        boardId: "Board ID",
+      },
+      example: "$0.key refers to the issue key from the first operation's result",
+    },
+    common_use_cases: [
+      {
+        title: "Create issue and set up",
+        description: "Create an issue, link it, add a comment, and transition — all in one call:",
+        steps: [
+          {
+            description: "Full workflow",
+            code: {
+              operations: [
+                { tool: "manage_jira_issue", args: { operation: "create", projectKey: "PROJ", summary: "New task", issueType: "Task" } },
+                { tool: "manage_jira_issue", args: { operation: "link", issueKey: "$0.key", linkedIssueKey: "PROJ-100", linkType: "relates to" } },
+                { tool: "manage_jira_issue", args: { operation: "comment", issueKey: "$0.key", comment: "Created and linked" }, onError: "continue" },
+              ],
+            },
+          },
+        ],
+      },
+      {
+        title: "Search and act",
+        description: "Run a JQL query then get details on specific results:",
+        steps: [
+          {
+            description: "Search then fetch",
+            code: {
+              operations: [
+                { tool: "manage_jira_filter", args: { operation: "execute_jql", jql: "project = PROJ AND status = Open", maxResults: 5 } },
+                { tool: "manage_jira_issue", args: { operation: "get", issueKey: "PROJ-100", expand: ["transitions"] } },
+              ],
+            },
+          },
+        ],
+      },
+    ],
+    guardrails: {
+      description: "Destructive operations (delete, move) are pre-scanned against the bulk-destructive limit. If the queue would exceed the limit, the entire queue is refused before any operations execute.",
+      max_operations: 10,
+    },
+    related_resources: [],
   };
 }
 
