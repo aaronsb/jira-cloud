@@ -2,6 +2,7 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import { JiraClient } from '../client/jira-client.js';
 import { MarkdownRenderer } from '../mcp/markdown-renderer.js';
+import { bulkOperationGuard } from '../utils/bulk-operation-guard.js';
 import { issueNextSteps } from '../utils/next-steps.js';
 import { normalizeArgs } from '../utils/normalize-args.js';
 
@@ -248,7 +249,14 @@ async function handleGetIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs)
 async function handleMoveIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs) {
   const issueKey = args.issueKey!;
 
+  // Check bulk-destructive guard
+  const deflection = bulkOperationGuard.check('move', issueKey, process.env.JIRA_HOST);
+  if (deflection) {
+    return { content: [{ type: 'text', text: deflection }] };
+  }
+
   await jiraClient.moveIssue(issueKey, args.targetProjectKey!, args.targetIssueType!);
+  bulkOperationGuard.record('move', issueKey);
 
   // Get the moved issue (it now has a new key in the target project)
   const movedIssue = await jiraClient.getIssue(issueKey, false, false);
@@ -267,11 +275,18 @@ async function handleMoveIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs
 async function handleDeleteIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs) {
   const issueKey = args.issueKey!;
 
+  // Check bulk-destructive guard
+  const deflection = bulkOperationGuard.check('delete', issueKey, process.env.JIRA_HOST);
+  if (deflection) {
+    return { content: [{ type: 'text', text: deflection }] };
+  }
+
   // Get the issue details before deleting for a final snapshot
   const issue = await jiraClient.getIssue(issueKey, false, false);
   const markdown = MarkdownRenderer.renderIssue(issue);
 
   await jiraClient.deleteIssue(issueKey);
+  bulkOperationGuard.record('delete', issueKey);
 
   return {
     content: [
