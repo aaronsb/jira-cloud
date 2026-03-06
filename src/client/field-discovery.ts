@@ -85,6 +85,53 @@ export class FieldDiscovery {
   }
 
   /**
+   * Get fields valid for a specific project + issue type, intersected with the master catalog.
+   * Returns only writable catalog fields that are also valid for this context.
+   * Falls back to the full writable catalog if the createmeta call fails.
+   */
+  async getContextFields(
+    client: Version3Client,
+    projectKey: string,
+    issueTypeName: string,
+  ): Promise<CatalogField[]> {
+    if (!this.ready || this.catalog.length === 0) {
+      return [];
+    }
+
+    try {
+      // Step 1: Get issue types for this project
+      const issueTypes = await client.issues.getCreateIssueMetaIssueTypes({
+        projectIdOrKey: projectKey,
+      });
+      const matchingType = (issueTypes.issueTypes || issueTypes.createMetaIssueType || [])
+        .find(t => t.name?.toLowerCase() === issueTypeName.toLowerCase());
+
+      if (!matchingType?.id) {
+        console.error(`[field-discovery] Issue type "${issueTypeName}" not found in project ${projectKey}`);
+        return this.catalog.filter(f => f.writable);
+      }
+
+      // Step 2: Get fields for this project + issue type
+      const fieldMeta = await client.issues.getCreateIssueMetaIssueTypeId({
+        projectIdOrKey: projectKey,
+        issueTypeId: matchingType.id,
+        maxResults: 100,
+      });
+      const contextFieldIds = new Set(
+        (fieldMeta.fields || fieldMeta.results || []).map(f => f.fieldId)
+      );
+
+      // Step 3: Intersect with master catalog (writable fields only)
+      return this.catalog.filter(f => f.writable && contextFieldIds.has(f.id));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[field-discovery] Context field fetch failed for ${projectKey}/${issueTypeName}: ${msg}`);
+      // Fall back to all writable catalog fields
+      return this.catalog.filter(f => f.writable);
+    }
+  }
+
+  /**
    * Start discovery in the background. Does not block.
    * Returns a promise that resolves when done (for testing).
    */

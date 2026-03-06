@@ -32,6 +32,11 @@ export class JiraClient {
     storyPoints: string;
   };
 
+  /** Expose the underlying Version3Client for field discovery and other direct API access */
+  get v3Client(): Version3Client {
+    return this.client;
+  }
+
   constructor(config: JiraConfig) {
     const clientConfig = {
       host: config.host,
