@@ -109,9 +109,10 @@ describe('boardNextSteps', () => {
     expect(result).toContain('jira://boards/42/overview');
   });
 
-  it('returns suggestions for get_configuration', () => {
-    const result = boardNextSteps('get_configuration', 42);
-    expect(result).toContain('sprint');
+  it('returns empty for removed admin operations', () => {
+    expect(boardNextSteps('create', 42)).toBe('');
+    expect(boardNextSteps('delete', 42)).toBe('');
+    expect(boardNextSteps('get_configuration', 42)).toBe('');
   });
 
   it('returns empty for unknown operation', () => {

@@ -55,10 +55,16 @@ describe('toolSchemas', () => {
     expect(assigneeProp.description.toLowerCase()).not.toContain('username');
   });
 
-  it('lead description says accountId, not username', () => {
+  it('project schema is read-only (get and list only)', () => {
     const projectSchema = toolSchemas.manage_jira_project;
-    const leadProp = projectSchema.inputSchema.properties.lead as { description: string };
-    expect(leadProp.description.toLowerCase()).toContain('accountid');
+    const ops = projectSchema.inputSchema.properties.operation.enum;
+    expect(ops).toEqual(['get', 'list']);
+  });
+
+  it('board schema is read-only (get and list only)', () => {
+    const boardSchema = toolSchemas.manage_jira_board;
+    const ops = boardSchema.inputSchema.properties.operation.enum;
+    expect(ops).toEqual(['get', 'list']);
   });
 
   it('jql description references tool documentation resource', () => {

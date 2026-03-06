@@ -163,6 +163,12 @@ describe('project handler validation', () => {
     await expectValidationError(mod, fn, {}, 'Invalid operation');
   });
 
+  it('rejects admin operations', async () => {
+    await expectValidationError(mod, fn, { operation: 'create' }, 'Invalid operation');
+    await expectValidationError(mod, fn, { operation: 'update' }, 'Invalid operation');
+    await expectValidationError(mod, fn, { operation: 'delete' }, 'Invalid operation');
+  });
+
   it('rejects get without projectKey', async () => {
     await expectValidationError(mod, fn, { operation: 'get' }, 'projectKey');
   });
@@ -180,20 +186,14 @@ describe('board handler validation', () => {
     await expectValidationError(mod, fn, {}, 'Invalid operation');
   });
 
+  it('rejects admin operations', async () => {
+    await expectValidationError(mod, fn, { operation: 'create' }, 'Invalid operation');
+    await expectValidationError(mod, fn, { operation: 'update' }, 'Invalid operation');
+    await expectValidationError(mod, fn, { operation: 'delete' }, 'Invalid operation');
+    await expectValidationError(mod, fn, { operation: 'get_configuration' }, 'Invalid operation');
+  });
+
   it('rejects get without boardId', async () => {
     await expectValidationError(mod, fn, { operation: 'get' }, 'boardId');
-  });
-
-  it('rejects create without name', async () => {
-    await expectValidationError(mod, fn, { operation: 'create' }, 'name');
-  });
-
-  it('rejects create without type', async () => {
-    await expectValidationError(mod, fn, { operation: 'create', name: 'Board' }, 'type');
-  });
-
-  it('rejects create without projectKey', async () => {
-    await expectValidationError(mod, fn,
-      { operation: 'create', name: 'Board', type: 'scrum' }, 'projectKey');
   });
 });

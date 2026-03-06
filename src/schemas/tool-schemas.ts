@@ -231,28 +231,12 @@ export const toolSchemas = {
       properties: {
         operation: {
           type: 'string',
-          enum: ['get', 'create', 'update', 'delete', 'list'],
+          enum: ['get', 'list'],
           description: 'Operation to perform',
         },
         projectKey: {
           type: 'string',
-          description: 'Project key (e.g., PROJ). Required for get, update, delete.',
-        },
-        name: {
-          type: 'string',
-          description: 'Project name. Required for create.',
-        },
-        key: {
-          type: 'string',
-          description: 'Project key. Required for create.',
-        },
-        description: {
-          type: 'string',
-          description: 'Project description.',
-        },
-        lead: {
-          type: 'string',
-          description: 'Atlassian accountId of the project lead.',
+          description: 'Project key (e.g., PROJ). Required for get.',
         },
         startAt: {
           type: 'integer',
@@ -290,25 +274,12 @@ export const toolSchemas = {
       properties: {
         operation: {
           type: 'string',
-          enum: ['get', 'list', 'create', 'update', 'delete', 'get_configuration'],
+          enum: ['get', 'list'],
           description: 'Operation to perform',
         },
         boardId: {
           type: 'integer',
-          description: 'Board ID. Required for get, update, delete, get_configuration.',
-        },
-        name: {
-          type: 'string',
-          description: 'Board name. Required for create.',
-        },
-        type: {
-          type: 'string',
-          enum: ['scrum', 'kanban'],
-          description: 'Board type. Required for create.',
-        },
-        projectKey: {
-          type: 'string',
-          description: 'Project key. Required for create.',
+          description: 'Board ID. Required for get.',
         },
         startAt: {
           type: 'integer',

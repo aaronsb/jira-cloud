@@ -176,13 +176,7 @@ export function boardNextSteps(operation: string, boardId?: number): string {
     case 'get':
       steps.push(
         { description: 'View board sprints', tool: 'manage_jira_sprint', example: { operation: 'list', boardId } },
-        { description: 'Get board configuration', tool: 'manage_jira_board', example: { operation: 'get_configuration', boardId } },
         { description: `Read board overview resource at jira://boards/${boardId}/overview` },
-      );
-      break;
-    case 'get_configuration':
-      steps.push(
-        { description: 'View or create sprints', tool: 'manage_jira_sprint', example: { operation: 'list', boardId } },
       );
       break;
   }
