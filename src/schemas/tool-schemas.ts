@@ -144,13 +144,13 @@ export const toolSchemas = {
 
   manage_jira_issue: {
     name: 'manage_jira_issue',
-    description: 'Get, create, update, delete, transition, comment on, or link Jira issues',
+    description: 'Get, create, update, delete, move, transition, comment on, or link Jira issues',
     inputSchema: {
       type: 'object',
       properties: {
         operation: {
           type: 'string',
-          enum: ['create', 'get', 'update', 'delete', 'transition', 'comment', 'link'],
+          enum: ['create', 'get', 'update', 'delete', 'move', 'transition', 'comment', 'link'],
           description: 'Operation to perform',
         },
         issueKey: {
@@ -209,6 +209,14 @@ export const toolSchemas = {
         linkedIssueKey: {
           type: 'string',
           description: 'Issue key to link to. Required for link.',
+        },
+        targetProjectKey: {
+          type: 'string',
+          description: 'Target project key for move (e.g., NEWPROJ). Required for move.',
+        },
+        targetIssueType: {
+          type: 'string',
+          description: 'Target issue type for move (e.g., Story, Bug). Required for move.',
         },
         expand: {
           type: 'array',

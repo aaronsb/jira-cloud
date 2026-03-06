@@ -83,6 +83,19 @@ describe('issue handler validation', () => {
     await expectValidationError(mod, fn, { operation: 'delete' }, 'issueKey');
   });
 
+  it('rejects move without issueKey', async () => {
+    await expectValidationError(mod, fn, { operation: 'move' }, 'issueKey');
+  });
+
+  it('rejects move without targetProjectKey', async () => {
+    await expectValidationError(mod, fn, { operation: 'move', issueKey: 'PROJ-1' }, 'targetProjectKey');
+  });
+
+  it('rejects move without targetIssueType', async () => {
+    await expectValidationError(mod, fn,
+      { operation: 'move', issueKey: 'PROJ-1', targetProjectKey: 'NEWPROJ' }, 'targetIssueType');
+  });
+
   it('rejects invalid expand values', async () => {
     await expectValidationError(mod, fn,
       { operation: 'get', issueKey: 'PROJ-1', expand: ['invalid'] }, 'Invalid expansion');

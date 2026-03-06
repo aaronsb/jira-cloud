@@ -30,6 +30,11 @@ describe('issueNextSteps', () => {
     expect(result).toContain('related issues');
   });
 
+  it('returns suggestions for move', () => {
+    const result = issueNextSteps('move', 'PROJ-1');
+    expect(result).toContain('moved issue');
+  });
+
   it('returns empty for unknown operation', () => {
     expect(issueNextSteps('unknown')).toBe('');
   });
