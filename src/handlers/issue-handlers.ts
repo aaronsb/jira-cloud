@@ -19,6 +19,7 @@ type ManageJiraIssueArgs = {
   priority?: string;
   assignee?: string;
   labels?: string[];
+  dueDate?: string | null;
   customFields?: Record<string, any>;
   transitionId?: string;
   comment?: string;
@@ -129,11 +130,12 @@ function validateManageJiraIssueArgs(args: unknown): args is ManageJiraIssueArgs
         normalizedArgs.assignee === undefined &&
         normalizedArgs.priority === undefined &&
         normalizedArgs.labels === undefined &&
+        normalizedArgs.dueDate === undefined &&
         normalizedArgs.customFields === undefined
       ) {
         throw new McpError(
           ErrorCode.InvalidParams,
-          'At least one update field (summary, description, parent, assignee, priority, labels, or customFields) must be provided for the update operation.'
+          'At least one update field (summary, description, parent, assignee, priority, labels, dueDate, or customFields) must be provided for the update operation.'
         );
       }
       break;
@@ -387,6 +389,7 @@ async function handleCreateIssue(jiraClient: JiraClient, args: ManageJiraIssueAr
     priority: args.priority,
     assignee: args.assignee,
     labels: args.labels,
+    dueDate: args.dueDate ?? undefined,
     customFields,
   });
   
@@ -415,6 +418,7 @@ async function handleUpdateIssue(jiraClient: JiraClient, args: ManageJiraIssueAr
     assignee: args.assignee,
     priority: args.priority,
     labels: args.labels,
+    dueDate: args.dueDate,
     customFields,
   });
 

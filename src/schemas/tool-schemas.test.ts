@@ -61,10 +61,10 @@ describe('toolSchemas', () => {
       expect(schema.inputSchema.required).toEqual(['operations']);
     });
 
-    it('has operations array with maxItems 10', () => {
+    it('has operations array with maxItems 16', () => {
       const opsProp = schema.inputSchema.properties.operations as any;
       expect(opsProp.type).toBe('array');
-      expect(opsProp.maxItems).toBe(10);
+      expect(opsProp.maxItems).toBe(16);
     });
 
     it('lists all domain tools in the tool enum', () => {
