@@ -494,7 +494,7 @@ describe('renderCubeSetup', () => {
     expect(output).toContain('## Suggested Cubes');
     expect(output).toContain('`groupBy: "project"`');
     expect(output).toContain('4 groups');
-    expect(output).toContain('24 count queries');
+    expect(output).toContain('24 base queries');
   });
 
   it('includes available measures', () => {

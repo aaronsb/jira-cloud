@@ -18,6 +18,8 @@ const CUBE_SAMPLE_PCT = 0.2;   // 20% of total issues
 const CUBE_SAMPLE_MIN = 50;    // floor — enough for rare dimension values
 const CUBE_SAMPLE_MAX = 500;   // ceiling — proven fast with lean search
 const MAX_CUBE_GROUPS = 20;
+const MAX_COUNT_QUERIES = 150; // ADR-206 budget: max count API calls per execution
+const STANDARD_MEASURES = 6;   // total, open, overdue, high+, created_7d, resolved_7d
 
 type StatusBucket = 'To Do' | 'In Progress' | 'Done';
 
@@ -431,6 +433,12 @@ function formatComputed(n: number): string {
   return Number.isInteger(n) ? String(n) : n.toFixed(1);
 }
 
+/** Compute max groups that fit within the query budget */
+function maxGroupsForBudget(implicitCount: number): number {
+  const queriesPerGroup = STANDARD_MEASURES + implicitCount;
+  return Math.floor(MAX_COUNT_QUERIES / queriesPerGroup);
+}
+
 async function handleSummary(jiraClient: JiraClient, jql: string, groupBy?: GroupByField, compute?: ComputeColumn[]): Promise<string> {
   const lines: string[] = [];
   lines.push(`# Summary: ${jql}`);
@@ -438,12 +446,15 @@ async function handleSummary(jiraClient: JiraClient, jql: string, groupBy?: Grou
 
   // Detect implicit measures needed by compute expressions
   const neededImplicits = compute ? detectImplicitMeasures(compute) : [];
+  const groupBudget = maxGroupsForBudget(neededImplicits.length);
 
   if (groupBy === 'project') {
-    const keys = extractProjectKeys(jql);
+    let keys = extractProjectKeys(jql);
     if (keys.length === 0) {
       throw new McpError(ErrorCode.InvalidParams, 'groupBy "project" requires project keys in JQL (e.g., project in (AA, GC))');
     }
+    const capped = keys.length > groupBudget;
+    if (capped) keys = keys.slice(0, groupBudget);
     const remaining = removeProjectClause(jql);
     const rows = await Promise.all(
       keys.map(k => buildCountRow(jiraClient, k,
@@ -454,6 +465,9 @@ async function handleSummary(jiraClient: JiraClient, jql: string, groupBy?: Grou
     rows.sort((a, b) => b.unresolved - a.unresolved);
     lines.push('');
     lines.push(renderSummaryTable(rows, compute));
+    if (capped) {
+      lines.push(`*Capped at ${groupBudget} groups to stay within ${MAX_COUNT_QUERIES}-query budget*`);
+    }
   } else if (groupBy) {
     // For non-project groupBy, sample per-project for representative dimension values
     const issues = await samplePerProject(jiraClient, jql);
@@ -466,9 +480,12 @@ async function handleSummary(jiraClient: JiraClient, jql: string, groupBy?: Grou
       throw new McpError(ErrorCode.InvalidParams, `No ${groupBy} values found in sampled issues`);
     }
 
-    const jqlClause = groupByJqlClause(groupBy, dim.values);
+    // Cap groups to query budget
+    const cappedValues = dim.values.slice(0, groupBudget);
+
+    const jqlClause = groupByJqlClause(groupBy, cappedValues);
     const rows = await Promise.all(
-      dim.values.map((value, idx) => buildCountRow(jiraClient, value,
+      cappedValues.map((value, idx) => buildCountRow(jiraClient, value,
         `(${jql}) AND ${jqlClause[idx]}`,
         neededImplicits
       ))
@@ -476,8 +493,11 @@ async function handleSummary(jiraClient: JiraClient, jql: string, groupBy?: Grou
     rows.sort((a, b) => b.unresolved - a.unresolved);
     lines.push('');
     lines.push(renderSummaryTable(rows, compute));
-    if (dim.count > dim.values.length) {
-      lines.push(`*Showing top ${dim.values.length} of ${dim.count} ${groupBy} values (from ${issues.length}-issue sample)*`);
+    if (dim.count > cappedValues.length) {
+      const reason = cappedValues.length < dim.values.length
+        ? `capped at ${groupBudget} groups (${MAX_COUNT_QUERIES}-query budget)`
+        : `from ${issues.length}-issue sample`;
+      lines.push(`*Showing top ${cappedValues.length} of ${dim.count} ${groupBy} values (${reason})*`);
     }
   } else {
     // No groupBy — single row for the whole JQL
@@ -556,13 +576,14 @@ export function renderCubeSetup(jql: string, sampleSize: number, dimensions: Dim
 
   // Suggested cubes with cost estimates
   lines.push('');
-  lines.push('## Suggested Cubes');
-  const QUERIES_PER_GROUP = 6; // standard measures
+  lines.push(`## Suggested Cubes (budget: ${MAX_COUNT_QUERIES} queries)`);
   for (const dim of dimensions) {
     const groups = Math.min(dim.count, MAX_CUBE_GROUPS);
-    const queries = groups * QUERIES_PER_GROUP;
+    const queries = groups * STANDARD_MEASURES;
     const estSeconds = Math.max(1, Math.round(queries / 12)); // ~12 parallel queries/sec
-    lines.push(`- \`groupBy: "${dim.name}"\` — ${groups} groups, ${queries} count queries (~${estSeconds}s)`);
+    const withinBudget = queries <= MAX_COUNT_QUERIES;
+    const badge = withinBudget ? '' : ' ⚠️ add compute measures to stay in budget';
+    lines.push(`- \`groupBy: "${dim.name}"\` — ${groups} groups, ${queries} base queries (~${estSeconds}s)${badge}`);
   }
 
   return lines.join('\n');
