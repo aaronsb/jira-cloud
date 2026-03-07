@@ -261,6 +261,29 @@ export function renderCycle(issues: JiraIssueDetails[], now: Date): string {
       .slice(0, 5);
     const oldestStr = oldest.map(o => `${o.key} (${o.age}d)`).join(', ');
     lines.push(`**Oldest open:** ${oldestStr}`);
+
+    // Staleness — how long since last update
+    const staleness = open.map(i => ({
+      key: i.key,
+      days: daysBetween(parseDate(i.updated), now),
+    }));
+    const buckets = { fresh: 0, aging: 0, stale: 0, abandoned: 0 };
+    for (const s of staleness) {
+      if (s.days < 7) buckets.fresh++;
+      else if (s.days < 30) buckets.aging++;
+      else if (s.days < 90) buckets.stale++;
+      else buckets.abandoned++;
+    }
+    lines.push(`**Staleness:** <7d: ${buckets.fresh} | 7-30d: ${buckets.aging} | 30-90d: ${buckets.stale} | 90d+: ${buckets.abandoned}`);
+
+    // Most stale open issues
+    const mostStale = staleness
+      .sort((a, b) => b.days - a.days)
+      .slice(0, 5);
+    if (mostStale.length > 0 && mostStale[0].days >= 30) {
+      const staleStr = mostStale.map(s => `${s.key} (${s.days}d)`).join(', ');
+      lines.push(`**Most stale:** ${staleStr}`);
+    }
   }
 
   return lines.join('\n');
