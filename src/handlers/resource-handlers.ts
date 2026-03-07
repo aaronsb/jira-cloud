@@ -46,6 +46,12 @@ export function setupResourceHandlers(jiraClient: JiraClient) {
             mimeType: 'application/json',
             description: 'Discovered custom fields ranked by usage — names, types, descriptions, writability'
           },
+          {
+            uri: 'jira://analysis/recipes',
+            name: 'Analysis Query Recipes',
+            mimeType: 'text/markdown',
+            description: 'Composition patterns for analyze_jira_issues — how to combine summary counts, groupBy, and JQL for PM dashboards'
+          },
           // Add tool resources
           ...toolResources.resources
         ]
@@ -102,6 +108,10 @@ export function setupResourceHandlers(jiraClient: JiraClient) {
 
         if (uri === 'jira://custom-fields') {
           return getCustomFieldsCatalog();
+        }
+
+        if (uri === 'jira://analysis/recipes') {
+          return getAnalysisRecipes();
         }
         
         // Handle resource templates
@@ -403,6 +413,88 @@ async function getContextCustomFields(jiraClient: JiraClient, projectKey: string
         count: result.length,
         catalogReady: fieldDiscovery.isReady(),
       }, null, 2),
+    }],
+  };
+}
+
+/**
+ * Returns analysis query recipes — composition patterns for the analyze_jira_issues tool
+ */
+function getAnalysisRecipes() {
+  const markdown = `# Analysis Query Recipes
+
+## Two Layers
+
+Stack these for magnitude + detail:
+
+1. **Count layer** — \`analyze_jira_issues\` with \`metrics: ["summary"]\` + \`groupBy: "project"\` → exact counts, no cap
+2. **Detail layer** — \`analyze_jira_issues\` with other metrics, or \`manage_jira_filter\` execute_jql → individual issues
+
+## Recipes
+
+### Project Health Snapshot
+**Question:** Which projects are busiest / most at-risk?
+\`\`\`json
+{ "jql": "project in (AA, LGS, GD, GC) AND resolution = Unresolved", "metrics": ["summary"], "groupBy": "project" }
+\`\`\`
+
+### Net Flow / Velocity
+**Question:** Are we resolving faster than creating?
+Run two summary queries and subtract:
+- \`created >= -7d\` with \`groupBy: "project"\` → created this week
+- \`resolved >= -7d\` with \`groupBy: "project"\` → resolved this week
+Net = created - resolved. Positive = growing backlog. Negative = clearing.
+
+### Bug Ratio
+**Question:** How much open work is bugs vs planned?
+\`\`\`json
+{ "jql": "issuetype = Bug AND resolution = Unresolved", "metrics": ["summary"], "groupBy": "project" }
+\`\`\`
+
+### Overdue Breakdown
+**Question:** Where are we most behind?
+\`\`\`json
+{ "jql": "resolution = Unresolved AND dueDate < now()", "metrics": ["summary"], "groupBy": "project" }
+\`\`\`
+
+### Deadline Pressure Window
+**Question:** What's due in the next 2 weeks?
+\`\`\`json
+{ "jql": "resolution = Unresolved AND dueDate >= now() AND dueDate <= 14d", "metrics": ["summary"], "groupBy": "project" }
+\`\`\`
+
+### Stale Backlog
+**Question:** How much backlog needs grooming?
+\`\`\`json
+{ "jql": "status = Backlog AND created <= -90d", "metrics": ["summary"], "groupBy": "project" }
+\`\`\`
+
+### Ownership Gaps
+**Question:** What has no owner?
+\`\`\`json
+{ "jql": "resolution = Unresolved AND assignee is EMPTY", "metrics": ["summary"], "groupBy": "project" }
+\`\`\`
+
+### Planning Coverage
+**Question:** How much work has no due date?
+\`\`\`json
+{ "jql": "resolution = Unresolved AND dueDate is EMPTY", "metrics": ["summary"], "groupBy": "project" }
+\`\`\`
+
+## Key Patterns
+
+- \`groupBy: "project"\` turns any query into a cross-project comparison table with exact counts
+- Two summary queries = velocity (created vs resolved over same window)
+- \`dueDate is EMPTY\` surfaces planning gaps that overdue queries miss
+- \`assignee is EMPTY AND priority in (High, Highest)\` = high-priority work with no owner (most actionable)
+- Use \`summary\` for cross-project scope, then \`distribution\`/\`schedule\` per-project for detail
+`;
+
+  return {
+    contents: [{
+      uri: 'jira://analysis/recipes',
+      mimeType: 'text/markdown',
+      text: markdown,
     }],
   };
 }
