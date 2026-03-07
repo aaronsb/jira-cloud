@@ -423,103 +423,95 @@ async function getContextCustomFields(jiraClient: JiraClient, projectKey: string
 function getAnalysisRecipes() {
   const markdown = `# Analysis Query Recipes
 
-## Two Layers
+## Foundation Rules
 
-Stack these for magnitude + detail:
+- **Always start with cube_setup** on unfamiliar JQL before committing to a query. It tells you what dimensions exist, how many distinct values each has, and estimates query cost. Think of it as DESCRIBE TABLE before a SQL query.
+- **\`metrics: ["summary"] + groupBy: "project"\` is your default opening move.** It's exact (no sampling cap), fast, and gives you a cross-project comparison in one call. Use everything else to drill down after.
+- **The \`distribution\` metric is rich but capped at 500 issues.** Only use it scoped to a single project, never cross-project. Mixing it into a broad query will silently undersample.
+- **\`manage_jira_project\` issue counts cap at 100** — never use it for actual counts, only for metadata. \`analyze_jira_issues\` with \`metrics: ["summary"]\` is always more accurate.
 
-1. **Count layer** — \`analyze_jira_issues\` with \`metrics: ["summary"]\` + \`groupBy: "project"\` → exact counts, no cap
-2. **Detail layer** — \`analyze_jira_issues\` with other metrics, or \`manage_jira_filter\` execute_jql → individual issues
+## Core Recipes
 
-## Recipes
-
-### Project Health Snapshot
+### Org-wide Health Snapshot
 **Question:** Which projects are busiest / most at-risk?
 \`\`\`json
-{ "jql": "project in (AA, LGS, GD, GC) AND resolution = Unresolved", "metrics": ["summary"], "groupBy": "project" }
+{ "jql": "project in (...) AND resolution = Unresolved", "metrics": ["summary"], "groupBy": "project", "compute": ["overdue_pct = overdue / open * 100", "high_pct = high / open * 100", "clearing = resolved_7d > created_7d", "planning_gap = no_due_date / open * 100"] }
 \`\`\`
+One query, full picture. The \`clearing\` boolean immediately flags which projects are accumulating debt.
 
 ### Net Flow / Velocity
 **Question:** Are we resolving faster than creating?
-Run two summary queries and subtract:
-- \`created >= -7d\` with \`groupBy: "project"\` → created this week
-- \`resolved >= -7d\` with \`groupBy: "project"\` → resolved this week
-Net = created - resolved. Positive = growing backlog. Negative = clearing.
-
-### Bug Ratio
-**Question:** How much open work is bugs vs planned?
 \`\`\`json
-{ "jql": "issuetype = Bug AND resolution = Unresolved", "metrics": ["summary"], "groupBy": "project" }
+{ "jql": "project in (...) AND (created >= -7d OR resolved >= -7d)", "metrics": ["summary"], "groupBy": "project", "compute": ["net_flow = resolved_7d - created_7d", "clearing = resolved_7d > created_7d"] }
 \`\`\`
+Positive net_flow = clearing, negative = accumulating. The OR condition in JQL ensures you capture both sides of the ledger.
 
-### Overdue Breakdown
-**Question:** Where are we most behind?
+### Team Workload Scorecard
+**Question:** Who is overloaded or under-tracked?
 \`\`\`json
-{ "jql": "resolution = Unresolved AND dueDate < now()", "metrics": ["summary"], "groupBy": "project" }
+{ "jql": "project in (...) AND resolution = Unresolved AND assignee is not EMPTY", "metrics": ["summary"], "groupBy": "assignee", "compute": ["overdue_pct = overdue / open * 100", "high_pct = high / open * 100", "no_dates = no_due_date / open * 100"] }
 \`\`\`
+The \`no_dates\` column is the secret ingredient — it distinguishes "this person is behind" from "this person has no dates set so overdue looks artificially low." Scope to 2-3 projects max.
 
-### Deadline Pressure Window
-**Question:** What's due in the next 2 weeks?
-\`\`\`json
-{ "jql": "resolution = Unresolved AND dueDate >= now() AND dueDate <= 14d", "metrics": ["summary"], "groupBy": "project" }
-\`\`\`
-
-### Stale Backlog
-**Question:** How much backlog needs grooming?
-\`\`\`json
-{ "jql": "status = Backlog AND created <= -90d", "metrics": ["summary"], "groupBy": "project" }
-\`\`\`
-
-### Ownership Gaps
-**Question:** What has no owner?
-\`\`\`json
-{ "jql": "resolution = Unresolved AND assignee is EMPTY", "metrics": ["summary"], "groupBy": "project" }
-\`\`\`
-
-### Planning Coverage
-**Question:** How much work has no due date?
+### Planning Gap Detector
+**Question:** Where is risk invisible?
 \`\`\`json
 { "jql": "resolution = Unresolved AND dueDate is EMPTY", "metrics": ["summary"], "groupBy": "project" }
 \`\`\`
+Projects with high-priority open issues and no due dates aren't "on time" — they're untracked. Don't trust overdue numbers in projects with high planning gap.
 
-## Data Cube (Advanced)
+### Stale Backlog Grooming Target
+**Question:** What needs a decision?
+\`\`\`json
+{ "jql": "status = Backlog AND created <= -90d", "metrics": ["summary"], "groupBy": "project" }
+\`\`\`
+Anything sitting in Backlog 90+ days with no movement is a decision waiting to happen. Pair with \`manage_jira_filter\` execute_jql to get the actual list for a grooming session.
+
+### Unowned + Urgent (Danger Combo)
+**Question:** What's high priority with no owner?
+\`\`\`json
+{ "jql": "resolution = Unresolved AND assignee is EMPTY AND priority in (High, Highest)", "metrics": ["summary"], "groupBy": "project" }
+\`\`\`
+This should always return zero. When it doesn't, it's the most actionable finding in the entire system.
+
+### Blocked Issue Sweep
+**Question:** What's stuck?
+Use \`manage_jira_filter\` with \`execute_jql\` for this one:
+\`\`\`json
+{ "operation": "execute_jql", "jql": "status = Blocked ORDER BY created ASC" }
+\`\`\`
+Blocked lists tend to be small but each one is a potential cascade. Oldest first surfaces the longest-stuck items for escalation.
+
+## Data Cube
 
 For multi-dimensional analysis, use the two-phase cube pattern:
 
 ### Phase 1: Discover dimensions
 \`\`\`json
-{ "jql": "project in (AA, LGS, GD, GC) AND resolution = Unresolved", "metrics": ["cube_setup"] }
+{ "jql": "project in (...) AND resolution = Unresolved", "metrics": ["cube_setup"] }
 \`\`\`
-Returns available dimensions, their values, and cost estimates for each groupBy option.
+Returns available dimensions, their values, cost estimates, and query budget.
 
 ### Phase 2: Execute with computed columns
 \`\`\`json
-{ "jql": "project in (AA, LGS, GD, GC) AND resolution = Unresolved", "metrics": ["summary"], "groupBy": "project", "compute": ["bug_pct = bugs / total * 100", "net_flow = created_7d - resolved_7d", "clearing = resolved_7d > created_7d"] }
+{ "jql": "project in (...) AND resolution = Unresolved", "metrics": ["summary"], "groupBy": "project", "compute": ["bug_pct = bugs / total * 100", "net_flow = created_7d - resolved_7d", "clearing = resolved_7d > created_7d"] }
 \`\`\`
 
-### Compute DSL
-- Arithmetic: \`+\`, \`-\`, \`*\`, \`/\`
-- Comparisons: \`>\`, \`<\`, \`>=\`, \`<=\`, \`==\`, \`!=\` (produce Yes/No)
+### Compute DSL Reference
+- Arithmetic: \`+\`, \`-\`, \`*\`, \`/\` (division by zero = 0)
+- Comparisons: \`>\`, \`<\`, \`>=\`, \`<=\`, \`==\`, \`!=\` (produce Yes/No — cannot be summed or averaged)
 - Standard columns: total, open, overdue, high, created_7d, resolved_7d
-- Implicit measures (lazily resolved): bugs, unassigned, no_due_date, blocked
-- Max 5 expressions per query
+- Implicit measures (lazily resolved via count API): bugs, unassigned, no_due_date, blocked
+- Max 5 expressions per query, 150-query budget per execution
+- Expressions evaluate linearly — later expressions can reference earlier ones
 
-### Example computed columns
-- \`bug_pct = bugs / total * 100\` — bug ratio as percentage
-- \`net_flow = created_7d - resolved_7d\` — positive = growing backlog
-- \`clearing = resolved_7d > created_7d\` — Yes/No: is backlog shrinking?
-- \`risk = overdue > 10\` — Yes/No flag for at-risk projects
-- \`velocity = resolved_7d / 7\` — daily throughput
+## Gotchas
 
-## Key Patterns
-
-- \`groupBy: "project"\` turns any query into a cross-project comparison table with exact counts
-- \`groupBy: "assignee"\` / \`"priority"\` / \`"issuetype"\` — slice by any dimension
-- \`compute\` adds derived columns without extra tool calls
-- Two summary queries = velocity (created vs resolved over same window)
-- \`dueDate is EMPTY\` surfaces planning gaps that overdue queries miss
-- \`assignee is EMPTY AND priority in (High, Highest)\` = high-priority work with no owner (most actionable)
-- Use \`cube_setup\` first to discover dimensions, then \`summary\` + \`groupBy\` + \`compute\` to execute
-- Use \`summary\` for cross-project scope, then \`distribution\`/\`schedule\` per-project for detail
+- **\`groupBy: "assignee"\` on large JQL will error.** Scope to 2-3 projects at a time.
+- **Don't trust overdue in projects with high planning_gap.** If 100% of issues have no due date, overdue = 0 is meaningless, not good news.
+- **Boolean computed columns (Yes/No) can't be summed or averaged.** Don't try to build a ratio on top of one.
+- **\`resolved >= -7d\` is the reliable resolution window.** The Resolved 7d column in summary derives from this same window.
+- **Use \`cube_setup\` first** to discover dimensions, then \`summary\` + \`groupBy\` + \`compute\` to execute.
 `;
 
   return {
