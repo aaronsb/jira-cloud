@@ -91,106 +91,84 @@ export function renderIssue(issue: JiraIssueDetails, transitions?: TransitionDet
   lines.push(`# ${issue.key}: ${issue.summary}`);
   lines.push('');
 
-  // Core fields
-  lines.push(`**Type:** ${issue.issueType} | **Status:** ${formatStatus(issue.status)}${issue.priority ? ` | **Priority:** ${issue.priority}` : ''}`);
-  if (issue.assignee) {
-    lines.push(`**Assignee:** ${issue.assignee}`);
-  } else {
-    lines.push(`**Assignee:** Unassigned`);
-  }
-  lines.push(`**Reporter:** ${issue.reporter}`);
+  // Core fields — pipe-delimited
+  const core = [issue.issueType, formatStatus(issue.status)];
+  if (issue.priority) core.push(issue.priority);
+  core.push(issue.assignee || 'Unassigned');
+  lines.push(core.join(' | '));
+  lines.push(`Reporter: ${issue.reporter}`);
 
-  if (issue.parent) {
-    lines.push(`**Parent:** ${issue.parent}`);
-  }
+  if (issue.parent) lines.push(`Parent: ${issue.parent}`);
+  if (issue.labels && issue.labels.length > 0) lines.push(`Labels: ${issue.labels.join(', ')}`);
 
-  if (issue.labels && issue.labels.length > 0) {
-    lines.push(`**Labels:** ${issue.labels.join(', ')}`);
-  }
-
-  // Dates
+  // Dates — single line
   const dates: string[] = [];
   if (issue.created) dates.push(`Created ${formatDate(issue.created)}`);
   if (issue.updated) dates.push(`Updated ${formatDate(issue.updated)}`);
-  if (dates.length > 0) lines.push(`**${dates.join(' | ')}**`);
+  if (issue.startDate) dates.push(`Start ${formatDate(issue.startDate)}`);
+  if (issue.dueDate) dates.push(`Due ${formatDate(issue.dueDate)}`);
+  if (issue.resolutionDate) dates.push(`Resolved ${formatDate(issue.resolutionDate)}`);
+  if (dates.length > 0) lines.push(dates.join(' | '));
 
-  const scheduleDates: string[] = [];
-  if (issue.startDate) scheduleDates.push(`Start: ${formatDate(issue.startDate)}`);
-  if (issue.dueDate) scheduleDates.push(`Due: ${formatDate(issue.dueDate)}`);
-  if (issue.resolutionDate) scheduleDates.push(`Resolved: ${formatDate(issue.resolutionDate)}`);
-  if (scheduleDates.length > 0) lines.push(`**${scheduleDates.join(' | ')}**`);
-
-  if (issue.storyPoints) {
-    lines.push(`**Points:** ${issue.storyPoints}`);
-  }
-
+  if (issue.storyPoints) lines.push(`Points: ${issue.storyPoints}`);
   if (issue.timeEstimate) {
     const hours = Math.floor(issue.timeEstimate / 3600);
     const minutes = Math.floor((issue.timeEstimate % 3600) / 60);
     const parts: string[] = [];
     if (hours > 0) parts.push(`${hours}h`);
     if (minutes > 0) parts.push(`${minutes}m`);
-    lines.push(`**Estimate:** ${parts.length > 0 ? parts.join(' ') : '0m'}`);
+    lines.push(`Estimate: ${parts.length > 0 ? parts.join(' ') : '0m'}`);
   }
+  if (issue.resolution) lines.push(`Resolution: ${issue.resolution}`);
 
-  if (issue.resolution) {
-    lines.push(`**Resolution:** ${issue.resolution}`);
-  }
-
-  // Description (truncated for token efficiency)
+  // Description — full for single issue view
   if (issue.description) {
     lines.push('');
-    lines.push('## Description');
-    const desc = stripHtml(issue.description);
-    lines.push(truncate(desc, 300));
+    lines.push('Description:');
+    lines.push(stripHtml(issue.description));
   }
 
   // Issue links
   if (issue.issueLinks && issue.issueLinks.length > 0) {
     lines.push('');
-    lines.push('## Links');
+    lines.push('Links:');
     for (const link of issue.issueLinks) {
-      if (link.outward) {
-        lines.push(`- ${link.type} -> ${link.outward}`);
-      }
-      if (link.inward) {
-        lines.push(`- ${link.type} <- ${link.inward}`);
-      }
+      if (link.outward) lines.push(`${link.type} -> ${link.outward}`);
+      if (link.inward) lines.push(`${link.type} <- ${link.inward}`);
     }
   }
 
   // Comments (if present)
   if (issue.comments && issue.comments.length > 0) {
     lines.push('');
-    lines.push(`## Comments (${issue.comments.length})`);
-    // Show last 3 comments
-    const recentComments = issue.comments.slice(-3);
-    for (const comment of recentComments) {
-      lines.push(`- **${comment.author}** (${formatDate(comment.created)}): ${truncate(stripHtml(comment.body), 100)}`);
+    lines.push(`Comments (${issue.comments.length}):`);
+    const recentComments = issue.comments.slice(-5);
+    if (issue.comments.length > 5) {
+      lines.push(`  +${issue.comments.length - 5} older comments`);
     }
-    if (issue.comments.length > 3) {
-      lines.push(`  ... and ${issue.comments.length - 3} more comments`);
+    for (const comment of recentComments) {
+      lines.push(`${comment.author} (${formatDate(comment.created)}): ${stripHtml(comment.body)}`);
     }
   }
 
   // Custom fields (from catalog discovery)
   if (issue.customFieldValues && issue.customFieldValues.length > 0) {
     lines.push('');
-    lines.push('## Custom Fields');
+    lines.push('Custom Fields:');
     for (const cf of issue.customFieldValues) {
       const displayValue = Array.isArray(cf.value)
         ? (cf.value as unknown[]).join(', ')
         : String(cf.value);
-      lines.push(`- **${cf.name}** (${cf.type}): ${displayValue}`);
+      lines.push(`${cf.name} (${cf.type}): ${displayValue}`);
     }
   }
 
   // Available transitions
   if (transitions && transitions.length > 0) {
     lines.push('');
-    lines.push('## Available Actions');
+    lines.push('Actions:');
     for (const t of transitions) {
-      lines.push(`- **${t.name}** -> ${t.to.name} (id: ${t.id})`);
+      lines.push(`${t.name} -> ${t.to.name} (id: ${t.id})`);
     }
   }
 
