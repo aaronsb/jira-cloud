@@ -332,7 +332,7 @@ export const toolSchemas = {
 
   analyze_jira_issues: {
     name: 'analyze_jira_issues',
-    description: 'Compute project metrics over issues selected by JQL. Use "summary" for exact counts across projects (no sampling cap). Use other metrics for detailed analysis of individual issue data. Always prefer this tool over manage_jira_filter or manage_jira_project for quantitative questions (counts, totals, overdue, workload).',
+    description: 'Compute project metrics over issues selected by JQL. Use "summary" for exact counts across projects (no sampling cap). Use other metrics for detailed analysis of individual issue data. Always prefer this tool over manage_jira_filter or manage_jira_project for quantitative questions (counts, totals, overdue, workload). Read jira://analysis/recipes for composition patterns.',
     inputSchema: {
       type: 'object',
       properties: {
