@@ -339,19 +339,15 @@ export function renderProjectList(projects: ProjectData[]): string {
   lines.push('');
 
   for (const project of projects) {
-    lines.push(`## ${project.key}: ${project.name}`);
-    if (project.lead) {
-      lines.push(`Lead: ${project.lead}`);
-    }
-    if (project.description) {
-      lines.push(`> ${truncate(stripHtml(project.description), 100)}`);
-    }
+    const parts = [project.key, project.name];
+    if (project.lead) parts.push(project.lead);
     if (project.statusCounts) {
       const total = Object.values(project.statusCounts).reduce((a, b) => a + b, 0);
-      lines.push(`Issues: ${total}`);
+      parts.push(`${total} issues`);
     }
-    lines.push('');
+    lines.push(parts.join(' | '));
   }
+  lines.push('');
 
   lines.push('---');
   lines.push(`Tip: Use manage_jira_project with operation="get" and projectKey="KEY" for details`);
