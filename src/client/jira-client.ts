@@ -37,6 +37,11 @@ export class JiraClient {
     return this.client;
   }
 
+  /** Expose custom field IDs for JQL construction outside the client */
+  get customFieldIds(): { startDate: string; storyPoints: string } {
+    return this.customFields;
+  }
+
   constructor(config: JiraConfig) {
     const clientConfig = {
       host: config.host,

@@ -493,7 +493,7 @@ function generateAnalysisToolDocumentation(schema: any) {
       },
       compute: {
         type: "array of strings",
-        description: "Computed columns for summary tables. Each: 'name = expr'. Arithmetic, comparisons, column refs. Implicit measures: bugs, unassigned, no_due_date, blocked.",
+        description: "Computed columns for summary tables. Each: 'name = expr'. Arithmetic, comparisons, column refs. Implicit measures: bugs, unassigned, no_due_date, no_estimate, no_start_date, no_labels, blocked.",
       },
       maxResults: {
         type: "integer",

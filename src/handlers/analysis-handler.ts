@@ -322,18 +322,39 @@ export function removeProjectClause(jql: string): string {
     .trim();
 }
 
+/** Run async tasks in batches to avoid API rate limiting */
+async function batchParallel<T>(tasks: (() => Promise<T>)[], batchSize: number): Promise<T[]> {
+  const results: T[] = [];
+  for (let i = 0; i < tasks.length; i += batchSize) {
+    const batch = tasks.slice(i, i + batchSize);
+    results.push(...await Promise.all(batch.map(fn => fn())));
+  }
+  return results;
+}
+
+const ROW_BATCH_SIZE = 3; // ~18-33 concurrent count queries per batch
+
 /** Build a scoped JQL by adding a condition to the base query */
 function scopeJql(baseJql: string, condition: string): string {
   return `(${baseJql}) AND ${condition}`;
 }
 
-/** Implicit measures — lazily resolved if referenced in compute expressions */
-const IMPLICIT_MEASURES: Record<string, string> = {
-  bugs: 'issuetype = Bug AND resolution = Unresolved',
-  unassigned: 'assignee is EMPTY AND resolution = Unresolved',
-  no_due_date: 'dueDate is EMPTY AND resolution = Unresolved',
-  blocked: 'status = Blocked',
-};
+/** Implicit measures — lazily resolved if referenced in compute expressions.
+ *  Built dynamically because some use custom field IDs. */
+function buildImplicitMeasures(customFieldIds?: { startDate: string; storyPoints: string }): Record<string, string> {
+  const measures: Record<string, string> = {
+    bugs: 'issuetype = Bug AND resolution = Unresolved',
+    unassigned: 'assignee is EMPTY AND resolution = Unresolved',
+    no_due_date: 'dueDate is EMPTY AND resolution = Unresolved',
+    blocked: 'status = Blocked',
+    no_labels: 'labels is EMPTY AND resolution = Unresolved',
+  };
+  if (customFieldIds) {
+    measures.no_estimate = `${customFieldIds.storyPoints} is EMPTY AND resolution = Unresolved`;
+    measures.no_start_date = `${customFieldIds.startDate} is EMPTY AND resolution = Unresolved`;
+  }
+  return measures;
+}
 
 /** Map dimension values to JQL clauses for groupBy scoping */
 export function groupByJqlClause(dimension: GroupByField, values: string[]): string[] {
@@ -356,6 +377,7 @@ async function buildCountRow(
   label: string,
   baseJql: string,
   implicitMeasureNames?: string[],
+  implicitMeasureDefs?: Record<string, string>,
 ): Promise<CountRow> {
   const [total, unresolved, overdue, highPriority, createdRecently, resolvedRecently] = await Promise.all([
     jiraClient.countIssues(baseJql),
@@ -367,10 +389,10 @@ async function buildCountRow(
   ]);
 
   let implicitMeasures: Record<string, number> | undefined;
-  if (implicitMeasureNames && implicitMeasureNames.length > 0) {
+  if (implicitMeasureNames && implicitMeasureNames.length > 0 && implicitMeasureDefs) {
     const counts = await Promise.all(
       implicitMeasureNames.map(name =>
-        jiraClient.countIssues(scopeJql(baseJql, IMPLICIT_MEASURES[name]))
+        jiraClient.countIssues(scopeJql(baseJql, implicitMeasureDefs[name]))
       )
     );
     implicitMeasures = {};
@@ -444,8 +466,9 @@ async function handleSummary(jiraClient: JiraClient, jql: string, groupBy?: Grou
   lines.push(`# Summary: ${jql}`);
   lines.push(`As of ${formatDateShort(new Date())} — counts are exact (no sampling cap)`);
 
-  // Detect implicit measures needed by compute expressions
-  const neededImplicits = compute ? detectImplicitMeasures(compute) : [];
+  // Build implicit measures with custom field IDs for JQL construction
+  const implicitDefs = buildImplicitMeasures(jiraClient.customFieldIds);
+  const neededImplicits = compute ? detectImplicitMeasures(compute, implicitDefs) : [];
   const groupBudget = maxGroupsForBudget(neededImplicits.length);
 
   if (groupBy === 'project') {
@@ -456,11 +479,12 @@ async function handleSummary(jiraClient: JiraClient, jql: string, groupBy?: Grou
     const capped = keys.length > groupBudget;
     if (capped) keys = keys.slice(0, groupBudget);
     const remaining = removeProjectClause(jql);
-    const rows = await Promise.all(
-      keys.map(k => buildCountRow(jiraClient, k,
+    const rows = await batchParallel(
+      keys.map(k => () => buildCountRow(jiraClient, k,
         remaining ? `project = ${k} AND (${remaining})` : `project = ${k}`,
-        neededImplicits
-      ))
+        neededImplicits, implicitDefs
+      )),
+      ROW_BATCH_SIZE,
     );
     rows.sort((a, b) => b.unresolved - a.unresolved);
     lines.push('');
@@ -484,11 +508,12 @@ async function handleSummary(jiraClient: JiraClient, jql: string, groupBy?: Grou
     const cappedValues = dim.values.slice(0, groupBudget);
 
     const jqlClause = groupByJqlClause(groupBy, cappedValues);
-    const rows = await Promise.all(
-      cappedValues.map((value, idx) => buildCountRow(jiraClient, value,
+    const rows = await batchParallel(
+      cappedValues.map((value, idx) => () => buildCountRow(jiraClient, value,
         `(${jql}) AND ${jqlClause[idx]}`,
-        neededImplicits
-      ))
+        neededImplicits, implicitDefs
+      )),
+      ROW_BATCH_SIZE,
     );
     rows.sort((a, b) => b.unresolved - a.unresolved);
     lines.push('');
@@ -501,7 +526,7 @@ async function handleSummary(jiraClient: JiraClient, jql: string, groupBy?: Grou
     }
   } else {
     // No groupBy — single row for the whole JQL
-    const row = await buildCountRow(jiraClient, 'All', jql, neededImplicits);
+    const row = await buildCountRow(jiraClient, 'All', jql, neededImplicits, implicitDefs);
     lines.push('');
     lines.push(renderSummaryTable([row], compute));
   }
@@ -510,9 +535,9 @@ async function handleSummary(jiraClient: JiraClient, jql: string, groupBy?: Grou
 }
 
 /** Detect which implicit measures are referenced by compute expressions */
-function detectImplicitMeasures(compute: ComputeColumn[]): string[] {
+function detectImplicitMeasures(compute: ComputeColumn[], implicitMeasureDefs: Record<string, string>): string[] {
   const refs = extractColumnRefs(compute);
-  return Object.keys(IMPLICIT_MEASURES).filter(name => refs.has(name));
+  return Object.keys(implicitMeasureDefs).filter(name => refs.has(name));
 }
 
 // ── Cube Setup ────────────────────────────────────────────────────────
@@ -572,7 +597,7 @@ export function renderCubeSetup(jql: string, sampleSize: number, dimensions: Dim
   lines.push('- total, open, overdue, high+, created_7d, resolved_7d');
   lines.push('');
   lines.push('Implicit measures (lazily resolved if referenced in `compute`):');
-  lines.push('- bugs, unassigned, no_due_date, blocked');
+  lines.push('- bugs, unassigned, no_due_date, no_estimate, no_start_date, no_labels, blocked');
 
   // Suggested cubes with cost estimates
   lines.push('');
