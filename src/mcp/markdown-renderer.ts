@@ -232,22 +232,16 @@ export function renderIssueSearchResults(
   // Issues list
   for (let i = 0; i < issues.length; i++) {
     const issue = issues[i];
-    const num = pagination.startAt + i + 1;
-    lines.push(`## ${num}. ${issue.key}: ${issue.summary}`);
-    const meta = [`${formatStatus(issue.status)}`, issue.assignee || 'Unassigned'];
+    const meta = [issue.key, issue.summary, formatStatus(issue.status), issue.assignee || 'Unassigned'];
     if (issue.priority) meta.push(issue.priority);
+    if (issue.dueDate) meta.push(`due ${formatDate(issue.dueDate)}`);
     lines.push(meta.join(' | '));
-    const searchDates: string[] = [];
-    if (issue.dueDate) searchDates.push(`Due: ${formatDate(issue.dueDate)}`);
-    if (issue.startDate) searchDates.push(`Start: ${formatDate(issue.startDate)}`);
-    if (searchDates.length > 0) lines.push(searchDates.join(' | '));
     if (issue.description) {
       const desc = stripHtml(issue.description);
       if (desc.length > 0) {
-        lines.push(`> ${truncate(desc, 120)}`);
+        lines.push(`  ${truncate(desc, 120)}`);
       }
     }
-    lines.push('');
   }
 
   // Pagination guidance
@@ -413,9 +407,9 @@ export function renderBoardList(boards: BoardData[]): string {
   }
 
   for (const [type, typeBoards] of Object.entries(byType)) {
-    lines.push(`## ${type.charAt(0).toUpperCase() + type.slice(1)} Boards`);
+    lines.push(`${type.charAt(0).toUpperCase() + type.slice(1)} Boards:`);
     for (const board of typeBoards) {
-      lines.push(`- **${board.name}** (id: ${board.id})${board.projectKey ? ` - ${board.projectKey}` : ''}`);
+      lines.push(`${board.name} | id: ${board.id}${board.projectKey ? ` | ${board.projectKey}` : ''}`);
     }
     lines.push('');
   }
@@ -473,7 +467,7 @@ export function renderSprint(sprint: SprintData): string {
 
   if (sprint.issues && sprint.issues.length > 0) {
     lines.push('');
-    lines.push(`## Issues (${sprint.issues.length})`);
+    lines.push(`Issues (${sprint.issues.length}):`);
 
     // Group by status
     const byStatus: Record<string, SprintIssueData[]> = {};
@@ -484,9 +478,9 @@ export function renderSprint(sprint: SprintData): string {
     }
 
     for (const [status, statusIssues] of Object.entries(byStatus)) {
-      lines.push(`### ${status} (${statusIssues.length})`);
+      lines.push(`${status} (${statusIssues.length}):`);
       for (const issue of statusIssues) {
-        lines.push(`- ${issue.key}: ${issue.summary}${issue.assignee ? ` [${issue.assignee}]` : ''}`);
+        lines.push(`${issue.key} | ${issue.summary}${issue.assignee ? ` | ${issue.assignee}` : ''}`);
       }
     }
   }
@@ -554,17 +548,17 @@ export function renderFilterList(filters: FilterData[]): string {
   const others = filters.filter(f => !f.favourite);
 
   if (favorites.length > 0) {
-    lines.push('## Favorites');
+    lines.push('Favorites:');
     for (const filter of favorites) {
-      lines.push(`- **${filter.name}** (id: ${filter.id}) - ${filter.owner}`);
+      lines.push(`${filter.name} | id: ${filter.id} | ${filter.owner}`);
     }
     lines.push('');
   }
 
   if (others.length > 0) {
-    lines.push('## Other Filters');
+    lines.push('Other Filters:');
     for (const filter of others) {
-      lines.push(`- ${filter.name} (id: ${filter.id}) - ${filter.owner}`);
+      lines.push(`${filter.name} | id: ${filter.id} | ${filter.owner}`);
     }
   }
 
