@@ -7,12 +7,14 @@ import { normalizeArgs } from '../utils/normalize-args.js';
 
 // ── Types ──────────────────────────────────────────────────────────────
 
-type MetricGroup = 'points' | 'time' | 'schedule' | 'cycle' | 'distribution' | 'summary';
+type MetricGroup = 'points' | 'time' | 'schedule' | 'cycle' | 'distribution' | 'summary' | 'cube_setup';
 
 const ALL_METRICS: MetricGroup[] = ['points', 'time', 'schedule', 'cycle', 'distribution'];
 const VALID_GROUP_BY = ['project', 'assignee', 'priority', 'issuetype'] as const;
 type GroupByField = typeof VALID_GROUP_BY[number];
 const MAX_ISSUES = 500;
+const CUBE_SAMPLE_SIZE = 50;
+const MAX_CUBE_GROUPS = 20;
 
 type StatusBucket = 'To Do' | 'In Progress' | 'Done';
 
@@ -382,6 +384,92 @@ async function handleSummary(jiraClient: JiraClient, jql: string, groupBy?: Grou
   return lines.join('\n');
 }
 
+// ── Cube Setup ────────────────────────────────────────────────────────
+
+interface DimensionInfo {
+  name: string;
+  values: string[];
+  count: number;
+}
+
+/** Extract distinct dimension values from sampled issues */
+export function extractDimensions(issues: JiraIssueDetails[]): DimensionInfo[] {
+  const dims: { name: string; extractor: (i: JiraIssueDetails) => string }[] = [
+    { name: 'project', extractor: i => i.key.split('-')[0] },
+    { name: 'status', extractor: i => i.status },
+    { name: 'assignee', extractor: i => i.assignee || 'Unassigned' },
+    { name: 'priority', extractor: i => i.priority || 'None' },
+    { name: 'issuetype', extractor: i => i.issueType || 'Unknown' },
+  ];
+
+  return dims.map(({ name, extractor }) => {
+    const counts = new Map<string, number>();
+    for (const issue of issues) {
+      const val = extractor(issue);
+      counts.set(val, (counts.get(val) || 0) + 1);
+    }
+    // Sort by count descending, cap at MAX_CUBE_GROUPS
+    const sorted = [...counts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, MAX_CUBE_GROUPS);
+    return {
+      name,
+      values: sorted.map(([v]) => v),
+      count: counts.size,
+    };
+  });
+}
+
+/** Render cube setup response with dimension catalog and cost estimates */
+export function renderCubeSetup(jql: string, sampleSize: number, dimensions: DimensionInfo[]): string {
+  const lines = [`# Cube Setup: ${jql}`, `Sampled ${sampleSize} issues to discover dimensions.`, ''];
+
+  // Dimension table
+  lines.push('## Available Dimensions');
+  lines.push('| Dimension | Distinct Values | Count |');
+  lines.push('|-----------|----------------|------:|');
+  for (const dim of dimensions) {
+    const displayed = dim.values.slice(0, 5).join(', ');
+    const more = dim.count > 5 ? ` +${dim.count - 5}` : '';
+    lines.push(`| ${dim.name} | ${displayed}${more} | ${dim.count} |`);
+  }
+
+  // Available measures
+  lines.push('');
+  lines.push('## Available Measures');
+  lines.push('Standard columns per group (via count API):');
+  lines.push('- total, open, overdue, high+, created_7d, resolved_7d');
+  lines.push('');
+  lines.push('Implicit measures (lazily resolved if referenced in `compute`):');
+  lines.push('- bugs, unassigned, no_due_date, blocked');
+
+  // Suggested cubes with cost estimates
+  lines.push('');
+  lines.push('## Suggested Cubes');
+  const QUERIES_PER_GROUP = 6; // standard measures
+  for (const dim of dimensions) {
+    const groups = Math.min(dim.count, MAX_CUBE_GROUPS);
+    const queries = groups * QUERIES_PER_GROUP;
+    const estSeconds = Math.max(1, Math.round(queries / 12)); // ~12 parallel queries/sec
+    lines.push(`- \`groupBy: "${dim.name}"\` — ${groups} groups, ${queries} count queries (~${estSeconds}s)`);
+  }
+
+  return lines.join('\n');
+}
+
+async function handleCubeSetup(jiraClient: JiraClient, jql: string): Promise<string> {
+  // Sample issues to discover dimensions
+  const result = await jiraClient.searchIssuesLean(jql, CUBE_SAMPLE_SIZE);
+  const issues = result.issues;
+
+  if (issues.length === 0) {
+    return `# Cube Setup: ${jql}\n\nNo issues matched this query. Cannot discover dimensions.`;
+  }
+
+  const dimensions = extractDimensions(issues);
+  return renderCubeSetup(jql, issues.length, dimensions);
+}
+
 // ── Main Handler ───────────────────────────────────────────────────────
 
 export async function handleAnalysisRequest(jiraClient: JiraClient, request: any) {
@@ -397,6 +485,7 @@ export async function handleAnalysisRequest(jiraClient: JiraClient, request: any
     ? args.metrics as string[]
     : [];
   const hasSummary = requested.includes('summary');
+  const hasCubeSetup = requested.includes('cube_setup');
   const fetchMetrics = requested.length > 0
     ? requested.filter(m => ALL_METRICS.includes(m as MetricGroup)) as MetricGroup[]
     : ALL_METRICS;
@@ -405,6 +494,18 @@ export async function handleAnalysisRequest(jiraClient: JiraClient, request: any
   const groupBy = (typeof args.groupBy === 'string' && VALID_GROUP_BY.includes(args.groupBy as GroupByField))
     ? args.groupBy as GroupByField
     : undefined;
+
+  // Cube setup — discover dimensions from sample, no issue fetching
+  if (hasCubeSetup) {
+    const cubeText = await handleCubeSetup(jiraClient, jql);
+    const nextSteps = analysisNextSteps(jql, []);
+    return {
+      content: [{
+        type: 'text',
+        text: cubeText + '\n' + nextSteps,
+      }],
+    };
+  }
 
   // If only summary requested, skip issue fetching entirely
   if (hasSummary && fetchMetrics.length === 0) {

@@ -344,9 +344,9 @@ export const toolSchemas = {
           type: 'array',
           items: {
             type: 'string',
-            enum: ['summary', 'points', 'time', 'schedule', 'cycle', 'distribution'],
+            enum: ['summary', 'points', 'time', 'schedule', 'cycle', 'distribution', 'cube_setup'],
           },
-          description: 'Which metric groups to compute. summary = exact issue counts via count API (no cap, fastest). points = earned value/SPI. time = effort estimates. schedule = overdue/risk. cycle = lead time/throughput. distribution = counts by status/assignee/priority/type. Default: all except summary.',
+          description: 'Which metric groups to compute. summary = exact issue counts via count API (no cap, fastest). cube_setup = sample issues and discover available dimensions/measures for cube queries. points = earned value/SPI. time = effort estimates. schedule = overdue/risk. cycle = lead time/throughput. distribution = counts by status/assignee/priority/type. Default: all except summary and cube_setup.',
         },
         groupBy: {
           type: 'string',
