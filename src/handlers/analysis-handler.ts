@@ -453,12 +453,12 @@ async function handleSummary(jiraClient: JiraClient, jql: string, groupBy?: Grou
     lines.push('');
     lines.push(renderSummaryTable(rows, compute));
   } else if (groupBy) {
-    // For non-project groupBy, sample to discover values, then count per value
-    const sample = await jiraClient.searchIssuesLean(jql, CUBE_SAMPLE_SIZE);
-    if (sample.issues.length === 0) {
+    // For non-project groupBy, sample per-project for representative dimension values
+    const issues = await samplePerProject(jiraClient, jql);
+    if (issues.length === 0) {
       throw new McpError(ErrorCode.InvalidParams, `No issues matched JQL — cannot discover ${groupBy} values`);
     }
-    const dims = extractDimensions(sample.issues);
+    const dims = extractDimensions(issues);
     const dim = dims.find(d => d.name === groupBy);
     if (!dim || dim.values.length === 0) {
       throw new McpError(ErrorCode.InvalidParams, `No ${groupBy} values found in sampled issues`);
@@ -475,7 +475,7 @@ async function handleSummary(jiraClient: JiraClient, jql: string, groupBy?: Grou
     lines.push('');
     lines.push(renderSummaryTable(rows, compute));
     if (dim.count > dim.values.length) {
-      lines.push(`*Showing top ${dim.values.length} of ${dim.count} ${groupBy} values (from ${sample.issues.length}-issue sample)*`);
+      lines.push(`*Showing top ${dim.values.length} of ${dim.count} ${groupBy} values (from ${issues.length}-issue sample)*`);
     }
   } else {
     // No groupBy — single row for the whole JQL
@@ -566,16 +566,48 @@ export function renderCubeSetup(jql: string, sampleSize: number, dimensions: Dim
   return lines.join('\n');
 }
 
+/** Sample issues across all projects in scope for representative dimension discovery */
+async function samplePerProject(jiraClient: JiraClient, jql: string): Promise<JiraIssueDetails[]> {
+  let projectKeys = extractProjectKeys(jql);
+
+  if (projectKeys.length === 0) {
+    const allProjects = await jiraClient.listProjects();
+    projectKeys = allProjects.map(p => p.key);
+  }
+
+  if (projectKeys.length <= 1) {
+    // Single project or couldn't discover — just sample directly
+    const result = await jiraClient.searchIssuesLean(jql, CUBE_SAMPLE_SIZE);
+    return result.issues;
+  }
+
+  const remaining = removeProjectClause(jql);
+  const perProject = Math.max(5, Math.floor(CUBE_SAMPLE_SIZE / projectKeys.length));
+  const samples = await Promise.all(
+    projectKeys.map(async k => {
+      const scopedJql = remaining ? `project = ${k} AND (${remaining})` : `project = ${k}`;
+      try {
+        const result = await jiraClient.searchIssuesLean(scopedJql, perProject);
+        return result.issues;
+      } catch {
+        return [];
+      }
+    })
+  );
+  return samples.flat();
+}
+
 async function handleCubeSetup(jiraClient: JiraClient, jql: string): Promise<string> {
-  // Sample issues to discover dimensions
-  const result = await jiraClient.searchIssuesLean(jql, CUBE_SAMPLE_SIZE);
-  const issues = result.issues;
+  const issues = await samplePerProject(jiraClient, jql);
 
   if (issues.length === 0) {
     return `# Cube Setup: ${jql}\n\nNo issues matched this query. Cannot discover dimensions.`;
   }
 
+  // Extract dimensions — project dimension uses actual keys from sample
+  // (samplePerProject ensures coverage across all projects in scope)
   const dimensions = extractDimensions(issues);
+
   return renderCubeSetup(jql, issues.length, dimensions);
 }
 
