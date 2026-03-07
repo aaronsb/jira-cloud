@@ -201,3 +201,17 @@ export function boardNextSteps(operation: string, boardId?: number): string {
   }
   return steps.length > 0 ? formatSteps(steps) : '';
 }
+
+export function analysisNextSteps(jql: string, issueKeys: string[]): string {
+  const steps: NextStep[] = [];
+  if (issueKeys.length > 0) {
+    steps.push(
+      { description: 'Get details on a specific issue', tool: 'manage_jira_issue', example: { operation: 'get', issueKey: issueKeys[0] } },
+    );
+  }
+  steps.push(
+    { description: 'Narrow the analysis with refined JQL', tool: 'analyze_jira_issues', example: { jql: `${jql} AND priority = High` } },
+    { description: 'View the full issue list', tool: 'manage_jira_filter', example: { operation: 'execute_jql', jql } },
+  );
+  return formatSteps(steps);
+}

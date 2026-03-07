@@ -59,6 +59,10 @@
       "description": "Manage sprints and assign issues to sprints"
     },
     {
+      "name": "analyze_jira_issues",
+      "description": "Compute project metrics over a set of issues selected by JQL"
+    },
+    {
       "name": "queue_jira_operations",
       "description": "Execute multiple Jira operations in a single call"
     }
