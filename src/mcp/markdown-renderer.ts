@@ -143,11 +143,13 @@ export function renderIssue(issue: JiraIssueDetails, transitions?: TransitionDet
     lines.push('');
     lines.push(`Comments (${issue.comments.length}):`);
     const recentComments = issue.comments.slice(-5);
+    const startIdx = issue.comments.length - recentComments.length + 1;
     if (issue.comments.length > 5) {
       lines.push(`  +${issue.comments.length - 5} older comments`);
     }
-    for (const comment of recentComments) {
-      lines.push(`${comment.author} (${formatDate(comment.created)}): ${stripHtml(comment.body)}`);
+    for (let i = 0; i < recentComments.length; i++) {
+      const comment = recentComments[i];
+      lines.push(`[${startIdx + i}/${issue.comments.length}] ${comment.author} (${formatDate(comment.created)}): ${stripHtml(comment.body)}`);
     }
   }
 
