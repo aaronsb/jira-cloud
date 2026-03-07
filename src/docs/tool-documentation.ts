@@ -483,15 +483,21 @@ function generateAnalysisToolDocumentation(schema: any) {
       },
       metrics: {
         type: "array of strings",
-        description: "Which metric groups to include. Default: all.",
-        values: ["points", "time", "schedule", "cycle", "distribution"],
+        description: "Which metric groups to compute. summary uses count API (no cap). Others fetch issue data (subject to maxResults).",
+        values: ["summary", "points", "time", "schedule", "cycle", "distribution"],
+      },
+      groupBy: {
+        type: "string",
+        description: "Split summary counts by dimension. Use with metrics: ['summary'].",
+        values: ["project", "assignee", "priority", "issuetype"],
       },
       maxResults: {
         type: "integer",
-        description: "Max issues to analyze (default 100, max 500).",
+        description: "Max issues to fetch for detail metrics (default 100, max 500). Does not apply to summary.",
       },
     },
     metric_groups: {
+      summary: "Exact counts — total, open, overdue, high priority, created/resolved last 7 days. No sampling cap. Supports groupBy for cross-project comparison.",
       points: "Earned Value — PV, EV, remaining, SPI, status breakdown, unestimated count",
       time: "Effort — original estimate, completed, remaining by status category",
       schedule: "Risk — date window, overdue count/slip, due soon, concentration risk, missing dates",
@@ -499,6 +505,13 @@ function generateAnalysisToolDocumentation(schema: any) {
       distribution: "Composition — counts by status, assignee, priority, issue type",
     },
     common_use_cases: [
+      {
+        title: "Cross-project comparison",
+        description: "Compare issue counts across multiple projects (exact, no cap):",
+        steps: [
+          { description: "Summary by project", code: { jql: "project in (AA, GC, GD, LGS)", metrics: ["summary"], groupBy: "project" } },
+        ],
+      },
       {
         title: "Sprint health check",
         description: "Analyze all issues in the current sprint:",
@@ -514,10 +527,10 @@ function generateAnalysisToolDocumentation(schema: any) {
         ],
       },
       {
-        title: "Workload balance",
-        description: "See how work is distributed across team members:",
+        title: "Quick project overview",
+        description: "Get exact issue counts without fetching data:",
         steps: [
-          { description: "Distribution only", code: { jql: "project = AA AND resolution = Unresolved", metrics: ["distribution"] } },
+          { description: "Summary only", code: { jql: "project = AA", metrics: ["summary"] } },
         ],
       },
     ],

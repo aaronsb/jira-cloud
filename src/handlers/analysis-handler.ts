@@ -7,9 +7,11 @@ import { normalizeArgs } from '../utils/normalize-args.js';
 
 // ── Types ──────────────────────────────────────────────────────────────
 
-type MetricGroup = 'points' | 'time' | 'schedule' | 'cycle' | 'distribution';
+type MetricGroup = 'points' | 'time' | 'schedule' | 'cycle' | 'distribution' | 'summary';
 
 const ALL_METRICS: MetricGroup[] = ['points', 'time', 'schedule', 'cycle', 'distribution'];
+const VALID_GROUP_BY = ['project', 'assignee', 'priority', 'issuetype'] as const;
+type GroupByField = typeof VALID_GROUP_BY[number];
 const MAX_ISSUES = 500;
 
 type StatusBucket = 'To Do' | 'In Progress' | 'Done';
@@ -275,6 +277,111 @@ export function renderDistribution(issues: JiraIssueDetails[]): string {
   return lines.join('\n');
 }
 
+// ── Summary (count-based) ─────────────────────────────────────────────
+
+interface CountRow {
+  label: string;
+  total: number;
+  unresolved: number;
+  overdue: number;
+  highPriority: number;
+  createdRecently: number;
+  resolvedRecently: number;
+}
+
+/** Extract project keys from JQL like "project in (AA, GC, GD)" or "project = AA" */
+export function extractProjectKeys(jql: string): string[] {
+  // project in (AA, GC, GD)
+  const inMatch = jql.match(/project\s+in\s*\(([^)]+)\)/i);
+  if (inMatch) {
+    return inMatch[1].split(',').map(k => k.trim().replace(/['"]/g, ''));
+  }
+  // project = AA
+  const eqMatch = jql.match(/project\s*=\s*['"]?(\w+)['"]?/i);
+  if (eqMatch) {
+    return [eqMatch[1]];
+  }
+  return [];
+}
+
+/** Remove the project clause from JQL, returning remaining constraints */
+export function removeProjectClause(jql: string): string {
+  return jql
+    .replace(/project\s+in\s*\([^)]+\)\s*(AND\s*)?/i, '')
+    .replace(/project\s*=\s*['"]?\w+['"]?\s*(AND\s*)?/i, '')
+    .replace(/^\s*AND\s*/i, '')
+    .replace(/\s*AND\s*$/i, '')
+    .trim();
+}
+
+/** Build a scoped JQL by adding a condition to the base query */
+function scopeJql(baseJql: string, condition: string): string {
+  return `(${baseJql}) AND ${condition}`;
+}
+
+async function buildCountRow(jiraClient: JiraClient, label: string, baseJql: string): Promise<CountRow> {
+  const [total, unresolved, overdue, highPriority, createdRecently, resolvedRecently] = await Promise.all([
+    jiraClient.countIssues(baseJql),
+    jiraClient.countIssues(scopeJql(baseJql, 'resolution = Unresolved')),
+    jiraClient.countIssues(scopeJql(baseJql, 'resolution = Unresolved AND dueDate < now()')),
+    jiraClient.countIssues(scopeJql(baseJql, 'priority in (High, Highest, Critical, Blocker)')),
+    jiraClient.countIssues(scopeJql(baseJql, 'created >= -7d')),
+    jiraClient.countIssues(scopeJql(baseJql, 'resolved >= -7d')),
+  ]);
+  return { label, total, unresolved, overdue, highPriority, createdRecently, resolvedRecently };
+}
+
+export function renderSummaryTable(rows: CountRow[]): string {
+  const lines = ['## Summary (exact counts)', ''];
+  lines.push('| Scope | Total | Open | Overdue | High+ | Created 7d | Resolved 7d |');
+  lines.push('|-------|------:|-----:|--------:|------:|-----------:|------------:|');
+  for (const r of rows) {
+    lines.push(`| ${r.label} | ${r.total} | ${r.unresolved} | ${r.overdue} | ${r.highPriority} | ${r.createdRecently} | ${r.resolvedRecently} |`);
+  }
+  // Totals row if multiple
+  if (rows.length > 1) {
+    const sum = (fn: (r: CountRow) => number) => rows.reduce((s, r) => s + fn(r), 0);
+    lines.push(`| **Total** | **${sum(r => r.total)}** | **${sum(r => r.unresolved)}** | **${sum(r => r.overdue)}** | **${sum(r => r.highPriority)}** | **${sum(r => r.createdRecently)}** | **${sum(r => r.resolvedRecently)}** |`);
+  }
+  return lines.join('\n');
+}
+
+async function handleSummary(jiraClient: JiraClient, jql: string, groupBy?: GroupByField): Promise<string> {
+  const lines: string[] = [];
+  lines.push(`# Summary: ${jql}`);
+  lines.push(`As of ${formatDateShort(new Date())} — counts are exact (no sampling cap)`);
+
+  if (groupBy === 'project') {
+    const keys = extractProjectKeys(jql);
+    if (keys.length === 0) {
+      throw new McpError(ErrorCode.InvalidParams, 'groupBy "project" requires project keys in JQL (e.g., project in (AA, GC))');
+    }
+    const remaining = removeProjectClause(jql);
+    const rows = await Promise.all(
+      keys.map(k => buildCountRow(jiraClient, k,
+        remaining ? `project = ${k} AND (${remaining})` : `project = ${k}`
+      ))
+    );
+    rows.sort((a, b) => b.unresolved - a.unresolved);
+    lines.push('');
+    lines.push(renderSummaryTable(rows));
+  } else if (groupBy) {
+    // For non-project groupBy, get the overall count first
+    const overallRow = await buildCountRow(jiraClient, 'All', jql);
+    lines.push('');
+    lines.push(renderSummaryTable([overallRow]));
+    lines.push('');
+    lines.push(`*groupBy "${groupBy}" — only "project" supports per-group breakdown currently. Other dimensions coming soon.*`);
+  } else {
+    // No groupBy — single row for the whole JQL
+    const row = await buildCountRow(jiraClient, 'All', jql);
+    lines.push('');
+    lines.push(renderSummaryTable([row]));
+  }
+
+  return lines.join('\n');
+}
+
 // ── Main Handler ───────────────────────────────────────────────────────
 
 export async function handleAnalysisRequest(jiraClient: JiraClient, request: any) {
@@ -285,16 +392,34 @@ export async function handleAnalysisRequest(jiraClient: JiraClient, request: any
     throw new McpError(ErrorCode.InvalidParams, 'jql parameter is required.');
   }
 
+  // Parse requested metrics
+  const requested = (args.metrics && Array.isArray(args.metrics))
+    ? args.metrics as string[]
+    : [];
+  const hasSummary = requested.includes('summary');
+  const fetchMetrics = requested.length > 0
+    ? requested.filter(m => ALL_METRICS.includes(m as MetricGroup)) as MetricGroup[]
+    : ALL_METRICS;
+
+  // Parse groupBy
+  const groupBy = (typeof args.groupBy === 'string' && VALID_GROUP_BY.includes(args.groupBy as GroupByField))
+    ? args.groupBy as GroupByField
+    : undefined;
+
+  // If only summary requested, skip issue fetching entirely
+  if (hasSummary && fetchMetrics.length === 0) {
+    const summaryText = await handleSummary(jiraClient, jql, groupBy);
+    const nextSteps = analysisNextSteps(jql, []);
+    return {
+      content: [{
+        type: 'text',
+        text: summaryText + '\n' + nextSteps,
+      }],
+    };
+  }
+
   const DEFAULT_MAX = 100;
   const maxResults = Math.min(Number(args.maxResults) || DEFAULT_MAX, MAX_ISSUES);
-
-  // Parse requested metrics
-  let metrics: MetricGroup[] = ALL_METRICS;
-  if (args.metrics && Array.isArray(args.metrics)) {
-    const requested = args.metrics as string[];
-    const valid = requested.filter(m => ALL_METRICS.includes(m as MetricGroup));
-    if (valid.length > 0) metrics = valid as MetricGroup[];
-  }
 
   // Fetch issues using cursor-based pagination (50 per page, Jira enhanced search API)
   const allIssues: JiraIssueDetails[] = [];
@@ -324,7 +449,7 @@ export async function handleAnalysisRequest(jiraClient: JiraClient, request: any
     }
   }
 
-  if (allIssues.length === 0) {
+  if (allIssues.length === 0 && !hasSummary) {
     return {
       content: [{
         type: 'text',
@@ -336,25 +461,34 @@ export async function handleAnalysisRequest(jiraClient: JiraClient, request: any
   const now = new Date();
   const lines: string[] = [];
 
-  // Header
-  lines.push(`# Analysis: ${jql}`);
-  lines.push(`Analyzed ${allIssues.length} issues (as of ${formatDateShort(now)})`);
-  if (truncated) {
-    lines.push(`*Results capped at ${maxResults} issues — query may match more.*`);
+  // Summary first if requested alongside other metrics
+  if (hasSummary) {
+    const summaryText = await handleSummary(jiraClient, jql, groupBy);
+    lines.push(summaryText);
   }
 
-  // Render requested metrics
-  const renderers: Record<MetricGroup, () => string> = {
-    points: () => renderPoints(allIssues),
-    time: () => renderTime(allIssues),
-    schedule: () => renderSchedule(allIssues, now),
-    cycle: () => renderCycle(allIssues, now),
-    distribution: () => renderDistribution(allIssues),
-  };
+  // Header for fetch-based metrics
+  if (fetchMetrics.length > 0 && allIssues.length > 0) {
+    if (hasSummary) lines.push('');
+    lines.push(`# Detail: ${jql}`);
+    lines.push(`Analyzed ${allIssues.length} issues (as of ${formatDateShort(now)})`);
+    if (truncated) {
+      lines.push(`*Results capped at ${maxResults} issues — query may match more.*`);
+    }
 
-  for (const metric of metrics) {
-    lines.push('');
-    lines.push(renderers[metric]());
+    // Render requested metrics
+    const renderers: Record<string, () => string> = {
+      points: () => renderPoints(allIssues),
+      time: () => renderTime(allIssues),
+      schedule: () => renderSchedule(allIssues, now),
+      cycle: () => renderCycle(allIssues, now),
+      distribution: () => renderDistribution(allIssues),
+    };
+
+    for (const metric of fetchMetrics) {
+      lines.push('');
+      lines.push(renderers[metric]());
+    }
   }
 
   // Next steps
