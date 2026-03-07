@@ -486,6 +486,18 @@ export class JiraClient {
   }
 
   /** Lightweight search returning only fields needed for analysis (no description, links, rendered HTML) */
+  async countIssues(jql: string): Promise<number> {
+    try {
+      const cleanJql = jql.replace(/\\"/g, '"');
+      console.error(`Counting issues for JQL: ${cleanJql}`);
+      const result = await this.client.issueSearch.countIssues({ jql: cleanJql });
+      return result.count ?? 0;
+    } catch (error) {
+      console.error('Error counting issues:', error);
+      throw error;
+    }
+  }
+
   async searchIssuesLean(jql: string, maxResults = 50, nextPageToken?: string): Promise<SearchResponse> {
     try {
       const cleanJql = jql.replace(/\\"/g, '"');

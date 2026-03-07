@@ -1,7 +1,7 @@
 export const toolSchemas = {
   manage_jira_filter: {
     name: 'manage_jira_filter',
-    description: 'Search for issues using JQL queries, or manage saved filters',
+    description: 'Search for issues using JQL queries, or manage saved filters. Returns issue details (title, status, description). For quantitative questions (counts, totals, overdue, workload), use analyze_jira_issues instead.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -245,7 +245,7 @@ export const toolSchemas = {
 
   manage_jira_project: {
     name: 'manage_jira_project',
-    description: 'List projects or get project details including status counts',
+    description: 'List projects or get project configuration and metadata. For issue counts, workload, or cross-project comparison, use analyze_jira_issues with metrics: ["summary"] instead.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -332,25 +332,30 @@ export const toolSchemas = {
 
   analyze_jira_issues: {
     name: 'analyze_jira_issues',
-    description: 'Compute project metrics over a set of issues selected by JQL. Returns deterministic calculations: earned value (story points), effort tracking, schedule risk, flow/cycle metrics, and distribution breakdowns. Use this when asked about totals, progress, overdue items, workload balance, or any quantitative question about issues.',
+    description: 'Compute project metrics over issues selected by JQL. Use "summary" for exact counts across projects (no sampling cap). Use other metrics for detailed analysis of individual issue data. Always prefer this tool over manage_jira_filter or manage_jira_project for quantitative questions (counts, totals, overdue, workload).',
     inputSchema: {
       type: 'object',
       properties: {
         jql: {
           type: 'string',
-          description: 'JQL query selecting the issues to analyze. Examples: "sprint in openSprints()", "project = AA AND fixVersion = 2.0", "assignee = currentUser() AND resolution = Unresolved".',
+          description: 'JQL query selecting the issues to analyze. Examples: "project in (AA, GC, LGS)", "sprint in openSprints()", "assignee = currentUser() AND resolution = Unresolved".',
         },
         metrics: {
           type: 'array',
           items: {
             type: 'string',
-            enum: ['points', 'time', 'schedule', 'cycle', 'distribution'],
+            enum: ['summary', 'points', 'time', 'schedule', 'cycle', 'distribution'],
           },
-          description: 'Which metric groups to include. Default: all. points = earned value/SPI, time = effort estimates, schedule = due dates/overdue/risk, cycle = lead time/throughput/age, distribution = counts by status/assignee/priority/type.',
+          description: 'Which metric groups to compute. summary = exact issue counts via count API (no cap, fastest). points = earned value/SPI. time = effort estimates. schedule = overdue/risk. cycle = lead time/throughput. distribution = counts by status/assignee/priority/type. Default: all except summary.',
+        },
+        groupBy: {
+          type: 'string',
+          enum: ['project', 'assignee', 'priority', 'issuetype'],
+          description: 'Split summary counts by this dimension. Use with metrics: ["summary"]. "project" produces a per-project comparison table.',
         },
         maxResults: {
           type: 'integer',
-          description: 'Max issues to analyze (default 100, max 500).',
+          description: 'Max issues to fetch for detail metrics (default 100, max 500). Does not apply to summary (which uses count API).',
           default: 100,
         },
       },

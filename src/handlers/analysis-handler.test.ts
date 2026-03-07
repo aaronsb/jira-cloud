@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { renderPoints, renderTime, renderSchedule, renderCycle, renderDistribution } from './analysis-handler.js';
+import { renderPoints, renderTime, renderSchedule, renderCycle, renderDistribution, renderSummaryTable } from './analysis-handler.js';
 import { JiraIssueDetails } from '../types/index.js';
 
 // ── Test Helpers ───────────────────────────────────────────────────────
@@ -261,5 +261,35 @@ describe('edge cases', () => {
     const output = renderSchedule(issues, now);
     expect(output).toContain('**Overdue:** 1 issue,');
     expect(output).toContain('LATE-1');
+  });
+});
+
+// ── Summary Table Tests ───────────────────────────────────────────────
+
+describe('renderSummaryTable', () => {
+  it('renders a single row', () => {
+    const output = renderSummaryTable([
+      { label: 'AA', total: 623, unresolved: 500, overdue: 85, highPriority: 1, createdRecently: 12, resolvedRecently: 8 },
+    ]);
+    expect(output).toContain('## Summary (exact counts)');
+    expect(output).toContain('| AA | 623 | 500 | 85 | 1 | 12 | 8 |');
+    expect(output).not.toContain('**Total**');
+  });
+
+  it('renders multiple rows with totals', () => {
+    const output = renderSummaryTable([
+      { label: 'AA', total: 600, unresolved: 500, overdue: 80, highPriority: 1, createdRecently: 10, resolvedRecently: 5 },
+      { label: 'LGS', total: 400, unresolved: 300, overdue: 30, highPriority: 47, createdRecently: 5, resolvedRecently: 3 },
+    ]);
+    expect(output).toContain('| AA |');
+    expect(output).toContain('| LGS |');
+    expect(output).toContain('| **Total** | **1000** | **800** | **110** | **48** | **15** | **8** |');
+  });
+
+  it('handles zero counts', () => {
+    const output = renderSummaryTable([
+      { label: 'EMPTY', total: 0, unresolved: 0, overdue: 0, highPriority: 0, createdRecently: 0, resolvedRecently: 0 },
+    ]);
+    expect(output).toContain('| EMPTY | 0 | 0 | 0 | 0 | 0 | 0 |');
   });
 });
