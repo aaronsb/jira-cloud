@@ -290,7 +290,7 @@ interface CountRow {
 }
 
 /** Extract project keys from JQL like "project in (AA, GC, GD)" or "project = AA" */
-function extractProjectKeys(jql: string): string[] {
+export function extractProjectKeys(jql: string): string[] {
   // project in (AA, GC, GD)
   const inMatch = jql.match(/project\s+in\s*\(([^)]+)\)/i);
   if (inMatch) {
@@ -302,6 +302,16 @@ function extractProjectKeys(jql: string): string[] {
     return [eqMatch[1]];
   }
   return [];
+}
+
+/** Remove the project clause from JQL, returning remaining constraints */
+export function removeProjectClause(jql: string): string {
+  return jql
+    .replace(/project\s+in\s*\([^)]+\)\s*(AND\s*)?/i, '')
+    .replace(/project\s*=\s*['"]?\w+['"]?\s*(AND\s*)?/i, '')
+    .replace(/^\s*AND\s*/i, '')
+    .replace(/\s*AND\s*$/i, '')
+    .trim();
 }
 
 /** Build a scoped JQL by adding a condition to the base query */
@@ -346,8 +356,11 @@ async function handleSummary(jiraClient: JiraClient, jql: string, groupBy?: Grou
     if (keys.length === 0) {
       throw new McpError(ErrorCode.InvalidParams, 'groupBy "project" requires project keys in JQL (e.g., project in (AA, GC))');
     }
+    const remaining = removeProjectClause(jql);
     const rows = await Promise.all(
-      keys.map(k => buildCountRow(jiraClient, k, `project = ${k}`))
+      keys.map(k => buildCountRow(jiraClient, k,
+        remaining ? `project = ${k} AND (${remaining})` : `project = ${k}`
+      ))
     );
     rows.sort((a, b) => b.unresolved - a.unresolved);
     lines.push('');

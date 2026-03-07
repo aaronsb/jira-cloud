@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { renderPoints, renderTime, renderSchedule, renderCycle, renderDistribution, renderSummaryTable } from './analysis-handler.js';
+import { renderPoints, renderTime, renderSchedule, renderCycle, renderDistribution, renderSummaryTable, extractProjectKeys, removeProjectClause } from './analysis-handler.js';
 import { JiraIssueDetails } from '../types/index.js';
 
 // ── Test Helpers ───────────────────────────────────────────────────────
@@ -291,5 +291,50 @@ describe('renderSummaryTable', () => {
       { label: 'EMPTY', total: 0, unresolved: 0, overdue: 0, highPriority: 0, createdRecently: 0, resolvedRecently: 0 },
     ]);
     expect(output).toContain('| EMPTY | 0 | 0 | 0 | 0 | 0 | 0 |');
+  });
+});
+
+// ── JQL Parsing Tests ─────────────────────────────────────────────────
+
+describe('extractProjectKeys', () => {
+  it('extracts keys from project in (...)', () => {
+    expect(extractProjectKeys('project in (AA, GC, GD)')).toEqual(['AA', 'GC', 'GD']);
+  });
+
+  it('extracts single key from project = X', () => {
+    expect(extractProjectKeys('project = AA')).toEqual(['AA']);
+  });
+
+  it('handles quoted keys', () => {
+    expect(extractProjectKeys('project in ("AA", \'GC\')')).toEqual(['AA', 'GC']);
+  });
+
+  it('extracts keys with additional JQL clauses', () => {
+    expect(extractProjectKeys('project in (AA, GC) AND status = Open')).toEqual(['AA', 'GC']);
+  });
+
+  it('returns empty array when no project clause', () => {
+    expect(extractProjectKeys('assignee = currentUser()')).toEqual([]);
+  });
+});
+
+describe('removeProjectClause', () => {
+  it('removes project in (...) and trailing AND', () => {
+    expect(removeProjectClause('project in (AA, GC) AND resolution = Unresolved'))
+      .toBe('resolution = Unresolved');
+  });
+
+  it('removes project = X and trailing AND', () => {
+    expect(removeProjectClause('project = AA AND status = Open'))
+      .toBe('status = Open');
+  });
+
+  it('returns empty string when only project clause', () => {
+    expect(removeProjectClause('project in (AA, GC)')).toBe('');
+  });
+
+  it('preserves complex remaining JQL', () => {
+    expect(removeProjectClause('project in (AA) AND resolution = Unresolved AND priority = High'))
+      .toBe('resolution = Unresolved AND priority = High');
   });
 });
