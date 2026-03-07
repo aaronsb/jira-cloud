@@ -3,6 +3,7 @@
  */
 
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+
 import { promptDefinitions } from './prompt-definitions.js';
 
 interface PromptMessage {
