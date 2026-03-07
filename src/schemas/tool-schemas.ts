@@ -356,7 +356,7 @@ export const toolSchemas = {
         compute: {
           type: 'array',
           items: { type: 'string' },
-          description: 'Computed columns for cube execute. Each entry: "name = expr". Arithmetic (+,-,*,/), comparisons (>,<,>=,<=,==,!=). Column refs: total, open, overdue, high, created_7d, resolved_7d. Implicit measures resolved lazily: bugs, unassigned, no_due_date, no_estimate, no_start_date, no_labels, blocked. Max 5 expressions. Example: ["bug_pct = bugs / total * 100", "planning_gap = no_estimate / open * 100"].',
+          description: 'Computed columns for cube execute. Each entry: "name = expr". Arithmetic (+,-,*,/), comparisons (>,<,>=,<=,==,!=). Column refs: total, open, overdue, high, created_7d, resolved_7d. Implicit measures resolved lazily: bugs, unassigned, no_due_date, no_estimate, no_start_date, no_labels, blocked, stale (untouched 60d+), backlog_rot (undated+unassigned+untouched 60d+). Max 5 expressions. Example: ["bug_pct = bugs / total * 100", "rot_pct = backlog_rot / open * 100"].',
           maxItems: 5,
         },
         maxResults: {

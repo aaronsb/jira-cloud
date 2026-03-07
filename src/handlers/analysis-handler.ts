@@ -348,6 +348,8 @@ function buildImplicitMeasures(customFieldIds?: { startDate: string; storyPoints
     no_due_date: 'dueDate is EMPTY AND resolution = Unresolved',
     blocked: 'status = Blocked',
     no_labels: 'labels is EMPTY AND resolution = Unresolved',
+    stale: 'resolution = Unresolved AND updated <= -60d',
+    backlog_rot: 'resolution = Unresolved AND dueDate is EMPTY AND assignee is EMPTY AND updated <= -60d',
   };
   if (customFieldIds) {
     measures.no_estimate = `${customFieldIds.storyPoints} is EMPTY AND resolution = Unresolved`;
@@ -597,7 +599,7 @@ export function renderCubeSetup(jql: string, sampleSize: number, dimensions: Dim
   lines.push('- total, open, overdue, high+, created_7d, resolved_7d');
   lines.push('');
   lines.push('Implicit measures (lazily resolved if referenced in `compute`):');
-  lines.push('- bugs, unassigned, no_due_date, no_estimate, no_start_date, no_labels, blocked');
+  lines.push('- bugs, unassigned, no_due_date, no_estimate, no_start_date, no_labels, blocked, stale, backlog_rot');
 
   // Suggested cubes with cost estimates
   lines.push('');

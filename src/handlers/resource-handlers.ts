@@ -482,6 +482,13 @@ Use \`manage_jira_filter\` with \`execute_jql\` for this one:
 \`\`\`
 Blocked lists tend to be small but each one is a potential cascade. Oldest first surfaces the longest-stuck items for escalation.
 
+### Data Quality / Backlog Rot
+**Question:** How much of this backlog is noise?
+\`\`\`json
+{ "jql": "project in (...) AND resolution = Unresolved", "metrics": ["summary"], "groupBy": "project", "compute": ["stale_pct = stale / open * 100", "rot_pct = backlog_rot / open * 100"] }
+\`\`\`
+\`stale\` = untouched 60+ days. \`backlog_rot\` = undated + unassigned + untouched 60+ days. High rot_pct means overdue counts are misleading — the backlog is full of phantom work.
+
 ## Data Cube
 
 For multi-dimensional analysis, use the two-phase cube pattern:
@@ -501,7 +508,7 @@ Returns available dimensions, their values, cost estimates, and query budget.
 - Arithmetic: \`+\`, \`-\`, \`*\`, \`/\` (division by zero = 0)
 - Comparisons: \`>\`, \`<\`, \`>=\`, \`<=\`, \`==\`, \`!=\` (produce Yes/No — cannot be summed or averaged)
 - Standard columns: total, open, overdue, high, created_7d, resolved_7d
-- Implicit measures (lazily resolved via count API): bugs, unassigned, no_due_date, no_estimate, no_start_date, no_labels, blocked
+- Implicit measures (lazily resolved via count API): bugs, unassigned, no_due_date, no_estimate, no_start_date, no_labels, blocked, stale (untouched 60d+), backlog_rot (undated+unassigned+untouched 60d+)
 - Max 5 expressions per query, 150-query budget per execution
 - Expressions evaluate linearly — later expressions can reference earlier ones
 
