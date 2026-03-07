@@ -3,9 +3,11 @@ import { createRequire } from 'module';
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { 
-  CallToolRequestSchema, 
-  ErrorCode, 
+import {
+  CallToolRequestSchema,
+  ErrorCode,
+  GetPromptRequestSchema,
+  ListPromptsRequestSchema,
   ListResourcesRequestSchema,
   ListResourceTemplatesRequestSchema,
   ListToolsRequestSchema,
@@ -23,6 +25,8 @@ import { handleProjectRequest } from './handlers/project-handlers.js';
 import { createQueueHandler } from './handlers/queue-handler.js';
 import { setupResourceHandlers } from './handlers/resource-handlers.js';
 import { handleSprintRequest } from './handlers/sprint-handlers.js';
+import { promptDefinitions } from './prompts/prompt-definitions.js';
+import { getPrompt } from './prompts/prompt-messages.js';
 import { toolSchemas } from './schemas/tool-schemas.js';
 
 // Jira credentials from environment variables
@@ -61,6 +65,7 @@ class JiraServer {
         capabilities: {
           tools: {},
           resources: {},
+          prompts: {},
         },
       }
     );
@@ -104,6 +109,20 @@ class JiraServer {
     this.server.setRequestHandler(ListResourceTemplatesRequestSchema, resourceHandlers.listResourceTemplates);
     this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
       return resourceHandlers.readResource(request.params.uri);
+    });
+
+    // Set up prompt handlers
+    this.server.setRequestHandler(ListPromptsRequestSchema, async () => ({
+      prompts: promptDefinitions.map(p => ({
+        name: p.name,
+        description: p.description,
+        arguments: p.arguments,
+      })),
+    }));
+
+    this.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+      const { name, arguments: args } = request.params;
+      return getPrompt(name, args);
     });
 
     // Set up tool handlers

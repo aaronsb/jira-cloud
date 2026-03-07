@@ -102,7 +102,7 @@ The analytical workspace for quantitative questions. Uses the count API for exac
 
 **Standard measures** (always available): `total`, `open`, `overdue`, `high`, `created_7d`, `resolved_7d`
 
-**Implicit measures** (resolved lazily via count API only when referenced in `compute`): `bugs`, `unassigned`, `no_due_date`, `no_estimate`, `no_start_date`, `no_labels`, `blocked`
+**Implicit measures** (resolved lazily via count API only when referenced in `compute`): `bugs`, `unassigned`, `no_due_date`, `no_estimate`, `no_start_date`, `no_labels`, `blocked`, `stale` (untouched 60d+), `stale_status` (stuck in status 30d+), `backlog_rot` (undated + unassigned + untouched 60d+)
 
 **Compute DSL:** Arithmetic expressions evaluated per row.
 

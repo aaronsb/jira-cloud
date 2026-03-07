@@ -202,7 +202,7 @@ export function boardNextSteps(operation: string, boardId?: number): string {
   return steps.length > 0 ? formatSteps(steps) : '';
 }
 
-export function analysisNextSteps(jql: string, issueKeys: string[]): string {
+export function analysisNextSteps(jql: string, issueKeys: string[], truncated = false): string {
   const steps: NextStep[] = [];
   if (issueKeys.length > 0) {
     steps.push(
@@ -215,5 +215,10 @@ export function analysisNextSteps(jql: string, issueKeys: string[]): string {
     { description: 'Narrow the analysis with refined JQL', tool: 'analyze_jira_issues', example: { jql: `${jql} AND priority = High` } },
     { description: 'View the full issue list', tool: 'manage_jira_filter', example: { operation: 'execute_jql', jql } },
   );
+  if (truncated) {
+    steps.push(
+      { description: 'Detail metrics are sampled — narrow JQL by assignee, priority, or type for precise results. Use summary metrics (count API) for whole-project totals', tool: 'analyze_jira_issues', example: { jql: `${jql} AND assignee = currentUser()`, metrics: ['cycle'] } },
+    );
+  }
   return formatSteps(steps) + '\n- Read `jira://analysis/recipes` for data cube patterns and compute DSL examples';
 }

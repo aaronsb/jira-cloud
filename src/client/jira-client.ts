@@ -114,6 +114,7 @@ export class JiraClient {
       'created',
       'updated',
       'resolutiondate',
+      'statuscategorychangedate',
       'duedate',
       this.customFields.startDate,
       this.customFields.storyPoints,
@@ -141,6 +142,7 @@ export class JiraClient {
       created: fields?.created || '',
       updated: fields?.updated || '',
       resolutionDate: fields?.resolutiondate || null,
+      statusCategoryChanged: fields?.statuscategorychangedate ?? fields?.statuscategorychangeddate ?? null,
       dueDate: fields?.duedate || null,
       startDate: fields?.[this.customFields.startDate] || null,
       storyPoints: fields?.[this.customFields.storyPoints] ?? null,
@@ -511,7 +513,7 @@ export class JiraClient {
       const leanFields = [
         'summary', 'issuetype', 'priority', 'assignee', 'reporter',
         'status', 'resolution', 'labels', 'created', 'updated',
-        'resolutiondate', 'duedate', 'timeestimate',
+        'resolutiondate', 'statuscategorychangedate', 'duedate', 'timeestimate',
         this.customFields.startDate, this.customFields.storyPoints,
       ];
 
