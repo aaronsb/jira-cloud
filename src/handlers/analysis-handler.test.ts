@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { renderPoints, renderTime, renderSchedule, renderCycle, renderDistribution, renderSummaryTable, extractProjectKeys, removeProjectClause } from './analysis-handler.js';
+import { parseComputeList } from '../utils/cube-dsl.js';
+import { renderPoints, renderTime, renderSchedule, renderCycle, renderDistribution, renderSummaryTable, extractProjectKeys, removeProjectClause, extractDimensions, renderCubeSetup, groupByJqlClause } from './analysis-handler.js';
 import { JiraIssueDetails } from '../types/index.js';
 
 // ── Test Helpers ───────────────────────────────────────────────────────
@@ -292,6 +293,47 @@ describe('renderSummaryTable', () => {
     ]);
     expect(output).toContain('| EMPTY | 0 | 0 | 0 | 0 | 0 | 0 |');
   });
+
+  it('renders computed columns from DSL expressions', () => {
+    const compute = parseComputeList([
+      'net_flow = created_7d - resolved_7d',
+      'clearing = resolved_7d > created_7d',
+    ]);
+    const output = renderSummaryTable([
+      { label: 'AA', total: 100, unresolved: 80, overdue: 5, highPriority: 10, createdRecently: 12, resolvedRecently: 8 },
+    ], compute);
+    expect(output).toContain('net_flow');
+    expect(output).toContain('clearing');
+    // net_flow = 12 - 8 = 4
+    expect(output).toContain(' 4 |');
+    // clearing = 8 > 12 → No
+    expect(output).toContain(' No |');
+  });
+
+  it('renders computed columns with implicit measures', () => {
+    const compute = parseComputeList(['bug_pct = bugs / total * 100']);
+    const output = renderSummaryTable([
+      { label: 'AA', total: 200, unresolved: 150, overdue: 10, highPriority: 5, createdRecently: 8, resolvedRecently: 3,
+        implicitMeasures: { bugs: 30 } },
+    ], compute);
+    expect(output).toContain('bug_pct');
+    // 30 / 200 * 100 = 15
+    expect(output).toContain(' 15 |');
+  });
+
+  it('shows dash for computed columns in totals row', () => {
+    const compute = parseComputeList(['risk = overdue > 10']);
+    const output = renderSummaryTable([
+      { label: 'AA', total: 100, unresolved: 80, overdue: 15, highPriority: 5, createdRecently: 8, resolvedRecently: 3 },
+      { label: 'GC', total: 50, unresolved: 30, overdue: 2, highPriority: 1, createdRecently: 4, resolvedRecently: 2 },
+    ], compute);
+    // AA: overdue 15 > 10 → Yes, GC: overdue 2 > 10 → No
+    expect(output).toContain(' Yes |');
+    expect(output).toContain(' No |');
+    // Totals row shows dash for computed columns
+    expect(output).toContain('| **Total**');
+    expect(output).toContain(' — |');
+  });
 });
 
 // ── JQL Parsing Tests ─────────────────────────────────────────────────
@@ -336,5 +378,129 @@ describe('removeProjectClause', () => {
   it('preserves complex remaining JQL', () => {
     expect(removeProjectClause('project in (AA) AND resolution = Unresolved AND priority = High'))
       .toBe('resolution = Unresolved AND priority = High');
+  });
+});
+
+// ── groupBy JQL Clause Tests ─────────────────────────────────────────
+
+describe('groupByJqlClause', () => {
+  it('generates project = X clauses', () => {
+    expect(groupByJqlClause('project', ['AA', 'GC'])).toEqual([
+      'project = AA', 'project = GC',
+    ]);
+  });
+
+  it('generates assignee clauses with EMPTY for Unassigned', () => {
+    expect(groupByJqlClause('assignee', ['Alice', 'Unassigned'])).toEqual([
+      'assignee = "Alice"', 'assignee is EMPTY',
+    ]);
+  });
+
+  it('generates priority clauses', () => {
+    expect(groupByJqlClause('priority', ['High', 'Medium'])).toEqual([
+      'priority = "High"', 'priority = "Medium"',
+    ]);
+  });
+
+  it('generates issuetype clauses', () => {
+    expect(groupByJqlClause('issuetype', ['Story', 'Bug'])).toEqual([
+      'issuetype = "Story"', 'issuetype = "Bug"',
+    ]);
+  });
+});
+
+// ── Cube Setup Tests ─────────────────────────────────────────────────
+
+describe('extractDimensions', () => {
+  it('extracts project from issue key prefix', () => {
+    const issues = [
+      makeIssue({ key: 'AA-1' }),
+      makeIssue({ key: 'AA-2' }),
+      makeIssue({ key: 'GC-1' }),
+    ];
+    const dims = extractDimensions(issues);
+    const project = dims.find(d => d.name === 'project')!;
+    expect(project.values).toEqual(['AA', 'GC']);
+    expect(project.count).toBe(2);
+  });
+
+  it('extracts all five dimensions', () => {
+    const issues = [
+      makeIssue({ key: 'AA-1', status: 'Backlog', assignee: 'Alice', priority: 'High', issueType: 'Story' }),
+    ];
+    const dims = extractDimensions(issues);
+    expect(dims.map(d => d.name)).toEqual(['project', 'status', 'assignee', 'priority', 'issuetype']);
+  });
+
+  it('sorts values by count descending', () => {
+    const issues = [
+      makeIssue({ key: 'AA-1', priority: 'Low' }),
+      makeIssue({ key: 'AA-2', priority: 'High' }),
+      makeIssue({ key: 'AA-3', priority: 'High' }),
+      makeIssue({ key: 'AA-4', priority: 'High' }),
+      makeIssue({ key: 'AA-5', priority: 'Low' }),
+    ];
+    const dims = extractDimensions(issues);
+    const priority = dims.find(d => d.name === 'priority')!;
+    expect(priority.values[0]).toBe('High');
+    expect(priority.values[1]).toBe('Low');
+  });
+
+  it('uses Unassigned for null assignee', () => {
+    const issues = [makeIssue({ assignee: null })];
+    const dims = extractDimensions(issues);
+    const assignee = dims.find(d => d.name === 'assignee')!;
+    expect(assignee.values).toEqual(['Unassigned']);
+  });
+
+  it('caps values at 20 groups', () => {
+    // Create 25 distinct statuses
+    const issues = Array.from({ length: 25 }, (_, i) =>
+      makeIssue({ key: `T-${i + 1}`, status: `Status${i}` })
+    );
+    const dims = extractDimensions(issues);
+    const status = dims.find(d => d.name === 'status')!;
+    expect(status.values.length).toBe(20);
+    expect(status.count).toBe(25);
+  });
+});
+
+describe('renderCubeSetup', () => {
+  it('renders dimension table with counts', () => {
+    const dims = [
+      { name: 'project', values: ['AA', 'GC'], count: 2 },
+      { name: 'status', values: ['Backlog', 'In Progress'], count: 2 },
+    ];
+    const output = renderCubeSetup('project in (AA, GC)', 50, dims);
+    expect(output).toContain('# Cube Setup:');
+    expect(output).toContain('Sampled 50 issues');
+    expect(output).toContain('| project | AA, GC | 2 |');
+    expect(output).toContain('| status | Backlog, In Progress | 2 |');
+  });
+
+  it('truncates dimension values at 5 with +N more', () => {
+    const dims = [
+      { name: 'assignee', values: ['A', 'B', 'C', 'D', 'E', 'F', 'G'], count: 7 },
+    ];
+    const output = renderCubeSetup('project = AA', 50, dims);
+    expect(output).toContain('A, B, C, D, E +2');
+  });
+
+  it('includes cost estimates in suggested cubes', () => {
+    const dims = [
+      { name: 'project', values: ['AA', 'GC', 'GD', 'LGS'], count: 4 },
+    ];
+    const output = renderCubeSetup('project in (AA, GC, GD, LGS)', 50, dims);
+    expect(output).toContain('## Suggested Cubes');
+    expect(output).toContain('`groupBy: "project"`');
+    expect(output).toContain('4 groups');
+    expect(output).toContain('24 base queries');
+  });
+
+  it('includes available measures', () => {
+    const dims = [{ name: 'project', values: ['AA'], count: 1 }];
+    const output = renderCubeSetup('project = AA', 50, dims);
+    expect(output).toContain('total, open, overdue');
+    expect(output).toContain('bugs, unassigned, no_due_date, blocked');
   });
 });

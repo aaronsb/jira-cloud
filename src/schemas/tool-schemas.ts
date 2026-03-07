@@ -344,14 +344,20 @@ export const toolSchemas = {
           type: 'array',
           items: {
             type: 'string',
-            enum: ['summary', 'points', 'time', 'schedule', 'cycle', 'distribution'],
+            enum: ['summary', 'points', 'time', 'schedule', 'cycle', 'distribution', 'cube_setup'],
           },
-          description: 'Which metric groups to compute. summary = exact issue counts via count API (no cap, fastest). points = earned value/SPI. time = effort estimates. schedule = overdue/risk. cycle = lead time/throughput. distribution = counts by status/assignee/priority/type. Default: all except summary.',
+          description: 'Which metric groups to compute. summary = exact issue counts via count API (no cap, fastest). cube_setup = sample issues and discover available dimensions/measures for cube queries. points = earned value/SPI. time = effort estimates. schedule = overdue/risk. cycle = lead time/throughput. distribution = counts by status/assignee/priority/type. Default: all except summary and cube_setup.',
         },
         groupBy: {
           type: 'string',
           enum: ['project', 'assignee', 'priority', 'issuetype'],
           description: 'Split summary counts by this dimension. Use with metrics: ["summary"]. "project" produces a per-project comparison table.',
+        },
+        compute: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Computed columns for cube execute. Each entry: "name = expr". Arithmetic (+,-,*,/), comparisons (>,<,>=,<=,==,!=). Column refs: total, open, overdue, high, created_7d, resolved_7d. Implicit measures resolved lazily: bugs, unassigned, no_due_date, blocked. Max 5 expressions. Example: ["bug_pct = bugs / total * 100", "clearing = resolved_7d > created_7d"].',
+          maxItems: 5,
         },
         maxResults: {
           type: 'integer',

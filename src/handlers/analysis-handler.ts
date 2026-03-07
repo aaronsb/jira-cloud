@@ -2,17 +2,24 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import { JiraClient } from '../client/jira-client.js';
 import { JiraIssueDetails } from '../types/index.js';
+import { ComputeColumn, evaluateRow, extractColumnRefs, parseComputeList } from '../utils/cube-dsl.js';
 import { analysisNextSteps } from '../utils/next-steps.js';
 import { normalizeArgs } from '../utils/normalize-args.js';
 
 // ── Types ──────────────────────────────────────────────────────────────
 
-type MetricGroup = 'points' | 'time' | 'schedule' | 'cycle' | 'distribution' | 'summary';
+type MetricGroup = 'points' | 'time' | 'schedule' | 'cycle' | 'distribution' | 'summary' | 'cube_setup';
 
 const ALL_METRICS: MetricGroup[] = ['points', 'time', 'schedule', 'cycle', 'distribution'];
 const VALID_GROUP_BY = ['project', 'assignee', 'priority', 'issuetype'] as const;
 type GroupByField = typeof VALID_GROUP_BY[number];
 const MAX_ISSUES = 500;
+const CUBE_SAMPLE_PCT = 0.2;   // 20% of total issues
+const CUBE_SAMPLE_MIN = 50;    // floor — enough for rare dimension values
+const CUBE_SAMPLE_MAX = 500;   // ceiling — proven fast with lean search
+const MAX_CUBE_GROUPS = 20;
+const MAX_COUNT_QUERIES = 150; // ADR-206 budget: max count API calls per execution
+const STANDARD_MEASURES = 6;   // total, open, overdue, high+, created_7d, resolved_7d
 
 type StatusBucket = 'To Do' | 'In Progress' | 'Done';
 
@@ -287,6 +294,7 @@ interface CountRow {
   highPriority: number;
   createdRecently: number;
   resolvedRecently: number;
+  implicitMeasures?: Record<string, number>;
 }
 
 /** Extract project keys from JQL like "project in (AA, GC, GD)" or "project = AA" */
@@ -319,7 +327,36 @@ function scopeJql(baseJql: string, condition: string): string {
   return `(${baseJql}) AND ${condition}`;
 }
 
-async function buildCountRow(jiraClient: JiraClient, label: string, baseJql: string): Promise<CountRow> {
+/** Implicit measures — lazily resolved if referenced in compute expressions */
+const IMPLICIT_MEASURES: Record<string, string> = {
+  bugs: 'issuetype = Bug AND resolution = Unresolved',
+  unassigned: 'assignee is EMPTY AND resolution = Unresolved',
+  no_due_date: 'dueDate is EMPTY AND resolution = Unresolved',
+  blocked: 'status = Blocked',
+};
+
+/** Map dimension values to JQL clauses for groupBy scoping */
+export function groupByJqlClause(dimension: GroupByField, values: string[]): string[] {
+  switch (dimension) {
+    case 'project':
+      return values.map(v => `project = ${v}`);
+    case 'assignee':
+      return values.map(v =>
+        v === 'Unassigned' ? 'assignee is EMPTY' : `assignee = "${v}"`
+      );
+    case 'priority':
+      return values.map(v => `priority = "${v}"`);
+    case 'issuetype':
+      return values.map(v => `issuetype = "${v}"`);
+  }
+}
+
+async function buildCountRow(
+  jiraClient: JiraClient,
+  label: string,
+  baseJql: string,
+  implicitMeasureNames?: string[],
+): Promise<CountRow> {
   const [total, unresolved, overdue, highPriority, createdRecently, resolvedRecently] = await Promise.all([
     jiraClient.countIssues(baseJql),
     jiraClient.countIssues(scopeJql(baseJql, 'resolution = Unresolved')),
@@ -328,58 +365,280 @@ async function buildCountRow(jiraClient: JiraClient, label: string, baseJql: str
     jiraClient.countIssues(scopeJql(baseJql, 'created >= -7d')),
     jiraClient.countIssues(scopeJql(baseJql, 'resolved >= -7d')),
   ]);
-  return { label, total, unresolved, overdue, highPriority, createdRecently, resolvedRecently };
+
+  let implicitMeasures: Record<string, number> | undefined;
+  if (implicitMeasureNames && implicitMeasureNames.length > 0) {
+    const counts = await Promise.all(
+      implicitMeasureNames.map(name =>
+        jiraClient.countIssues(scopeJql(baseJql, IMPLICIT_MEASURES[name]))
+      )
+    );
+    implicitMeasures = {};
+    for (let i = 0; i < implicitMeasureNames.length; i++) {
+      implicitMeasures[implicitMeasureNames[i]] = counts[i];
+    }
+  }
+
+  return { label, total, unresolved, overdue, highPriority, createdRecently, resolvedRecently, implicitMeasures };
 }
 
-export function renderSummaryTable(rows: CountRow[]): string {
+export function renderSummaryTable(rows: CountRow[], computeColumns?: ComputeColumn[]): string {
   const lines = ['## Summary (exact counts)', ''];
-  lines.push('| Scope | Total | Open | Overdue | High+ | Created 7d | Resolved 7d |');
-  lines.push('|-------|------:|-----:|--------:|------:|-----------:|------------:|');
+  const extraHeaders = computeColumns?.map(c => c.name) ?? [];
+  const headerExtra = extraHeaders.map(h => ` ${h} |`).join('');
+  const alignExtra = extraHeaders.map(() => '---:|').join('');
+  lines.push(`| Scope | Total | Open | Overdue | High+ | Created 7d | Resolved 7d |${headerExtra}`);
+  lines.push(`|-------|------:|-----:|--------:|------:|-----------:|------------:|${alignExtra}`);
   for (const r of rows) {
-    lines.push(`| ${r.label} | ${r.total} | ${r.unresolved} | ${r.overdue} | ${r.highPriority} | ${r.createdRecently} | ${r.resolvedRecently} |`);
+    let computed = '';
+    if (computeColumns && computeColumns.length > 0) {
+      const rowMap = countRowToMap(r);
+      const results = evaluateRow(computeColumns, rowMap);
+      computed = results.map(res => {
+        const val = typeof res.value === 'number' ? formatComputed(res.value) : res.value;
+        return ` ${val} |`;
+      }).join('');
+    }
+    lines.push(`| ${r.label} | ${r.total} | ${r.unresolved} | ${r.overdue} | ${r.highPriority} | ${r.createdRecently} | ${r.resolvedRecently} |${computed}`);
   }
   // Totals row if multiple
   if (rows.length > 1) {
     const sum = (fn: (r: CountRow) => number) => rows.reduce((s, r) => s + fn(r), 0);
-    lines.push(`| **Total** | **${sum(r => r.total)}** | **${sum(r => r.unresolved)}** | **${sum(r => r.overdue)}** | **${sum(r => r.highPriority)}** | **${sum(r => r.createdRecently)}** | **${sum(r => r.resolvedRecently)}** |`);
+    const totalExtra = extraHeaders.map(() => ' — |').join('');
+    lines.push(`| **Total** | **${sum(r => r.total)}** | **${sum(r => r.unresolved)}** | **${sum(r => r.overdue)}** | **${sum(r => r.highPriority)}** | **${sum(r => r.createdRecently)}** | **${sum(r => r.resolvedRecently)}** |${totalExtra}`);
   }
   return lines.join('\n');
 }
 
-async function handleSummary(jiraClient: JiraClient, jql: string, groupBy?: GroupByField): Promise<string> {
+/** Convert a CountRow to a Map for DSL evaluation */
+function countRowToMap(row: CountRow): Map<string, number> {
+  const m = new Map<string, number>();
+  m.set('total', row.total);
+  m.set('open', row.unresolved);
+  m.set('overdue', row.overdue);
+  m.set('high', row.highPriority);
+  m.set('created_7d', row.createdRecently);
+  m.set('resolved_7d', row.resolvedRecently);
+  // Add implicit measure values if present
+  if (row.implicitMeasures) {
+    for (const [k, v] of Object.entries(row.implicitMeasures)) {
+      m.set(k, v);
+    }
+  }
+  return m;
+}
+
+/** Format a computed number — round to 1 decimal if fractional */
+function formatComputed(n: number): string {
+  return Number.isInteger(n) ? String(n) : n.toFixed(1);
+}
+
+/** Compute max groups that fit within the query budget */
+function maxGroupsForBudget(implicitCount: number): number {
+  const queriesPerGroup = STANDARD_MEASURES + implicitCount;
+  return Math.floor(MAX_COUNT_QUERIES / queriesPerGroup);
+}
+
+async function handleSummary(jiraClient: JiraClient, jql: string, groupBy?: GroupByField, compute?: ComputeColumn[]): Promise<string> {
   const lines: string[] = [];
   lines.push(`# Summary: ${jql}`);
   lines.push(`As of ${formatDateShort(new Date())} — counts are exact (no sampling cap)`);
 
+  // Detect implicit measures needed by compute expressions
+  const neededImplicits = compute ? detectImplicitMeasures(compute) : [];
+  const groupBudget = maxGroupsForBudget(neededImplicits.length);
+
   if (groupBy === 'project') {
-    const keys = extractProjectKeys(jql);
+    let keys = extractProjectKeys(jql);
     if (keys.length === 0) {
       throw new McpError(ErrorCode.InvalidParams, 'groupBy "project" requires project keys in JQL (e.g., project in (AA, GC))');
     }
+    const capped = keys.length > groupBudget;
+    if (capped) keys = keys.slice(0, groupBudget);
     const remaining = removeProjectClause(jql);
     const rows = await Promise.all(
       keys.map(k => buildCountRow(jiraClient, k,
-        remaining ? `project = ${k} AND (${remaining})` : `project = ${k}`
+        remaining ? `project = ${k} AND (${remaining})` : `project = ${k}`,
+        neededImplicits
       ))
     );
     rows.sort((a, b) => b.unresolved - a.unresolved);
     lines.push('');
-    lines.push(renderSummaryTable(rows));
+    lines.push(renderSummaryTable(rows, compute));
+    if (capped) {
+      lines.push(`*Capped at ${groupBudget} groups to stay within ${MAX_COUNT_QUERIES}-query budget*`);
+    }
   } else if (groupBy) {
-    // For non-project groupBy, get the overall count first
-    const overallRow = await buildCountRow(jiraClient, 'All', jql);
+    // For non-project groupBy, sample per-project for representative dimension values
+    const issues = await samplePerProject(jiraClient, jql);
+    if (issues.length === 0) {
+      throw new McpError(ErrorCode.InvalidParams, `No issues matched JQL — cannot discover ${groupBy} values`);
+    }
+    const dims = extractDimensions(issues);
+    const dim = dims.find(d => d.name === groupBy);
+    if (!dim || dim.values.length === 0) {
+      throw new McpError(ErrorCode.InvalidParams, `No ${groupBy} values found in sampled issues`);
+    }
+
+    // Cap groups to query budget
+    const cappedValues = dim.values.slice(0, groupBudget);
+
+    const jqlClause = groupByJqlClause(groupBy, cappedValues);
+    const rows = await Promise.all(
+      cappedValues.map((value, idx) => buildCountRow(jiraClient, value,
+        `(${jql}) AND ${jqlClause[idx]}`,
+        neededImplicits
+      ))
+    );
+    rows.sort((a, b) => b.unresolved - a.unresolved);
     lines.push('');
-    lines.push(renderSummaryTable([overallRow]));
-    lines.push('');
-    lines.push(`*groupBy "${groupBy}" — only "project" supports per-group breakdown currently. Other dimensions coming soon.*`);
+    lines.push(renderSummaryTable(rows, compute));
+    if (dim.count > cappedValues.length) {
+      const reason = cappedValues.length < dim.values.length
+        ? `capped at ${groupBudget} groups (${MAX_COUNT_QUERIES}-query budget)`
+        : `from ${issues.length}-issue sample`;
+      lines.push(`*Showing top ${cappedValues.length} of ${dim.count} ${groupBy} values (${reason})*`);
+    }
   } else {
     // No groupBy — single row for the whole JQL
-    const row = await buildCountRow(jiraClient, 'All', jql);
+    const row = await buildCountRow(jiraClient, 'All', jql, neededImplicits);
     lines.push('');
-    lines.push(renderSummaryTable([row]));
+    lines.push(renderSummaryTable([row], compute));
   }
 
   return lines.join('\n');
+}
+
+/** Detect which implicit measures are referenced by compute expressions */
+function detectImplicitMeasures(compute: ComputeColumn[]): string[] {
+  const refs = extractColumnRefs(compute);
+  return Object.keys(IMPLICIT_MEASURES).filter(name => refs.has(name));
+}
+
+// ── Cube Setup ────────────────────────────────────────────────────────
+
+interface DimensionInfo {
+  name: string;
+  values: string[];
+  count: number;
+}
+
+/** Extract distinct dimension values from sampled issues */
+export function extractDimensions(issues: JiraIssueDetails[]): DimensionInfo[] {
+  const dims: { name: string; extractor: (i: JiraIssueDetails) => string }[] = [
+    { name: 'project', extractor: i => i.key.split('-')[0] },
+    { name: 'status', extractor: i => i.status },
+    { name: 'assignee', extractor: i => i.assignee || 'Unassigned' },
+    { name: 'priority', extractor: i => i.priority || 'None' },
+    { name: 'issuetype', extractor: i => i.issueType || 'Unknown' },
+  ];
+
+  return dims.map(({ name, extractor }) => {
+    const counts = new Map<string, number>();
+    for (const issue of issues) {
+      const val = extractor(issue);
+      counts.set(val, (counts.get(val) || 0) + 1);
+    }
+    // Sort by count descending, cap at MAX_CUBE_GROUPS
+    const sorted = [...counts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, MAX_CUBE_GROUPS);
+    return {
+      name,
+      values: sorted.map(([v]) => v),
+      count: counts.size,
+    };
+  });
+}
+
+/** Render cube setup response with dimension catalog and cost estimates */
+export function renderCubeSetup(jql: string, sampleSize: number, dimensions: DimensionInfo[]): string {
+  const lines = [`# Cube Setup: ${jql}`, `Sampled ${sampleSize} issues to discover dimensions.`, ''];
+
+  // Dimension table
+  lines.push('## Available Dimensions');
+  lines.push('| Dimension | Distinct Values | Count |');
+  lines.push('|-----------|----------------|------:|');
+  for (const dim of dimensions) {
+    const displayed = dim.values.slice(0, 5).join(', ');
+    const more = dim.count > 5 ? ` +${dim.count - 5}` : '';
+    lines.push(`| ${dim.name} | ${displayed}${more} | ${dim.count} |`);
+  }
+
+  // Available measures
+  lines.push('');
+  lines.push('## Available Measures');
+  lines.push('Standard columns per group (via count API):');
+  lines.push('- total, open, overdue, high+, created_7d, resolved_7d');
+  lines.push('');
+  lines.push('Implicit measures (lazily resolved if referenced in `compute`):');
+  lines.push('- bugs, unassigned, no_due_date, blocked');
+
+  // Suggested cubes with cost estimates
+  lines.push('');
+  lines.push(`## Suggested Cubes (budget: ${MAX_COUNT_QUERIES} queries)`);
+  for (const dim of dimensions) {
+    const groups = Math.min(dim.count, MAX_CUBE_GROUPS);
+    const queries = groups * STANDARD_MEASURES;
+    const estSeconds = Math.max(1, Math.round(queries / 12)); // ~12 parallel queries/sec
+    const withinBudget = queries <= MAX_COUNT_QUERIES;
+    const badge = withinBudget ? '' : ' ⚠️ add compute measures to stay in budget';
+    lines.push(`- \`groupBy: "${dim.name}"\` — ${groups} groups, ${queries} base queries (~${estSeconds}s)${badge}`);
+  }
+
+  return lines.join('\n');
+}
+
+/** Compute dynamic sample size: 20% of total, clamped to [50, 500] */
+async function computeSampleSize(jiraClient: JiraClient, jql: string): Promise<number> {
+  const total = await jiraClient.countIssues(jql);
+  return Math.max(CUBE_SAMPLE_MIN, Math.min(CUBE_SAMPLE_MAX, Math.ceil(total * CUBE_SAMPLE_PCT)));
+}
+
+/** Sample issues across all projects in scope for representative dimension discovery */
+async function samplePerProject(jiraClient: JiraClient, jql: string): Promise<JiraIssueDetails[]> {
+  let projectKeys = extractProjectKeys(jql);
+
+  if (projectKeys.length === 0) {
+    const allProjects = await jiraClient.listProjects();
+    projectKeys = allProjects.map(p => p.key);
+  }
+
+  const sampleSize = await computeSampleSize(jiraClient, jql);
+
+  if (projectKeys.length <= 1) {
+    const result = await jiraClient.searchIssuesLean(jql, sampleSize);
+    return result.issues;
+  }
+
+  const remaining = removeProjectClause(jql);
+  const perProject = Math.max(5, Math.floor(sampleSize / projectKeys.length));
+  const samples = await Promise.all(
+    projectKeys.map(async k => {
+      const scopedJql = remaining ? `project = ${k} AND (${remaining})` : `project = ${k}`;
+      try {
+        const result = await jiraClient.searchIssuesLean(scopedJql, perProject);
+        return result.issues;
+      } catch {
+        return [];
+      }
+    })
+  );
+  return samples.flat();
+}
+
+async function handleCubeSetup(jiraClient: JiraClient, jql: string): Promise<string> {
+  const issues = await samplePerProject(jiraClient, jql);
+
+  if (issues.length === 0) {
+    return `# Cube Setup: ${jql}\n\nNo issues matched this query. Cannot discover dimensions.`;
+  }
+
+  // Extract dimensions — project dimension uses actual keys from sample
+  // (samplePerProject ensures coverage across all projects in scope)
+  const dimensions = extractDimensions(issues);
+
+  return renderCubeSetup(jql, issues.length, dimensions);
 }
 
 // ── Main Handler ───────────────────────────────────────────────────────
@@ -397,6 +656,7 @@ export async function handleAnalysisRequest(jiraClient: JiraClient, request: any
     ? args.metrics as string[]
     : [];
   const hasSummary = requested.includes('summary');
+  const hasCubeSetup = requested.includes('cube_setup');
   const fetchMetrics = requested.length > 0
     ? requested.filter(m => ALL_METRICS.includes(m as MetricGroup)) as MetricGroup[]
     : ALL_METRICS;
@@ -406,9 +666,27 @@ export async function handleAnalysisRequest(jiraClient: JiraClient, request: any
     ? args.groupBy as GroupByField
     : undefined;
 
+  // Parse compute expressions
+  let compute: ComputeColumn[] | undefined;
+  if (args.compute && Array.isArray(args.compute) && args.compute.length > 0) {
+    compute = parseComputeList(args.compute as string[]);
+  }
+
+  // Cube setup — discover dimensions from sample, no issue fetching
+  if (hasCubeSetup) {
+    const cubeText = await handleCubeSetup(jiraClient, jql);
+    const nextSteps = analysisNextSteps(jql, []);
+    return {
+      content: [{
+        type: 'text',
+        text: cubeText + '\n' + nextSteps,
+      }],
+    };
+  }
+
   // If only summary requested, skip issue fetching entirely
   if (hasSummary && fetchMetrics.length === 0) {
-    const summaryText = await handleSummary(jiraClient, jql, groupBy);
+    const summaryText = await handleSummary(jiraClient, jql, groupBy, compute);
     const nextSteps = analysisNextSteps(jql, []);
     return {
       content: [{
@@ -463,7 +741,7 @@ export async function handleAnalysisRequest(jiraClient: JiraClient, request: any
 
   // Summary first if requested alongside other metrics
   if (hasSummary) {
-    const summaryText = await handleSummary(jiraClient, jql, groupBy);
+    const summaryText = await handleSummary(jiraClient, jql, groupBy, compute);
     lines.push(summaryText);
   }
 
