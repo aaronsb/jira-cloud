@@ -130,6 +130,7 @@ export class JiraClient {
       assignee: fields?.assignee?.displayName || null,
       reporter: fields?.reporter?.displayName || '',
       status: fields?.status?.name || '',
+      statusCategory: fields?.status?.statusCategory?.key || 'unknown',
       resolution: fields?.resolution?.name || null,
       labels: fields?.labels || [],
       created: fields?.created || '',
@@ -137,8 +138,8 @@ export class JiraClient {
       resolutionDate: fields?.resolutiondate || null,
       dueDate: fields?.duedate || null,
       startDate: fields?.[this.customFields.startDate] || null,
-      storyPoints: fields?.[this.customFields.storyPoints] || null,
-      timeEstimate: fields?.timeestimate || null,
+      storyPoints: fields?.[this.customFields.storyPoints] ?? null,
+      timeEstimate: fields?.timeestimate ?? null,
       issueLinks: (fields?.issuelinks || []).map((link: any) => ({
         type: link.type?.name || '',
         outward: link.outwardIssue?.key || null,
@@ -482,6 +483,55 @@ export class JiraClient {
       issueIdOrKey: issueKey,
       comment: TextProcessor.markdownToAdf(commentBody)
     });
+  }
+
+  /** Lightweight search returning only fields needed for analysis (no description, links, rendered HTML) */
+  async searchIssuesLean(jql: string, maxResults = 50, nextPageToken?: string): Promise<SearchResponse> {
+    try {
+      const cleanJql = jql.replace(/\\"/g, '"');
+      console.error(`Executing lean JQL search with query: ${cleanJql}${nextPageToken ? ' (page token)' : ''}`);
+
+      const leanFields = [
+        'summary', 'issuetype', 'priority', 'assignee', 'reporter',
+        'status', 'resolution', 'labels', 'created', 'updated',
+        'resolutiondate', 'duedate', 'timeestimate',
+        this.customFields.startDate, this.customFields.storyPoints,
+      ];
+
+      const params: any = {
+        jql: cleanJql,
+        maxResults: Math.min(maxResults, 50),
+        fields: leanFields,
+      };
+      if (nextPageToken) {
+        params.nextPageToken = nextPageToken;
+      }
+
+      const timeoutMs = 30_000;
+      const searchResults = await Promise.race([
+        this.client.issueSearch.searchForIssuesUsingJqlEnhancedSearch(params),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error(`Lean search timed out after ${timeoutMs / 1000}s — try a narrower JQL query or smaller maxResults`)), timeoutMs)
+        ),
+      ]);
+
+      const issues = (searchResults.issues || []).map(issue => this.mapIssueFields(issue));
+      const hasMore = !!searchResults.nextPageToken;
+
+      return {
+        issues,
+        pagination: {
+          startAt: 0,
+          maxResults,
+          total: hasMore ? issues.length + 1 : issues.length,
+          hasMore,
+          nextPageToken: searchResults.nextPageToken || undefined,
+        }
+      };
+    } catch (error) {
+      console.error('Error executing lean JQL search:', error);
+      throw error;
+    }
   }
 
   async searchIssues(jql: string, startAt = 0, maxResults = 25): Promise<SearchResponse> {

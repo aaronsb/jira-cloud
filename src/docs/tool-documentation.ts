@@ -17,6 +17,7 @@ const documentationGenerators: Record<string, (schema: any) => any> = {
   manage_jira_filter: generateFilterToolDocumentation,
   manage_jira_project: generateProjectToolDocumentation,
   queue_jira_operations: generateQueueToolDocumentation,
+  analyze_jira_issues: generateAnalysisToolDocumentation,
 };
 
 export function generateToolDocumentation(toolName: string, schema: any): any {
@@ -466,6 +467,60 @@ function generateQueueToolDocumentation(_schema: any) {
       description: "Destructive operations (delete, move) are pre-scanned against the bulk-destructive limit. If the queue would exceed the limit, the entire queue is refused before any operations execute.",
       max_operations: 10,
     },
+    related_resources: [],
+  };
+}
+
+function generateAnalysisToolDocumentation(schema: any) {
+  return {
+    name: "Issue Analysis",
+    description: schema.description,
+    parameters: {
+      jql: {
+        type: "string",
+        description: "JQL query selecting the issues to analyze.",
+        required: true,
+      },
+      metrics: {
+        type: "array of strings",
+        description: "Which metric groups to include. Default: all.",
+        values: ["points", "time", "schedule", "cycle", "distribution"],
+      },
+      maxResults: {
+        type: "integer",
+        description: "Max issues to analyze (default 100, max 500).",
+      },
+    },
+    metric_groups: {
+      points: "Earned Value — PV, EV, remaining, SPI, status breakdown, unestimated count",
+      time: "Effort — original estimate, completed, remaining by status category",
+      schedule: "Risk — date window, overdue count/slip, due soon, concentration risk, missing dates",
+      cycle: "Flow — lead time median/mean, throughput, open issue age, oldest open",
+      distribution: "Composition — counts by status, assignee, priority, issue type",
+    },
+    common_use_cases: [
+      {
+        title: "Sprint health check",
+        description: "Analyze all issues in the current sprint:",
+        steps: [
+          { description: "Full analysis", code: { jql: "sprint in openSprints()" } },
+        ],
+      },
+      {
+        title: "Schedule risk for a release",
+        description: "Check overdue and upcoming deadlines:",
+        steps: [
+          { description: "Schedule only", code: { jql: "project = AA AND fixVersion = 2.0", metrics: ["schedule"] } },
+        ],
+      },
+      {
+        title: "Workload balance",
+        description: "See how work is distributed across team members:",
+        steps: [
+          { description: "Distribution only", code: { jql: "project = AA AND resolution = Unresolved", metrics: ["distribution"] } },
+        ],
+      },
+    ],
     related_resources: [],
   };
 }

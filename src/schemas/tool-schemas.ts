@@ -330,6 +330,34 @@ export const toolSchemas = {
   },
 
 
+  analyze_jira_issues: {
+    name: 'analyze_jira_issues',
+    description: 'Compute project metrics over a set of issues selected by JQL. Returns deterministic calculations: earned value (story points), effort tracking, schedule risk, flow/cycle metrics, and distribution breakdowns. Use this when asked about totals, progress, overdue items, workload balance, or any quantitative question about issues.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        jql: {
+          type: 'string',
+          description: 'JQL query selecting the issues to analyze. Examples: "sprint in openSprints()", "project = AA AND fixVersion = 2.0", "assignee = currentUser() AND resolution = Unresolved".',
+        },
+        metrics: {
+          type: 'array',
+          items: {
+            type: 'string',
+            enum: ['points', 'time', 'schedule', 'cycle', 'distribution'],
+          },
+          description: 'Which metric groups to include. Default: all. points = earned value/SPI, time = effort estimates, schedule = due dates/overdue/risk, cycle = lead time/throughput/age, distribution = counts by status/assignee/priority/type.',
+        },
+        maxResults: {
+          type: 'integer',
+          description: 'Max issues to analyze (default 100, max 500).',
+          default: 100,
+        },
+      },
+      required: ['jql'],
+    },
+  },
+
   queue_jira_operations: {
     name: 'queue_jira_operations',
     description: 'Execute multiple Jira operations in a single call. Operations run sequentially with result references ($0.key) and per-operation error strategies (bail/continue).',
@@ -343,7 +371,7 @@ export const toolSchemas = {
             properties: {
               tool: {
                 type: 'string',
-                enum: ['manage_jira_issue', 'manage_jira_filter', 'manage_jira_sprint', 'manage_jira_project', 'manage_jira_board'],
+                enum: ['manage_jira_issue', 'manage_jira_filter', 'manage_jira_sprint', 'manage_jira_project', 'manage_jira_board', 'analyze_jira_issues'],
                 description: 'Which tool to call.',
               },
               args: {

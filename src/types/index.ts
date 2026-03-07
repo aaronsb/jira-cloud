@@ -18,6 +18,7 @@ export interface JiraIssueDetails {
   assignee: string | null;
   reporter: string;
   status: string;
+  statusCategory: 'new' | 'indeterminate' | 'done' | 'unknown';
   resolution: string | null;
   labels: string[];
   created: string;
@@ -100,6 +101,7 @@ export interface SearchPagination {
   maxResults: number;
   total: number;
   hasMore: boolean;
+  nextPageToken?: string;
 }
 
 export interface SearchResponse {

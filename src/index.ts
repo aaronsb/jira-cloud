@@ -15,6 +15,7 @@ import {
 
 import { fieldDiscovery } from './client/field-discovery.js';
 import { JiraClient } from './client/jira-client.js';
+import { handleAnalysisRequest } from './handlers/analysis-handler.js';
 import { handleBoardRequest } from './handlers/board-handlers.js';
 import { handleFilterRequest } from './handlers/filter-handlers.js';
 import { handleIssueRequest } from './handlers/issue-handlers.js';
@@ -119,6 +120,7 @@ class JiraServer {
           manage_jira_board: handleBoardRequest,
           manage_jira_sprint: handleSprintRequest,
           manage_jira_filter: handleFilterRequest,
+          analyze_jira_issues: handleAnalysisRequest,
         };
 
         const handlers: Record<string, (client: JiraClient, req: typeof request) => Promise<any>> = {
