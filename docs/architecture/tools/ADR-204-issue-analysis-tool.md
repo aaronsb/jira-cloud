@@ -1,11 +1,13 @@
-# ADR-204: Issue Analysis Tool
+---
+status: Accepted
+date: 2026-03-06
+deciders:
+  - aaronsb
+related:
+  - ADR-200
+---
 
-| Field | Value |
-|-------|-------|
-| Status | Proposed |
-| Domain | tools |
-| Created | 2026-03-06 |
-| Decides | How to provide deterministic computations over sets of Jira issues |
+# ADR-204: Issue Analysis Tool
 
 ## Context
 

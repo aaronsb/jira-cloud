@@ -20,10 +20,10 @@ _MCP tool API surface, LLM interaction patterns, schema design_
 
 | ADR | Title | Status |
 |-----|-------|--------|
-| [ADR-200](./tools/ADR-200-llm-facing-tool-design-principles.md) | LLM-Facing Tool Design Principles | Proposed |
-| [ADR-201](./tools/ADR-201-dynamic-custom-field-discovery.md) | Dynamic Custom Field Discovery | Draft |
-| [ADR-202](./tools/ADR-202-tool-operation-guardrails-and-permissions.md) | Tool Operation Guardrails and Permissions | Draft |
-| [ADR-203](./tools/ADR-203-tool-batching-and-sequencing.md) | Operation Queue | Draft |
-| [ADR-204](./architecture/ADR-204-issue-analysis-tool.md) | Issue Analysis Tool | ? |
-| [ADR-205](./architecture/ADR-205-count-based-analysis.md) | Count-Based Analysis for Cross-Project Summaries | Proposed |
-| [ADR-206](./tools/ADR-206-analysis-data-cube.md) | Analysis Data Cube | Draft |
+| [ADR-200](./tools/ADR-200-llm-facing-tool-design-principles.md) | LLM-Facing Tool Design Principles | Accepted |
+| [ADR-201](./tools/ADR-201-dynamic-custom-field-discovery.md) | Dynamic Custom Field Discovery | Accepted |
+| [ADR-202](./tools/ADR-202-tool-operation-guardrails-and-permissions.md) | Tool Operation Guardrails and Permissions | Accepted |
+| [ADR-203](./tools/ADR-203-tool-batching-and-sequencing.md) | Operation Queue | Accepted |
+| [ADR-204](./tools/ADR-204-issue-analysis-tool.md) | Issue Analysis Tool | Accepted |
+| [ADR-205](./tools/ADR-205-count-based-analysis.md) | Count-Based Analysis for Cross-Project Summaries | Accepted |
+| [ADR-206](./tools/ADR-206-analysis-data-cube.md) | Analysis Data Cube | Accepted |
