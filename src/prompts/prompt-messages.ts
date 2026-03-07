@@ -2,6 +2,7 @@
  * Builds PromptMessage arrays for each prompt, substituting user-provided arguments.
  */
 
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { promptDefinitions } from './prompt-definitions.js';
 
 interface PromptMessage {
@@ -120,13 +121,13 @@ Ask me which dimension I'd like to drill into, or suggest the most useful one ba
 export function getPrompt(name: string, args?: Record<string, string>): GetPromptResult {
   const def = promptDefinitions.find(p => p.name === name);
   if (!def) {
-    throw new Error(`Unknown prompt: ${name}`);
+    throw new McpError(ErrorCode.InvalidParams, `Unknown prompt: ${name}`);
   }
 
   const resolvedArgs = args ?? {};
   for (const arg of def.arguments) {
     if (arg.required && !resolvedArgs[arg.name]) {
-      throw new Error(`Missing required argument: ${arg.name}`);
+      throw new McpError(ErrorCode.InvalidParams, `Missing required argument: ${arg.name}`);
     }
   }
 
