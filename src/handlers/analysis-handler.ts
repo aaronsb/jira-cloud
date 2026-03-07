@@ -842,7 +842,7 @@ export async function handleAnalysisRequest(jiraClient: JiraClient, request: any
   }
 
   // Next steps
-  const nextSteps = analysisNextSteps(jql, allIssues.slice(0, 3).map(i => i.key));
+  const nextSteps = analysisNextSteps(jql, allIssues.slice(0, 3).map(i => i.key), truncated);
   lines.push(nextSteps);
 
   return {
