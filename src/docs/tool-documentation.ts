@@ -483,13 +483,17 @@ function generateAnalysisToolDocumentation(schema: any) {
       },
       metrics: {
         type: "array of strings",
-        description: "Which metric groups to compute. summary uses count API (no cap). Others fetch issue data (subject to maxResults).",
-        values: ["summary", "points", "time", "schedule", "cycle", "distribution"],
+        description: "Which metric groups to compute. summary uses count API (no cap). cube_setup discovers dimensions. Others fetch issue data (subject to maxResults).",
+        values: ["summary", "cube_setup", "points", "time", "schedule", "cycle", "distribution"],
       },
       groupBy: {
         type: "string",
-        description: "Split summary counts by dimension. Use with metrics: ['summary'].",
+        description: "Split summary counts by dimension. Supports all dimensions. Use cube_setup to discover values first.",
         values: ["project", "assignee", "priority", "issuetype"],
+      },
+      compute: {
+        type: "array of strings",
+        description: "Computed columns for summary tables. Each: 'name = expr'. Arithmetic, comparisons, column refs. Implicit measures: bugs, unassigned, no_due_date, blocked.",
       },
       maxResults: {
         type: "integer",
@@ -497,7 +501,8 @@ function generateAnalysisToolDocumentation(schema: any) {
       },
     },
     metric_groups: {
-      summary: "Exact counts — total, open, overdue, high priority, created/resolved last 7 days. No sampling cap. Supports groupBy for cross-project comparison.",
+      summary: "Exact counts — total, open, overdue, high priority, created/resolved last 7 days. No sampling cap. Supports groupBy and compute for data cube queries.",
+      cube_setup: "Discover available dimensions and values from a sample. Returns dimension catalog and cost estimates. Use before cube execute.",
       points: "Earned Value — PV, EV, remaining, SPI, status breakdown, unestimated count",
       time: "Effort — original estimate, completed, remaining by status category",
       schedule: "Risk — date window, overdue count/slip, due soon, concentration risk, missing dates",
@@ -533,8 +538,16 @@ function generateAnalysisToolDocumentation(schema: any) {
           { description: "Summary only", code: { jql: "project = AA", metrics: ["summary"] } },
         ],
       },
+      {
+        title: "Data cube — discover then compute",
+        description: "Two-phase analysis with computed columns:",
+        steps: [
+          { description: "Discover dimensions", code: { jql: "project in (AA, GC, GD, LGS) AND resolution = Unresolved", metrics: ["cube_setup"] } },
+          { description: "Execute with compute", code: { jql: "project in (AA, GC, GD, LGS) AND resolution = Unresolved", metrics: ["summary"], groupBy: "project", compute: ["bug_pct = bugs / total * 100", "net_flow = created_7d - resolved_7d", "clearing = resolved_7d > created_7d"] } },
+        ],
+      },
     ],
-    related_resources: [],
+    related_resources: ["jira://analysis/recipes"],
   };
 }
 

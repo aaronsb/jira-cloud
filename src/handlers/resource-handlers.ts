@@ -481,12 +481,44 @@ Net = created - resolved. Positive = growing backlog. Negative = clearing.
 { "jql": "resolution = Unresolved AND dueDate is EMPTY", "metrics": ["summary"], "groupBy": "project" }
 \`\`\`
 
+## Data Cube (Advanced)
+
+For multi-dimensional analysis, use the two-phase cube pattern:
+
+### Phase 1: Discover dimensions
+\`\`\`json
+{ "jql": "project in (AA, LGS, GD, GC) AND resolution = Unresolved", "metrics": ["cube_setup"] }
+\`\`\`
+Returns available dimensions, their values, and cost estimates for each groupBy option.
+
+### Phase 2: Execute with computed columns
+\`\`\`json
+{ "jql": "project in (AA, LGS, GD, GC) AND resolution = Unresolved", "metrics": ["summary"], "groupBy": "project", "compute": ["bug_pct = bugs / total * 100", "net_flow = created_7d - resolved_7d", "clearing = resolved_7d > created_7d"] }
+\`\`\`
+
+### Compute DSL
+- Arithmetic: \`+\`, \`-\`, \`*\`, \`/\`
+- Comparisons: \`>\`, \`<\`, \`>=\`, \`<=\`, \`==\`, \`!=\` (produce Yes/No)
+- Standard columns: total, open, overdue, high, created_7d, resolved_7d
+- Implicit measures (lazily resolved): bugs, unassigned, no_due_date, blocked
+- Max 5 expressions per query
+
+### Example computed columns
+- \`bug_pct = bugs / total * 100\` — bug ratio as percentage
+- \`net_flow = created_7d - resolved_7d\` — positive = growing backlog
+- \`clearing = resolved_7d > created_7d\` — Yes/No: is backlog shrinking?
+- \`risk = overdue > 10\` — Yes/No flag for at-risk projects
+- \`velocity = resolved_7d / 7\` — daily throughput
+
 ## Key Patterns
 
 - \`groupBy: "project"\` turns any query into a cross-project comparison table with exact counts
+- \`groupBy: "assignee"\` / \`"priority"\` / \`"issuetype"\` — slice by any dimension
+- \`compute\` adds derived columns without extra tool calls
 - Two summary queries = velocity (created vs resolved over same window)
 - \`dueDate is EMPTY\` surfaces planning gaps that overdue queries miss
 - \`assignee is EMPTY AND priority in (High, Highest)\` = high-priority work with no owner (most actionable)
+- Use \`cube_setup\` first to discover dimensions, then \`summary\` + \`groupBy\` + \`compute\` to execute
 - Use \`summary\` for cross-project scope, then \`distribution\`/\`schedule\` per-project for detail
 `;
 

@@ -210,8 +210,10 @@ export function analysisNextSteps(jql: string, issueKeys: string[]): string {
     );
   }
   steps.push(
+    { description: 'Discover dimensions for cube analysis', tool: 'analyze_jira_issues', example: { jql, metrics: ['cube_setup'] } },
+    { description: 'Add computed columns', tool: 'analyze_jira_issues', example: { jql, metrics: ['summary'], groupBy: 'project', compute: ['bug_pct = bugs / total * 100'] } },
     { description: 'Narrow the analysis with refined JQL', tool: 'analyze_jira_issues', example: { jql: `${jql} AND priority = High` } },
     { description: 'View the full issue list', tool: 'manage_jira_filter', example: { operation: 'execute_jql', jql } },
   );
-  return formatSteps(steps) + '\n- Read `jira://analysis/recipes` for more query composition patterns';
+  return formatSteps(steps) + '\n- Read `jira://analysis/recipes` for data cube patterns and compute DSL examples';
 }
