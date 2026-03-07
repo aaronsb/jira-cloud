@@ -321,6 +321,22 @@ function scopeJql(baseJql: string, condition: string): string {
   return `(${baseJql}) AND ${condition}`;
 }
 
+/** Map dimension values to JQL clauses for groupBy scoping */
+export function groupByJqlClause(dimension: GroupByField, values: string[]): string[] {
+  switch (dimension) {
+    case 'project':
+      return values.map(v => `project = ${v}`);
+    case 'assignee':
+      return values.map(v =>
+        v === 'Unassigned' ? 'assignee is EMPTY' : `assignee = "${v}"`
+      );
+    case 'priority':
+      return values.map(v => `priority = "${v}"`);
+    case 'issuetype':
+      return values.map(v => `issuetype = "${v}"`);
+  }
+}
+
 async function buildCountRow(jiraClient: JiraClient, label: string, baseJql: string): Promise<CountRow> {
   const [total, unresolved, overdue, highPriority, createdRecently, resolvedRecently] = await Promise.all([
     jiraClient.countIssues(baseJql),
@@ -368,12 +384,29 @@ async function handleSummary(jiraClient: JiraClient, jql: string, groupBy?: Grou
     lines.push('');
     lines.push(renderSummaryTable(rows));
   } else if (groupBy) {
-    // For non-project groupBy, get the overall count first
-    const overallRow = await buildCountRow(jiraClient, 'All', jql);
+    // For non-project groupBy, sample to discover values, then count per value
+    const sample = await jiraClient.searchIssuesLean(jql, CUBE_SAMPLE_SIZE);
+    if (sample.issues.length === 0) {
+      throw new McpError(ErrorCode.InvalidParams, `No issues matched JQL — cannot discover ${groupBy} values`);
+    }
+    const dims = extractDimensions(sample.issues);
+    const dim = dims.find(d => d.name === groupBy);
+    if (!dim || dim.values.length === 0) {
+      throw new McpError(ErrorCode.InvalidParams, `No ${groupBy} values found in sampled issues`);
+    }
+
+    const jqlClause = groupByJqlClause(groupBy, dim.values);
+    const rows = await Promise.all(
+      dim.values.map((value, idx) => buildCountRow(jiraClient, value,
+        `(${jql}) AND ${jqlClause[idx]}`
+      ))
+    );
+    rows.sort((a, b) => b.unresolved - a.unresolved);
     lines.push('');
-    lines.push(renderSummaryTable([overallRow]));
-    lines.push('');
-    lines.push(`*groupBy "${groupBy}" — only "project" supports per-group breakdown currently. Other dimensions coming soon.*`);
+    lines.push(renderSummaryTable(rows));
+    if (dim.count > dim.values.length) {
+      lines.push(`*Showing top ${dim.values.length} of ${dim.count} ${groupBy} values (from ${sample.issues.length}-issue sample)*`);
+    }
   } else {
     // No groupBy — single row for the whole JQL
     const row = await buildCountRow(jiraClient, 'All', jql);

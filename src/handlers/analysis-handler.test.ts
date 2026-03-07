@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { renderPoints, renderTime, renderSchedule, renderCycle, renderDistribution, renderSummaryTable, extractProjectKeys, removeProjectClause, extractDimensions, renderCubeSetup } from './analysis-handler.js';
+import { renderPoints, renderTime, renderSchedule, renderCycle, renderDistribution, renderSummaryTable, extractProjectKeys, removeProjectClause, extractDimensions, renderCubeSetup, groupByJqlClause } from './analysis-handler.js';
 import { JiraIssueDetails } from '../types/index.js';
 
 // ── Test Helpers ───────────────────────────────────────────────────────
@@ -336,6 +336,34 @@ describe('removeProjectClause', () => {
   it('preserves complex remaining JQL', () => {
     expect(removeProjectClause('project in (AA) AND resolution = Unresolved AND priority = High'))
       .toBe('resolution = Unresolved AND priority = High');
+  });
+});
+
+// ── groupBy JQL Clause Tests ─────────────────────────────────────────
+
+describe('groupByJqlClause', () => {
+  it('generates project = X clauses', () => {
+    expect(groupByJqlClause('project', ['AA', 'GC'])).toEqual([
+      'project = AA', 'project = GC',
+    ]);
+  });
+
+  it('generates assignee clauses with EMPTY for Unassigned', () => {
+    expect(groupByJqlClause('assignee', ['Alice', 'Unassigned'])).toEqual([
+      'assignee = "Alice"', 'assignee is EMPTY',
+    ]);
+  });
+
+  it('generates priority clauses', () => {
+    expect(groupByJqlClause('priority', ['High', 'Medium'])).toEqual([
+      'priority = "High"', 'priority = "Medium"',
+    ]);
+  });
+
+  it('generates issuetype clauses', () => {
+    expect(groupByJqlClause('issuetype', ['Story', 'Bug'])).toEqual([
+      'issuetype = "Story"', 'issuetype = "Bug"',
+    ]);
   });
 });
 
