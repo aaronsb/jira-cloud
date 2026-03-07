@@ -353,6 +353,12 @@ export const toolSchemas = {
           enum: ['project', 'assignee', 'priority', 'issuetype'],
           description: 'Split summary counts by this dimension. Use with metrics: ["summary"]. "project" produces a per-project comparison table.',
         },
+        compute: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Computed columns for cube execute. Each entry: "name = expr". Arithmetic (+,-,*,/), comparisons (>,<,>=,<=,==,!=). Column refs: total, open, overdue, high, created_7d, resolved_7d. Implicit measures resolved lazily: bugs, unassigned, no_due_date, blocked. Max 5 expressions. Example: ["bug_pct = bugs / total * 100", "clearing = resolved_7d > created_7d"].',
+          maxItems: 5,
+        },
         maxResults: {
           type: 'integer',
           description: 'Max issues to fetch for detail metrics (default 100, max 500). Does not apply to summary (which uses count API).',

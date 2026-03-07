@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { parseComputeList } from '../utils/cube-dsl.js';
 import { renderPoints, renderTime, renderSchedule, renderCycle, renderDistribution, renderSummaryTable, extractProjectKeys, removeProjectClause, extractDimensions, renderCubeSetup, groupByJqlClause } from './analysis-handler.js';
 import { JiraIssueDetails } from '../types/index.js';
 
@@ -291,6 +292,47 @@ describe('renderSummaryTable', () => {
       { label: 'EMPTY', total: 0, unresolved: 0, overdue: 0, highPriority: 0, createdRecently: 0, resolvedRecently: 0 },
     ]);
     expect(output).toContain('| EMPTY | 0 | 0 | 0 | 0 | 0 | 0 |');
+  });
+
+  it('renders computed columns from DSL expressions', () => {
+    const compute = parseComputeList([
+      'net_flow = created_7d - resolved_7d',
+      'clearing = resolved_7d > created_7d',
+    ]);
+    const output = renderSummaryTable([
+      { label: 'AA', total: 100, unresolved: 80, overdue: 5, highPriority: 10, createdRecently: 12, resolvedRecently: 8 },
+    ], compute);
+    expect(output).toContain('net_flow');
+    expect(output).toContain('clearing');
+    // net_flow = 12 - 8 = 4
+    expect(output).toContain(' 4 |');
+    // clearing = 8 > 12 → No
+    expect(output).toContain(' No |');
+  });
+
+  it('renders computed columns with implicit measures', () => {
+    const compute = parseComputeList(['bug_pct = bugs / total * 100']);
+    const output = renderSummaryTable([
+      { label: 'AA', total: 200, unresolved: 150, overdue: 10, highPriority: 5, createdRecently: 8, resolvedRecently: 3,
+        implicitMeasures: { bugs: 30 } },
+    ], compute);
+    expect(output).toContain('bug_pct');
+    // 30 / 200 * 100 = 15
+    expect(output).toContain(' 15 |');
+  });
+
+  it('shows dash for computed columns in totals row', () => {
+    const compute = parseComputeList(['risk = overdue > 10']);
+    const output = renderSummaryTable([
+      { label: 'AA', total: 100, unresolved: 80, overdue: 15, highPriority: 5, createdRecently: 8, resolvedRecently: 3 },
+      { label: 'GC', total: 50, unresolved: 30, overdue: 2, highPriority: 1, createdRecently: 4, resolvedRecently: 2 },
+    ], compute);
+    // AA: overdue 15 > 10 → Yes, GC: overdue 2 > 10 → No
+    expect(output).toContain(' Yes |');
+    expect(output).toContain(' No |');
+    // Totals row shows dash for computed columns
+    expect(output).toContain('| **Total**');
+    expect(output).toContain(' — |');
   });
 });
 
