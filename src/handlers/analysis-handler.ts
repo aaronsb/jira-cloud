@@ -14,7 +14,9 @@ const ALL_METRICS: MetricGroup[] = ['points', 'time', 'schedule', 'cycle', 'dist
 const VALID_GROUP_BY = ['project', 'assignee', 'priority', 'issuetype'] as const;
 type GroupByField = typeof VALID_GROUP_BY[number];
 const MAX_ISSUES = 500;
-const CUBE_SAMPLE_SIZE = 50;
+const CUBE_SAMPLE_PCT = 0.2;   // 20% of total issues
+const CUBE_SAMPLE_MIN = 50;    // floor — enough for rare dimension values
+const CUBE_SAMPLE_MAX = 500;   // ceiling — proven fast with lean search
 const MAX_CUBE_GROUPS = 20;
 
 type StatusBucket = 'To Do' | 'In Progress' | 'Done';
@@ -566,6 +568,12 @@ export function renderCubeSetup(jql: string, sampleSize: number, dimensions: Dim
   return lines.join('\n');
 }
 
+/** Compute dynamic sample size: 20% of total, clamped to [50, 500] */
+async function computeSampleSize(jiraClient: JiraClient, jql: string): Promise<number> {
+  const total = await jiraClient.countIssues(jql);
+  return Math.max(CUBE_SAMPLE_MIN, Math.min(CUBE_SAMPLE_MAX, Math.ceil(total * CUBE_SAMPLE_PCT)));
+}
+
 /** Sample issues across all projects in scope for representative dimension discovery */
 async function samplePerProject(jiraClient: JiraClient, jql: string): Promise<JiraIssueDetails[]> {
   let projectKeys = extractProjectKeys(jql);
@@ -575,14 +583,15 @@ async function samplePerProject(jiraClient: JiraClient, jql: string): Promise<Ji
     projectKeys = allProjects.map(p => p.key);
   }
 
+  const sampleSize = await computeSampleSize(jiraClient, jql);
+
   if (projectKeys.length <= 1) {
-    // Single project or couldn't discover — just sample directly
-    const result = await jiraClient.searchIssuesLean(jql, CUBE_SAMPLE_SIZE);
+    const result = await jiraClient.searchIssuesLean(jql, sampleSize);
     return result.issues;
   }
 
   const remaining = removeProjectClause(jql);
-  const perProject = Math.max(5, Math.floor(CUBE_SAMPLE_SIZE / projectKeys.length));
+  const perProject = Math.max(5, Math.floor(sampleSize / projectKeys.length));
   const samples = await Promise.all(
     projectKeys.map(async k => {
       const scopedJql = remaining ? `project = ${k} AND (${remaining})` : `project = ${k}`;
