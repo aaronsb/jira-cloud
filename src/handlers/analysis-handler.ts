@@ -284,6 +284,27 @@ export function renderCycle(issues: JiraIssueDetails[], now: Date): string {
       const staleStr = mostStale.map(s => `${s.key} (${s.days}d)`).join(', ');
       lines.push(`**Most stale:** ${staleStr}`);
     }
+
+    // Status age — how long in current status
+    const withStatusAge = open.filter(i => i.statusCategoryChanged);
+    if (withStatusAge.length > 0) {
+      const statusAges = withStatusAge.map(i =>
+        daysBetween(parseDate(i.statusCategoryChanged!), now)
+      );
+      const med = median(statusAges);
+      const avg = mean(statusAges);
+      lines.push(`**Status age:** median ${med.toFixed(1)} days, mean ${avg.toFixed(1)} days in current status (${withStatusAge.length} issues)`);
+
+      const stuck = withStatusAge
+        .map(i => ({ key: i.key, status: i.status, days: daysBetween(parseDate(i.statusCategoryChanged!), now) }))
+        .filter(s => s.days >= 30)
+        .sort((a, b) => b.days - a.days)
+        .slice(0, 5);
+      if (stuck.length > 0) {
+        const stuckStr = stuck.map(s => `${s.key} ${s.status} (${s.days}d)`).join(', ');
+        lines.push(`**Stuck:** ${stuckStr}`);
+      }
+    }
   }
 
   return lines.join('\n');
@@ -372,6 +393,7 @@ function buildImplicitMeasures(customFieldIds?: { startDate: string; storyPoints
     blocked: 'status = Blocked',
     no_labels: 'labels is EMPTY AND resolution = Unresolved',
     stale: 'resolution = Unresolved AND updated <= -60d',
+    stale_status: 'resolution = Unresolved AND statusCategoryChangedDate <= -30d',
     backlog_rot: 'resolution = Unresolved AND dueDate is EMPTY AND assignee is EMPTY AND updated <= -60d',
   };
   if (customFieldIds) {
@@ -622,7 +644,7 @@ export function renderCubeSetup(jql: string, sampleSize: number, dimensions: Dim
   lines.push('- total, open, overdue, high+, created_7d, resolved_7d');
   lines.push('');
   lines.push('Implicit measures (lazily resolved if referenced in `compute`):');
-  lines.push('- bugs, unassigned, no_due_date, no_estimate, no_start_date, no_labels, blocked, stale, backlog_rot');
+  lines.push('- bugs, unassigned, no_due_date, no_estimate, no_start_date, no_labels, blocked, stale, stale_status, backlog_rot');
 
   // Suggested cubes with cost estimates
   lines.push('');

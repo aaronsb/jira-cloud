@@ -508,7 +508,7 @@ Returns available dimensions, their values, cost estimates, and query budget.
 - Arithmetic: \`+\`, \`-\`, \`*\`, \`/\` (division by zero = 0)
 - Comparisons: \`>\`, \`<\`, \`>=\`, \`<=\`, \`==\`, \`!=\` (produce Yes/No — cannot be summed or averaged)
 - Standard columns: total, open, overdue, high, created_7d, resolved_7d
-- Implicit measures (lazily resolved via count API): bugs, unassigned, no_due_date, no_estimate, no_start_date, no_labels, blocked, stale (untouched 60d+), backlog_rot (undated+unassigned+untouched 60d+)
+- Implicit measures (lazily resolved via count API): bugs, unassigned, no_due_date, no_estimate, no_start_date, no_labels, blocked, stale (untouched 60d+), stale_status (stuck in status 30d+), backlog_rot (undated+unassigned+untouched 60d+)
 - Max 5 expressions per query, 150-query budget per execution
 - Expressions evaluate linearly — later expressions can reference earlier ones
 

@@ -24,6 +24,7 @@ export interface JiraIssueDetails {
   created: string;
   updated: string;
   resolutionDate: string | null;
+  statusCategoryChanged: string | null;
   dueDate: string | null;
   startDate: string | null;
   storyPoints: number | null;

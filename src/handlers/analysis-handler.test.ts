@@ -501,6 +501,6 @@ describe('renderCubeSetup', () => {
     const dims = [{ name: 'project', values: ['AA'], count: 1 }];
     const output = renderCubeSetup('project = AA', 50, dims);
     expect(output).toContain('total, open, overdue');
-    expect(output).toContain('bugs, unassigned, no_due_date, no_estimate, no_start_date, no_labels, blocked, stale, backlog_rot');
+    expect(output).toContain('bugs, unassigned, no_due_date, no_estimate, no_start_date, no_labels, blocked, stale, stale_status, backlog_rot');
   });
 });
