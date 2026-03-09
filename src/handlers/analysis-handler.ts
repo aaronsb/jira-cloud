@@ -13,11 +13,12 @@ type MetricGroup = 'points' | 'time' | 'schedule' | 'cycle' | 'distribution' | '
 const ALL_METRICS: MetricGroup[] = ['points', 'time', 'schedule', 'cycle', 'distribution'];
 const VALID_GROUP_BY = ['project', 'assignee', 'priority', 'issuetype'] as const;
 type GroupByField = typeof VALID_GROUP_BY[number];
-const MAX_ISSUES = 500;
+const MAX_ISSUES_HARD = 500;   // absolute ceiling for detail metrics — beyond this, context explodes
+const MAX_ISSUES_DEFAULT = 100;
 const CUBE_SAMPLE_PCT = 0.2;   // 20% of total issues
 const CUBE_SAMPLE_MIN = 50;    // floor — enough for rare dimension values
 const CUBE_SAMPLE_MAX = 500;   // ceiling — proven fast with lean search
-const MAX_CUBE_GROUPS = 20;
+const DEFAULT_GROUP_LIMIT = 20;
 const MAX_COUNT_QUERIES = 150; // ADR-206 budget: max count API calls per execution
 const STANDARD_MEASURES = 6;   // total, open, overdue, high+, created_7d, resolved_7d
 
@@ -77,11 +78,14 @@ function sumBy<T>(items: T[], valueFn: (item: T) => number | null): number {
   return items.reduce((sum, item) => sum + (valueFn(item) || 0), 0);
 }
 
-function mapToString(map: Map<string, number>, separator = ' | '): string {
-  return [...map.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .map(([k, v]) => `${k}: ${v}`)
-    .join(separator);
+function mapToString(map: Map<string, number>, separator = ' | ', limit?: number): string {
+  const sorted = [...map.entries()].sort((a, b) => b[1] - a[1]);
+  const capped = limit ? sorted.slice(0, limit) : sorted;
+  const result = capped.map(([k, v]) => `${k}: ${v}`).join(separator);
+  if (limit && sorted.length > limit) {
+    return `${result} | (+${sorted.length - limit} more — use groupLimit to see all)`;
+  }
+  return result;
 }
 
 function median(values: number[]): number {
@@ -310,20 +314,20 @@ export function renderCycle(issues: JiraIssueDetails[], now: Date): string {
   return lines.join('\n');
 }
 
-export function renderDistribution(issues: JiraIssueDetails[]): string {
+export function renderDistribution(issues: JiraIssueDetails[], groupLimit = DEFAULT_GROUP_LIMIT): string {
   const lines = ['## Distribution', ''];
 
   const byStatus = countBy(issues, i => i.status);
-  lines.push(`**By status:** ${mapToString(byStatus)}`);
+  lines.push(`**By status:** ${mapToString(byStatus, ' | ', groupLimit)}`);
 
   const byAssignee = countBy(issues, i => i.assignee || 'Unassigned');
-  lines.push(`**By assignee:** ${mapToString(byAssignee)}`);
+  lines.push(`**By assignee:** ${mapToString(byAssignee, ' | ', groupLimit)}`);
 
   const byPriority = countBy(issues, i => i.priority || 'None');
-  lines.push(`**By priority:** ${mapToString(byPriority)}`);
+  lines.push(`**By priority:** ${mapToString(byPriority, ' | ', groupLimit)}`);
 
   const byType = countBy(issues, i => i.issueType || 'Unknown');
-  lines.push(`**By type:** ${mapToString(byType)}`);
+  lines.push(`**By type:** ${mapToString(byType, ' | ', groupLimit)}`);
 
   return lines.join('\n');
 }
@@ -508,7 +512,7 @@ function maxGroupsForBudget(implicitCount: number): number {
   return Math.floor(MAX_COUNT_QUERIES / queriesPerGroup);
 }
 
-async function handleSummary(jiraClient: JiraClient, jql: string, groupBy?: GroupByField, compute?: ComputeColumn[]): Promise<string> {
+async function handleSummary(jiraClient: JiraClient, jql: string, groupBy?: GroupByField, compute?: ComputeColumn[], groupLimit = DEFAULT_GROUP_LIMIT): Promise<string> {
   const lines: string[] = [];
   lines.push(`# Summary: ${jql}`);
   lines.push(`As of ${formatDateShort(new Date())} — counts are exact (no sampling cap)`);
@@ -518,13 +522,16 @@ async function handleSummary(jiraClient: JiraClient, jql: string, groupBy?: Grou
   const neededImplicits = compute ? detectImplicitMeasures(compute, implicitDefs) : [];
   const groupBudget = maxGroupsForBudget(neededImplicits.length);
 
+  // Effective group cap: user's preference vs API query budget (whichever is smaller)
+  const effectiveGroupCap = Math.min(groupLimit, groupBudget);
+
   if (groupBy === 'project') {
     let keys = extractProjectKeys(jql);
     if (keys.length === 0) {
       throw new McpError(ErrorCode.InvalidParams, 'groupBy "project" requires project keys in JQL (e.g., project in (AA, GC))');
     }
-    const capped = keys.length > groupBudget;
-    if (capped) keys = keys.slice(0, groupBudget);
+    const capped = keys.length > effectiveGroupCap;
+    if (capped) keys = keys.slice(0, effectiveGroupCap);
     const remaining = removeProjectClause(jql);
     const rows = await batchParallel(
       keys.map(k => () => buildCountRow(jiraClient, k,
@@ -537,7 +544,10 @@ async function handleSummary(jiraClient: JiraClient, jql: string, groupBy?: Grou
     lines.push('');
     lines.push(renderSummaryTable(rows, compute));
     if (capped) {
-      lines.push(`*Capped at ${groupBudget} groups to stay within ${MAX_COUNT_QUERIES}-query budget*`);
+      const reason = effectiveGroupCap < groupBudget
+        ? `groupLimit=${effectiveGroupCap} — increase groupLimit to see more`
+        : `${MAX_COUNT_QUERIES}-query budget`;
+      lines.push(`*Capped at ${effectiveGroupCap} groups (${reason})*`);
     }
   } else if (groupBy) {
     // For non-project groupBy, sample per-project for representative dimension values
@@ -545,14 +555,14 @@ async function handleSummary(jiraClient: JiraClient, jql: string, groupBy?: Grou
     if (issues.length === 0) {
       throw new McpError(ErrorCode.InvalidParams, `No issues matched JQL — cannot discover ${groupBy} values`);
     }
-    const dims = extractDimensions(issues);
+    const dims = extractDimensions(issues, groupLimit);
     const dim = dims.find(d => d.name === groupBy);
     if (!dim || dim.values.length === 0) {
       throw new McpError(ErrorCode.InvalidParams, `No ${groupBy} values found in sampled issues`);
     }
 
-    // Cap groups to query budget
-    const cappedValues = dim.values.slice(0, groupBudget);
+    // Cap groups to effective limit
+    const cappedValues = dim.values.slice(0, effectiveGroupCap);
 
     const jqlClause = groupByJqlClause(groupBy, cappedValues);
     const rows = await batchParallel(
@@ -566,10 +576,15 @@ async function handleSummary(jiraClient: JiraClient, jql: string, groupBy?: Grou
     lines.push('');
     lines.push(renderSummaryTable(rows, compute));
     if (dim.count > cappedValues.length) {
-      const reason = cappedValues.length < dim.values.length
-        ? `capped at ${groupBudget} groups (${MAX_COUNT_QUERIES}-query budget)`
-        : `from ${issues.length}-issue sample`;
-      lines.push(`*Showing top ${cappedValues.length} of ${dim.count} ${groupBy} values (${reason})*`);
+      const reasons: string[] = [];
+      if (cappedValues.length < dim.values.length) {
+        reasons.push(effectiveGroupCap < groupBudget
+          ? `groupLimit=${effectiveGroupCap} — increase groupLimit to see more`
+          : `${MAX_COUNT_QUERIES}-query budget`);
+      } else {
+        reasons.push(`from ${issues.length}-issue sample`);
+      }
+      lines.push(`*Showing top ${cappedValues.length} of ${dim.count} ${groupBy} values (${reasons.join(', ')})*`);
     }
   } else {
     // No groupBy — single row for the whole JQL
@@ -596,7 +611,7 @@ interface DimensionInfo {
 }
 
 /** Extract distinct dimension values from sampled issues */
-export function extractDimensions(issues: JiraIssueDetails[]): DimensionInfo[] {
+export function extractDimensions(issues: JiraIssueDetails[], groupLimit = DEFAULT_GROUP_LIMIT): DimensionInfo[] {
   const dims: { name: string; extractor: (i: JiraIssueDetails) => string }[] = [
     { name: 'project', extractor: i => i.key.split('-')[0] },
     { name: 'status', extractor: i => i.status },
@@ -611,10 +626,10 @@ export function extractDimensions(issues: JiraIssueDetails[]): DimensionInfo[] {
       const val = extractor(issue);
       counts.set(val, (counts.get(val) || 0) + 1);
     }
-    // Sort by count descending, cap at MAX_CUBE_GROUPS
+    // Sort by count descending, cap at groupLimit
     const sorted = [...counts.entries()]
       .sort((a, b) => b[1] - a[1])
-      .slice(0, MAX_CUBE_GROUPS);
+      .slice(0, groupLimit);
     return {
       name,
       values: sorted.map(([v]) => v),
@@ -650,7 +665,7 @@ export function renderCubeSetup(jql: string, sampleSize: number, dimensions: Dim
   lines.push('');
   lines.push(`## Suggested Cubes (budget: ${MAX_COUNT_QUERIES} queries)`);
   for (const dim of dimensions) {
-    const groups = Math.min(dim.count, MAX_CUBE_GROUPS);
+    const groups = Math.min(dim.count, DEFAULT_GROUP_LIMIT);
     const queries = groups * STANDARD_MEASURES;
     const estSeconds = Math.max(1, Math.round(queries / 12)); // ~12 parallel queries/sec
     const withinBudget = queries <= MAX_COUNT_QUERIES;
@@ -744,6 +759,10 @@ export async function handleAnalysisRequest(jiraClient: JiraClient, request: any
     compute = parseComputeList(args.compute as string[]);
   }
 
+  // Parse groupLimit — soft cap on group/dimension values (no hard cap for summary metrics)
+  const rawGroupLimit = Number(args.groupLimit);
+  const groupLimit = rawGroupLimit > 0 ? rawGroupLimit : DEFAULT_GROUP_LIMIT;
+
   // Cube setup — discover dimensions from sample, no issue fetching
   if (hasCubeSetup) {
     const cubeText = await handleCubeSetup(jiraClient, jql);
@@ -758,7 +777,7 @@ export async function handleAnalysisRequest(jiraClient: JiraClient, request: any
 
   // If only summary requested, skip issue fetching entirely
   if (hasSummary && fetchMetrics.length === 0) {
-    const summaryText = await handleSummary(jiraClient, jql, groupBy, compute);
+    const summaryText = await handleSummary(jiraClient, jql, groupBy, compute, groupLimit);
     const nextSteps = analysisNextSteps(jql, []);
     return {
       content: [{
@@ -768,8 +787,7 @@ export async function handleAnalysisRequest(jiraClient: JiraClient, request: any
     };
   }
 
-  const DEFAULT_MAX = 100;
-  const maxResults = Math.min(Number(args.maxResults) || DEFAULT_MAX, MAX_ISSUES);
+  const maxResults = Math.min(Number(args.maxResults) || MAX_ISSUES_DEFAULT, MAX_ISSUES_HARD);
 
   // Fetch issues using cursor-based pagination (50 per page, Jira enhanced search API)
   const allIssues: JiraIssueDetails[] = [];
@@ -813,7 +831,7 @@ export async function handleAnalysisRequest(jiraClient: JiraClient, request: any
 
   // Summary first if requested alongside other metrics
   if (hasSummary) {
-    const summaryText = await handleSummary(jiraClient, jql, groupBy, compute);
+    const summaryText = await handleSummary(jiraClient, jql, groupBy, compute, groupLimit);
     lines.push(summaryText);
   }
 
@@ -823,7 +841,7 @@ export async function handleAnalysisRequest(jiraClient: JiraClient, request: any
     lines.push(`# Detail: ${jql}`);
     lines.push(`Analyzed ${allIssues.length} issues (as of ${formatDateShort(now)})`);
     if (truncated) {
-      lines.push(`*Results capped at ${maxResults} issues — query may match more.*`);
+      lines.push(`*Results capped at ${maxResults} issues — distributions below are approximate. For exact counts, use metrics: ["summary"] with groupBy instead.*`);
     }
 
     // Render requested metrics
@@ -832,7 +850,7 @@ export async function handleAnalysisRequest(jiraClient: JiraClient, request: any
       time: () => renderTime(allIssues),
       schedule: () => renderSchedule(allIssues, now),
       cycle: () => renderCycle(allIssues, now),
-      distribution: () => renderDistribution(allIssues),
+      distribution: () => renderDistribution(allIssues, groupLimit),
     };
 
     for (const metric of fetchMetrics) {
