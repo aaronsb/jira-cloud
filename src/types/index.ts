@@ -8,6 +8,12 @@ export interface JiraAttachment {
   url: string;
 }
 
+export interface JiraPerson {
+  displayName: string;
+  accountId: string;
+  role: 'assignee' | 'reporter' | 'commenter';
+}
+
 export interface JiraIssueDetails {
   key: string;
   summary: string;
@@ -47,6 +53,7 @@ export interface JiraIssueDetails {
     type: string;
     description: string;
   }>;
+  people?: JiraPerson[];
 }
 
 export interface HierarchyNode {

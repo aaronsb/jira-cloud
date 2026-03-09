@@ -2,9 +2,51 @@ import MarkdownIt from 'markdown-it';
 
 import { AdfNode } from '../types/index.js';
 
+// Jira accountIds: hex strings or "712020:uuid-format"
+const MENTION_RE = /@([a-zA-Z0-9][a-zA-Z0-9:_-]{9,})/g;
+
 export class TextProcessor {
-  private static md = new MarkdownIt();
-  
+  private static md = new MarkdownIt().enable('strikethrough');
+
+  /**
+   * Split text into alternating text and mention ADF nodes.
+   * Recognizes @accountId patterns and converts them to ADF mention nodes.
+   */
+  private static splitMentions(text: string, marks?: any[]): any[] {
+    const nodes: any[] = [];
+    let lastIndex = 0;
+    MENTION_RE.lastIndex = 0;
+    let match;
+
+    while ((match = MENTION_RE.exec(text)) !== null) {
+      // Text before the mention
+      if (match.index > lastIndex) {
+        const before = text.slice(lastIndex, match.index);
+        const node: any = { type: 'text', text: before };
+        if (marks?.length) node.marks = marks;
+        nodes.push(node);
+      }
+      // Mention node
+      nodes.push({
+        type: 'mention',
+        attrs: { id: match[1], text: `@${match[1]}` },
+      });
+      lastIndex = MENTION_RE.lastIndex;
+    }
+
+    // Remaining text after last mention
+    if (lastIndex < text.length) {
+      const remaining = text.slice(lastIndex);
+      const node: any = { type: 'text', text: remaining };
+      if (marks?.length) node.marks = marks;
+      nodes.push(node);
+    }
+
+    // No mentions found — return empty so caller uses original logic
+    if (nodes.length === 0) return [];
+    return nodes;
+  }
+
   static markdownToAdf(markdown: string): any {
     // Replace literal \n sequences with actual newlines so markdown-it
     // correctly splits paragraphs. MCP JSON transport may deliver these
@@ -89,6 +131,23 @@ export class TextProcessor {
             const child = token.children![i];
 
             if (child.type === 'text') {
+              // Check for @accountId mentions in this text segment
+              const mentionNodes = TextProcessor.splitMentions(child.content, marks.length > 0 ? marks : undefined);
+              if (mentionNodes.length > 0) {
+                // Flush any pending plain text first
+                if (currentText) {
+                  lastBlock.content.push({
+                    type: 'text',
+                    text: currentText,
+                    ...(marks.length > 0 && { marks })
+                  });
+                  currentText = '';
+                }
+                lastBlock.content.push(...mentionNodes);
+                // Reset marks after flushing mention-bearing text
+                if (marks.length > 0) marks = [];
+                continue;
+              }
               if (currentText && marks.length > 0) {
                 lastBlock.content.push({
                   type: 'text',
@@ -117,6 +176,15 @@ export class TextProcessor {
                 currentText = '';
               }
               marks.push({ type: 'em' });
+            } else if (child.type === 's_open') {
+              if (currentText) {
+                lastBlock.content.push({
+                  type: 'text',
+                  text: currentText
+                });
+                currentText = '';
+              }
+              marks.push({ type: 'strike' });
             } else if (child.type === 'link_open') {
               if (currentText) {
                 lastBlock.content.push({
@@ -203,6 +271,147 @@ export class TextProcessor {
     }
 
     return '';
+  }
+
+  /**
+   * Convert ADF to markdown, preserving formatting for round-trip fidelity.
+   * This is the inverse of markdownToAdf — the agent reads markdown and
+   * writes markdown, so the formatting survives the Jira round-trip.
+   */
+  static adfToMarkdown(node: any): string {
+    if (!node) return '';
+
+    switch (node.type) {
+      case 'doc':
+        return (node.content || [])
+          .map((child: any) => TextProcessor.adfToMarkdown(child))
+          .join('\n\n')
+          .replace(/\n{3,}/g, '\n\n')
+          .trim();
+
+      case 'paragraph':
+        return (node.content || [])
+          .map((child: any) => TextProcessor.adfToMarkdown(child))
+          .join('');
+
+      case 'heading': {
+        const level = node.attrs?.level || 1;
+        const prefix = '#'.repeat(level);
+        const text = (node.content || [])
+          .map((child: any) => TextProcessor.adfToMarkdown(child))
+          .join('');
+        return `${prefix} ${text}`;
+      }
+
+      case 'text': {
+        let text = node.text || '';
+        if (node.marks) {
+          for (const mark of node.marks) {
+            switch (mark.type) {
+              case 'strong':
+                text = `**${text}**`;
+                break;
+              case 'em':
+                text = `*${text}*`;
+                break;
+              case 'strike':
+                text = `~~${text}~~`;
+                break;
+              case 'code':
+                text = `\`${text}\``;
+                break;
+              case 'link':
+                text = `[${text}](${mark.attrs?.href || ''})`;
+                break;
+            }
+          }
+        }
+        return text;
+      }
+
+      case 'mention':
+        // Emit @accountId so the agent can reuse it in comments
+        return `@${node.attrs?.id || node.attrs?.text?.replace('@', '') || ''}`;
+
+      case 'hardBreak':
+        return '\n';
+
+      case 'bulletList':
+        return (node.content || [])
+          .map((child: any) => TextProcessor.adfToMarkdown(child))
+          .join('\n');
+
+      case 'orderedList':
+        return (node.content || [])
+          .map((child: any, i: number) => {
+            const itemText = TextProcessor.adfListItemContent(child);
+            return `${i + 1}. ${itemText}`;
+          })
+          .join('\n');
+
+      case 'listItem': {
+        const itemText = TextProcessor.adfListItemContent(node);
+        return `- ${itemText}`;
+      }
+
+      case 'codeBlock': {
+        const lang = node.attrs?.language || '';
+        const code = (node.content || [])
+          .map((child: any) => child.text || '')
+          .join('');
+        return `\`\`\`${lang}\n${code}\n\`\`\``;
+      }
+
+      case 'blockquote': {
+        const content = (node.content || [])
+          .map((child: any) => TextProcessor.adfToMarkdown(child))
+          .join('\n');
+        return content.split('\n').map((line: string) => `> ${line}`).join('\n');
+      }
+
+      case 'rule':
+        return '---';
+
+      case 'table':
+      case 'tableRow':
+      case 'tableHeader':
+      case 'tableCell':
+        // Flatten table content to text — ADF tables don't round-trip well through markdown
+        return (node.content || [])
+          .map((child: any) => TextProcessor.adfToMarkdown(child))
+          .join(node.type === 'tableRow' ? ' | ' : '\n');
+
+      case 'mediaSingle':
+      case 'media':
+        // Media nodes can't round-trip; skip silently
+        return '';
+
+      case 'inlineCard':
+        return node.attrs?.url || '';
+
+      default:
+        // Unknown node — recurse into children if present
+        if (node.content) {
+          return (node.content || [])
+            .map((child: any) => TextProcessor.adfToMarkdown(child))
+            .join('');
+        }
+        return node.text || '';
+    }
+  }
+
+  /** Extract text content from a listItem node (skipping the wrapping paragraph) */
+  private static adfListItemContent(node: any): string {
+    return (node.content || [])
+      .map((child: any) => {
+        if (child.type === 'paragraph') {
+          return (child.content || [])
+            .map((c: any) => TextProcessor.adfToMarkdown(c))
+            .join('');
+        }
+        return TextProcessor.adfToMarkdown(child);
+      })
+      .join('\n');
   }
 
   static isFieldPopulated(value: any): boolean {

@@ -1,6 +1,6 @@
 import { Version3Client, AgileClient } from 'jira.js';
 
-import { JiraConfig, JiraIssueDetails, FilterResponse, TransitionDetails, SearchResponse, BoardResponse, SprintResponse, JiraAttachment } from '../types/index.js';
+import { JiraConfig, JiraIssueDetails, JiraPerson, FilterResponse, TransitionDetails, SearchResponse, BoardResponse, SprintResponse, JiraAttachment } from '../types/index.js';
 import { TextProcessor } from '../utils/text-processing.js';
 
 // Define additional types for sprint operations
@@ -126,10 +126,22 @@ export class JiraClient {
   /** Maps a raw Jira API issue to our JiraIssueDetails shape */
   private mapIssueFields(issue: any): JiraIssueDetails {
     const fields = issue.fields ?? issue.fields;
+
+    // Extract people with accountIds for @mention support
+    const people: JiraPerson[] = [];
+    if (fields?.assignee?.accountId && fields?.assignee?.displayName) {
+      people.push({ displayName: fields.assignee.displayName, accountId: fields.assignee.accountId, role: 'assignee' });
+    }
+    if (fields?.reporter?.accountId && fields?.reporter?.displayName) {
+      people.push({ displayName: fields.reporter.displayName, accountId: fields.reporter.accountId, role: 'reporter' });
+    }
+
     return {
       key: issue.key,
       summary: fields?.summary,
-      description: (issue as any).renderedFields?.description || '',
+      description: fields?.description
+        ? TextProcessor.adfToMarkdown(fields.description)
+        : '',
       issueType: fields?.issuetype?.name || '',
       priority: fields?.priority?.name || null,
       parent: fields?.parent?.key || null,
@@ -152,6 +164,7 @@ export class JiraClient {
         outward: link.outwardIssue?.key || null,
         inward: link.inwardIssue?.key || null,
       })),
+      people: people.length > 0 ? people : undefined,
     };
   }
 
@@ -207,8 +220,8 @@ export class JiraClient {
 
     if (includeComments && issue.fields.comment?.comments) {
       issueDetails.comments = issue.fields.comment.comments
-        .filter(comment => 
-          comment.id && 
+        .filter(comment =>
+          comment.id &&
           comment.author?.displayName &&
           comment.body &&
           comment.created
@@ -216,9 +229,25 @@ export class JiraClient {
         .map(comment => ({
           id: comment.id!,
           author: comment.author!.displayName!,
-          body: comment.body?.content ? TextProcessor.extractTextFromAdf(comment.body) : String(comment.body),
+          body: comment.body?.content ? TextProcessor.adfToMarkdown(comment.body) : String(comment.body),
           created: comment.created!,
         }));
+
+      // Add comment authors to people list (deduplicated, capped at 10 total)
+      const existingIds = new Set((issueDetails.people || []).map(p => p.accountId));
+      const commentAuthors: JiraPerson[] = [];
+      for (const comment of issue.fields.comment.comments) {
+        const aid = comment.author?.accountId;
+        const name = comment.author?.displayName;
+        if (aid && name && !existingIds.has(aid)) {
+          existingIds.add(aid);
+          commentAuthors.push({ displayName: name, accountId: aid, role: 'commenter' });
+        }
+      }
+      if (commentAuthors.length > 0) {
+        const people = [...(issueDetails.people || []), ...commentAuthors];
+        issueDetails.people = people.slice(0, 10);
+      }
     }
 
     if (includeAttachments && issue.fields.attachment) {
