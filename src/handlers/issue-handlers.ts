@@ -300,11 +300,13 @@ async function handleGetIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs)
   // Get issue with requested expansions and catalog custom fields
   const includeComments = expansionOptions.comments || false;
   const includeAttachments = expansionOptions.attachments || false;
+  const includeHistory = expansionOptions.history || false;
   const issue = await jiraClient.getIssue(
     args.issueKey!,
     includeComments,
     includeAttachments,
     getCatalogFieldMeta(),
+    includeHistory,
   );
   
   // Get transitions if requested

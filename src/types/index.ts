@@ -54,6 +54,12 @@ export interface JiraIssueDetails {
     description: string;
   }>;
   people?: JiraPerson[];
+  statusHistory?: Array<{
+    date: string;
+    from: string;
+    to: string;
+    author: string;
+  }>;
 }
 
 export interface HierarchyNode {
