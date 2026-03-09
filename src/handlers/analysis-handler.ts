@@ -742,7 +742,12 @@ export async function handleAnalysisRequest(jiraClient: JiraClient, request: any
   let filterSource: string | undefined;
   const filterId = args.filterId as string | undefined;
   if (filterId && typeof filterId === 'string' && filterId.trim() !== '') {
-    const filter = await jiraClient.getFilter(filterId);
+    let filter: { name?: string; jql?: string };
+    try {
+      filter = await jiraClient.getFilter(filterId);
+    } catch {
+      throw new McpError(ErrorCode.InvalidParams, `Filter ${filterId} not found or not accessible. Use manage_jira_filter with operation "list" to see available filters.`);
+    }
     if (!filter.jql) {
       throw new McpError(ErrorCode.InvalidParams, `Filter ${filterId} has no JQL query.`);
     }
