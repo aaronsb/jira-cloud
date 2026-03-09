@@ -737,9 +737,22 @@ async function handleCubeSetup(jiraClient: JiraClient, jql: string): Promise<str
 export async function handleAnalysisRequest(jiraClient: JiraClient, request: any) {
   const args = normalizeArgs(request.params?.arguments || {});
 
-  const jql = args.jql as string;
-  if (!jql || typeof jql !== 'string' || jql.trim() === '') {
-    throw new McpError(ErrorCode.InvalidParams, 'jql parameter is required.');
+  // Resolve JQL: filterId takes precedence over inline jql
+  let jql: string;
+  let filterSource: string | undefined;
+  const filterId = args.filterId as string | undefined;
+  if (filterId && typeof filterId === 'string' && filterId.trim() !== '') {
+    const filter = await jiraClient.getFilter(filterId);
+    if (!filter.jql) {
+      throw new McpError(ErrorCode.InvalidParams, `Filter ${filterId} has no JQL query.`);
+    }
+    jql = filter.jql;
+    filterSource = `${filter.name || filterId} (filter ${filterId})`;
+  } else {
+    jql = args.jql as string;
+    if (!jql || typeof jql !== 'string' || jql.trim() === '') {
+      throw new McpError(ErrorCode.InvalidParams, 'Either jql or filterId parameter is required.');
+    }
   }
 
   // Parse requested metrics
@@ -770,11 +783,12 @@ export async function handleAnalysisRequest(jiraClient: JiraClient, request: any
   // Cube setup — discover dimensions from sample, no issue fetching
   if (hasCubeSetup) {
     const cubeText = await handleCubeSetup(jiraClient, jql);
-    const nextSteps = analysisNextSteps(jql, []);
+    const nextSteps = analysisNextSteps(jql, [], false, undefined, filterSource);
+    const banner = filterSource ? `*Using saved filter: ${filterSource}*\n\n` : '';
     return {
       content: [{
         type: 'text',
-        text: cubeText + '\n' + nextSteps,
+        text: banner + cubeText + '\n' + nextSteps,
       }],
     };
   }
@@ -782,11 +796,12 @@ export async function handleAnalysisRequest(jiraClient: JiraClient, request: any
   // If only summary requested, skip issue fetching entirely
   if (hasSummary && fetchMetrics.length === 0) {
     const summaryText = await handleSummary(jiraClient, jql, groupBy, compute, groupLimit);
-    const nextSteps = analysisNextSteps(jql, [], false, groupBy);
+    const nextSteps = analysisNextSteps(jql, [], false, groupBy, filterSource);
+    const banner = filterSource ? `*Using saved filter: ${filterSource}*\n\n` : '';
     return {
       content: [{
         type: 'text',
-        text: summaryText + '\n' + nextSteps,
+        text: banner + summaryText + '\n' + nextSteps,
       }],
     };
   }
@@ -833,6 +848,11 @@ export async function handleAnalysisRequest(jiraClient: JiraClient, request: any
   const now = new Date();
   const lines: string[] = [];
 
+  if (filterSource) {
+    lines.push(`*Using saved filter: ${filterSource}*`);
+    lines.push('');
+  }
+
   // Summary first if requested alongside other metrics
   if (hasSummary) {
     const summaryText = await handleSummary(jiraClient, jql, groupBy, compute, groupLimit);
@@ -864,7 +884,7 @@ export async function handleAnalysisRequest(jiraClient: JiraClient, request: any
   }
 
   // Next steps
-  const nextSteps = analysisNextSteps(jql, allIssues.slice(0, 3).map(i => i.key), truncated, groupBy);
+  const nextSteps = analysisNextSteps(jql, allIssues.slice(0, 3).map(i => i.key), truncated, groupBy, filterSource);
   lines.push(nextSteps);
 
   return {

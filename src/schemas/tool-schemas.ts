@@ -332,13 +332,17 @@ export const toolSchemas = {
 
   analyze_jira_issues: {
     name: 'analyze_jira_issues',
-    description: 'Compute project metrics over issues selected by JQL. For counting and breakdown questions ("how many by status/assignee/priority"), use metrics: ["summary"] with groupBy — this gives exact counts with no issue cap. Use detail metrics (points, time, schedule, cycle, distribution) only when you need per-issue analysis; these are capped at maxResults issues. Always prefer this tool over manage_jira_filter or manage_jira_project for quantitative questions. Read jira://analysis/recipes for composition patterns.',
+    description: 'Compute project metrics over issues selected by JQL or a saved filter. For counting and breakdown questions ("how many by status/assignee/priority"), use metrics: ["summary"] with groupBy — this gives exact counts with no issue cap. Use detail metrics (points, time, schedule, cycle, distribution) only when you need per-issue analysis; these are capped at maxResults issues. Always prefer this tool over manage_jira_filter or manage_jira_project for quantitative questions. Tip: save complex JQL as a filter with manage_jira_filter, then reuse the filterId here for repeated analysis. Read jira://analysis/recipes for composition patterns.',
     inputSchema: {
       type: 'object',
       properties: {
         jql: {
           type: 'string',
-          description: 'JQL query selecting the issues to analyze. Examples: "project in (AA, GC, LGS)", "sprint in openSprints()", "assignee = currentUser() AND resolution = Unresolved".',
+          description: 'JQL query selecting the issues to analyze. Either jql or filterId is required (filterId takes precedence). Examples: "project in (AA, GC, LGS)", "sprint in openSprints()", "assignee = currentUser() AND resolution = Unresolved".',
+        },
+        filterId: {
+          type: 'string',
+          description: 'ID of a saved Jira filter to use as the query source. The filter\'s JQL is resolved automatically. Use this to run different analyses against a saved query without repeating the JQL. Create filters with manage_jira_filter.',
         },
         metrics: {
           type: 'array',
@@ -370,13 +374,13 @@ export const toolSchemas = {
           default: 100,
         },
       },
-      required: ['jql'],
+      required: [],
     },
   },
 
   queue_jira_operations: {
     name: 'queue_jira_operations',
-    description: 'Execute multiple Jira operations in a single call. Operations run sequentially with result references ($0.key) and per-operation error strategies (bail/continue).',
+    description: 'Execute multiple Jira operations in a single call. Operations run sequentially with result references ($0.key) and per-operation error strategies (bail/continue). Powerful for analysis pipelines: create a filter, then run multiple analyze_jira_issues calls against $0.filterId with different groupBy/compute — all in one call.',
     inputSchema: {
       type: 'object',
       properties: {

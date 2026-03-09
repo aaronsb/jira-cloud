@@ -485,6 +485,12 @@ export class JiraClient {
       }));
   }
 
+  async getFilter(filterId: string): Promise<{ name?: string; jql?: string }> {
+    return await this.client.filters.getFilter({
+      id: parseInt(filterId, 10),
+    }) as { name?: string; jql?: string };
+  }
+
   async getFilterIssues(filterId: string): Promise<JiraIssueDetails[]> {
     const filter = await this.client.filters.getFilter({ 
       id: parseInt(filterId, 10) 
