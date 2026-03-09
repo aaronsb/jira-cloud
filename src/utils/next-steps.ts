@@ -217,7 +217,8 @@ export function analysisNextSteps(jql: string, issueKeys: string[], truncated = 
   );
   if (truncated) {
     steps.push(
-      { description: 'Detail metrics are sampled — narrow JQL by assignee, priority, or type for precise results. Use summary metrics (count API) for whole-project totals', tool: 'analyze_jira_issues', example: { jql: `${jql} AND assignee = currentUser()`, metrics: ['cycle'] } },
+      { description: 'Distribution counts above are approximate (issue cap hit). For exact breakdowns use summary + groupBy', tool: 'analyze_jira_issues', example: { jql, metrics: ['summary'], groupBy: 'assignee' } },
+      { description: 'Or narrow JQL for precise detail metrics', tool: 'analyze_jira_issues', example: { jql: `${jql} AND assignee = currentUser()`, metrics: ['cycle'] } },
     );
   }
   return formatSteps(steps) + '\n- Read `jira://analysis/recipes` for data cube patterns and compute DSL examples';

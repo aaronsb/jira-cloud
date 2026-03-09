@@ -332,7 +332,7 @@ export const toolSchemas = {
 
   analyze_jira_issues: {
     name: 'analyze_jira_issues',
-    description: 'Compute project metrics over issues selected by JQL. Use "summary" for exact counts across projects (no sampling cap). Use other metrics for detailed analysis of individual issue data. Always prefer this tool over manage_jira_filter or manage_jira_project for quantitative questions (counts, totals, overdue, workload). Read jira://analysis/recipes for composition patterns.',
+    description: 'Compute project metrics over issues selected by JQL. For counting and breakdown questions ("how many by status/assignee/priority"), use metrics: ["summary"] with groupBy — this gives exact counts with no issue cap. Use detail metrics (points, time, schedule, cycle, distribution) only when you need per-issue analysis; these are capped at maxResults issues. Always prefer this tool over manage_jira_filter or manage_jira_project for quantitative questions. Read jira://analysis/recipes for composition patterns.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -346,18 +346,23 @@ export const toolSchemas = {
             type: 'string',
             enum: ['summary', 'points', 'time', 'schedule', 'cycle', 'distribution', 'cube_setup'],
           },
-          description: 'Which metric groups to compute. summary = exact issue counts via count API (no cap, fastest). cube_setup = sample issues and discover available dimensions/measures for cube queries. points = earned value/SPI. time = effort estimates. schedule = overdue/risk. cycle = lead time/throughput. distribution = counts by status/assignee/priority/type. Default: all except summary and cube_setup.',
+          description: 'Which metric groups to compute. summary = exact counts via count API (no issue cap, fastest) — use with groupBy for "how many by assignee/status/priority" questions. distribution = approximate counts from fetched issues (capped by maxResults — use summary + groupBy instead when you need exact counts). cube_setup = discover dimensions before cube queries. points = earned value/SPI. time = effort estimates. schedule = overdue/risk. cycle = lead time/throughput. Default: all detail metrics. For counting/breakdown questions, always prefer summary + groupBy over distribution.',
         },
         groupBy: {
           type: 'string',
           enum: ['project', 'assignee', 'priority', 'issuetype'],
-          description: 'Split summary counts by this dimension. Use with metrics: ["summary"]. "project" produces a per-project comparison table.',
+          description: 'Split counts by this dimension — produces a breakdown table. Use with metrics: ["summary"] for exact counts. This is the correct approach for "how many issues per assignee/priority/type" questions. "project" produces a per-project comparison.',
         },
         compute: {
           type: 'array',
           items: { type: 'string' },
           description: 'Computed columns for cube execute. Each entry: "name = expr". Arithmetic (+,-,*,/), comparisons (>,<,>=,<=,==,!=). Column refs: total, open, overdue, high, created_7d, resolved_7d. Implicit measures resolved lazily: bugs, unassigned, no_due_date, no_estimate, no_start_date, no_labels, blocked, stale (untouched 60d+), stale_status (stuck in status 30d+), backlog_rot (undated+unassigned+untouched 60d+). Max 5 expressions. Example: ["bug_pct = bugs / total * 100", "rot_pct = backlog_rot / open * 100"].',
           maxItems: 5,
+        },
+        groupLimit: {
+          type: 'integer',
+          description: 'Max groups/dimension values to show (default 20). Applies to summary groupBy rows and distribution breakdowns. No hard cap for summary metrics — increase freely for full visibility. For detail metrics the issue fetch is separately capped by maxResults.',
+          default: 20,
         },
         maxResults: {
           type: 'integer',

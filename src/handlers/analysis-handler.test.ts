@@ -244,6 +244,27 @@ describe('renderDistribution', () => {
     const output = renderDistribution(issues);
     expect(output).toContain('Unassigned: 1');
   });
+
+  it('caps distribution values at groupLimit with hint', () => {
+    const issues = Array.from({ length: 10 }, (_, i) =>
+      makeIssue({ key: `T-${i}`, assignee: `User${i}` })
+    );
+    const output = renderDistribution(issues, 3);
+    expect(output).toContain('User0: 1');
+    expect(output).toContain('+7 more');
+    expect(output).toContain('groupLimit');
+  });
+
+  it('shows all values when groupLimit is large', () => {
+    const issues = [
+      makeIssue({ assignee: 'Alice' }),
+      makeIssue({ assignee: 'Bob' }),
+    ];
+    const output = renderDistribution(issues, 100);
+    expect(output).toContain('Alice: 1');
+    expect(output).toContain('Bob: 1');
+    expect(output).not.toContain('more');
+  });
 });
 
 // ── Edge Cases ─────────────────────────────────────────────────────────
@@ -453,7 +474,7 @@ describe('extractDimensions', () => {
     expect(assignee.values).toEqual(['Unassigned']);
   });
 
-  it('caps values at 20 groups', () => {
+  it('caps values at default 20 groups', () => {
     // Create 25 distinct statuses
     const issues = Array.from({ length: 25 }, (_, i) =>
       makeIssue({ key: `T-${i + 1}`, status: `Status${i}` })
@@ -462,6 +483,26 @@ describe('extractDimensions', () => {
     const status = dims.find(d => d.name === 'status')!;
     expect(status.values.length).toBe(20);
     expect(status.count).toBe(25);
+  });
+
+  it('respects custom groupLimit', () => {
+    const issues = Array.from({ length: 25 }, (_, i) =>
+      makeIssue({ key: `T-${i + 1}`, status: `Status${i}` })
+    );
+    const dims = extractDimensions(issues, 10);
+    const status = dims.find(d => d.name === 'status')!;
+    expect(status.values.length).toBe(10);
+    expect(status.count).toBe(25);
+  });
+
+  it('returns all values when groupLimit exceeds count', () => {
+    const issues = Array.from({ length: 5 }, (_, i) =>
+      makeIssue({ key: `T-${i + 1}`, status: `Status${i}` })
+    );
+    const dims = extractDimensions(issues, 100);
+    const status = dims.find(d => d.name === 'status')!;
+    expect(status.values.length).toBe(5);
+    expect(status.count).toBe(5);
   });
 });
 
