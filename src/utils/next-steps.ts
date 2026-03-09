@@ -109,6 +109,7 @@ export function filterNextSteps(operation: string, filterId?: string, jql?: stri
     case 'create':
       steps.push(
         { description: 'Execute the new filter', tool: 'manage_jira_filter', example: { operation: 'execute_filter', filterId } },
+        { description: 'Run analysis against this filter', tool: 'analyze_jira_issues', example: { filterId, metrics: ['summary'], groupBy: 'assignee' } },
       );
       break;
   }
@@ -202,7 +203,7 @@ export function boardNextSteps(operation: string, boardId?: number): string {
   return steps.length > 0 ? formatSteps(steps) : '';
 }
 
-export function analysisNextSteps(jql: string, issueKeys: string[], truncated = false, groupBy?: string): string {
+export function analysisNextSteps(jql: string, issueKeys: string[], truncated = false, groupBy?: string, filterSource?: string): string {
   const steps: NextStep[] = [];
   if (issueKeys.length > 0) {
     steps.push(
@@ -236,6 +237,12 @@ export function analysisNextSteps(jql: string, issueKeys: string[], truncated = 
     steps.push(
       { description: 'Distribution counts above are approximate (issue cap hit). For exact breakdowns use summary + groupBy', tool: 'analyze_jira_issues', example: { jql, metrics: ['summary'], groupBy: 'assignee' } },
       { description: 'Or narrow JQL for precise detail metrics', tool: 'analyze_jira_issues', example: { jql: `${jql} AND assignee = currentUser()`, metrics: ['cycle'] } },
+    );
+  }
+  // Suggest saving as filter if not already using one
+  if (!filterSource) {
+    steps.push(
+      { description: 'Save this query as a filter for reuse across analyses', tool: 'manage_jira_filter', example: { operation: 'create', name: '<descriptive name>', jql } },
     );
   }
   return formatSteps(steps) + '\n- Read `jira://analysis/recipes` for data cube patterns and compute DSL examples';

@@ -26,20 +26,25 @@ const builders: Record<string, (args: Record<string, string>) => GetPromptResult
     return {
       description: `Backlog health check for ${project}`,
       messages: [msg(
-`Analyze backlog health for project ${project}. Use the analyze_jira_issues and manage_jira_filter tools.
+`Analyze backlog health for project ${project}. Use the queue_jira_operations tool to run this as a pipeline.
 
-Step 1 — Summary with data quality signals:
-{"jql":"project = ${project} AND resolution = Unresolved","metrics":["summary"],"groupBy":"priority","compute":["rot_pct = backlog_rot / open * 100","stale_pct = stale / open * 100","gap_pct = no_estimate / open * 100"]}
+Use queue_jira_operations with this pipeline:
+Operation 0 — Save the query as a reusable filter:
+{"tool":"manage_jira_filter","args":{"operation":"create","name":"${project} backlog health","jql":"project = ${project} AND resolution = Unresolved"}}
 
-Step 2 — Cycle metrics for staleness distribution and status age:
-{"jql":"project = ${project} AND resolution = Unresolved","metrics":["cycle"],"maxResults":100}
+Operation 1 — Summary with data quality signals (uses $0.filterId):
+{"tool":"analyze_jira_issues","args":{"filterId":"$0.filterId","metrics":["summary"],"groupBy":"priority","compute":["rot_pct = backlog_rot / open * 100","stale_pct = stale / open * 100","gap_pct = no_estimate / open * 100"]}}
 
-Step 3 — Summarize findings:
+Operation 2 — Cycle metrics for staleness distribution:
+{"tool":"analyze_jira_issues","args":{"filterId":"$0.filterId","metrics":["cycle"],"maxResults":100}}
+
+After the pipeline completes, summarize findings:
 - What percentage of the backlog is rotting (no owner, no dates, untouched)?
 - What's stuck in the same status for 30+ days?
 - What's missing estimates or start dates?
 - Flag the worst offenders by issue key.
-- Recommend specific triage actions.`
+- Recommend specific triage actions.
+- The saved filter can be reused for follow-up analysis or shared with the team.`
       )],
     };
   },
@@ -48,21 +53,26 @@ Step 3 — Summarize findings:
     return {
       description: `Contributor workload for ${project}`,
       messages: [msg(
-`Analyze contributor workload for project ${project}. Use the analyze_jira_issues tool.
+`Analyze contributor workload for project ${project}. Use queue_jira_operations to run the analysis pipeline in a single call.
 
-Step 1 — Assignee distribution with quality signals:
-{"jql":"project = ${project} AND resolution = Unresolved","metrics":["summary"],"groupBy":"assignee","compute":["stale_pct = stale / open * 100","blocked_pct = blocked / open * 100"]}
+Use queue_jira_operations with this pipeline:
+Operation 0 — Save the base query as a filter:
+{"tool":"manage_jira_filter","args":{"operation":"create","name":"${project} workload","jql":"project = ${project} AND resolution = Unresolved"}}
 
-Step 2 — For the top 3 assignees by open issue count, run scoped detail metrics:
+Operation 1 — Assignee distribution with quality signals (uses $0.filterId):
+{"tool":"analyze_jira_issues","args":{"filterId":"$0.filterId","metrics":["summary"],"groupBy":"assignee","compute":["stale_pct = stale / open * 100","blocked_pct = blocked / open * 100"]}}
+
+After the pipeline, for the top 3 assignees by open count, run scoped detail:
 {"jql":"project = ${project} AND resolution = Unresolved AND assignee = '{name}'","metrics":["cycle","schedule"]}
 
-This pattern keeps each detail query within the sample cap for precise results.
+This keeps each detail query within the sample cap for precise results.
 
-Step 3 — Summarize:
+Summarize:
 - Who has the most open work?
 - Who has the most stale or at-risk issues?
 - Are there load imbalances?
-- What needs reassignment or triage?`
+- What needs reassignment or triage?
+- The saved filter can be reused for follow-up workload checks.`
       )],
     };
   },
@@ -74,16 +84,21 @@ Step 3 — Summarize:
 `Prepare a sprint review for board ${board_id}. Use manage_jira_sprint and analyze_jira_issues tools.
 
 Step 1 — Find the active sprint:
-{"operation":"list","boardId":${board_id},"state":"active"}
+Use manage_jira_sprint: {"operation":"list","boardId":${board_id},"state":"active"}
 
-Step 2 — Analyze sprint issues (use the sprint ID from step 1):
-{"jql":"sprint = {sprintId}","metrics":["summary","points","schedule"],"compute":["done_pct = resolved_7d / total * 100"]}
+Step 2 — Use queue_jira_operations to run the analysis pipeline (use the sprint ID from step 1):
+Operation 0 — Save the sprint query as a filter:
+{"tool":"manage_jira_filter","args":{"operation":"create","name":"Sprint review board ${board_id}","jql":"sprint = {sprintId}"}}
+
+Operation 1 — Summary + velocity metrics:
+{"tool":"analyze_jira_issues","args":{"filterId":"$0.filterId","metrics":["summary","points","schedule"],"compute":["done_pct = resolved_7d / total * 100"]}}
 
 Step 3 — Summarize:
 - Current velocity vs planned
 - Scope changes (items added/removed mid-sprint)
 - At-risk items (overdue, blocked, stale)
-- Completion forecast — will the sprint goal be met?`
+- Completion forecast — will the sprint goal be met?
+- The saved filter persists for daily standups or end-of-sprint reporting.`
       )],
     };
   },
