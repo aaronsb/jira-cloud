@@ -332,7 +332,7 @@ export const toolSchemas = {
 
   analyze_jira_issues: {
     name: 'analyze_jira_issues',
-    description: 'Compute project metrics over issues selected by JQL or a saved filter. For counting and breakdown questions ("how many by status/assignee/priority"), use metrics: ["summary"] with groupBy — this gives exact counts with no issue cap. Use detail metrics (points, time, schedule, cycle, distribution) only when you need per-issue analysis; these are capped at maxResults issues. Always prefer this tool over manage_jira_filter or manage_jira_project for quantitative questions. Tip: save complex JQL as a filter with manage_jira_filter, then reuse the filterId here for repeated analysis. Read jira://analysis/recipes for composition patterns.',
+    description: 'Compute project metrics over issues selected by JQL or a saved filter. For counting and breakdown questions ("how many by status/assignee/priority"), use metrics: ["summary"] with groupBy — this gives exact counts with no issue cap. Use detail metrics (points, time, schedule, cycle, distribution) for per-issue analysis (capped at maxResults). Use flow for status transition patterns — how issues move through statuses, where they bounce, and how long they stay. Tip: save complex JQL as a filter with manage_jira_filter, then reuse the filterId here for repeated analysis. Read jira://analysis/recipes for composition patterns.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -348,9 +348,9 @@ export const toolSchemas = {
           type: 'array',
           items: {
             type: 'string',
-            enum: ['summary', 'points', 'time', 'schedule', 'cycle', 'distribution', 'cube_setup'],
+            enum: ['summary', 'points', 'time', 'schedule', 'cycle', 'distribution', 'flow', 'cube_setup'],
           },
-          description: 'Which metric groups to compute. summary = exact counts via count API (no issue cap, fastest) — use with groupBy for "how many by assignee/status/priority" questions. distribution = approximate counts from fetched issues (capped by maxResults — use summary + groupBy instead when you need exact counts). cube_setup = discover dimensions before cube queries. points = earned value/SPI. time = effort estimates. schedule = overdue/risk. cycle = lead time/throughput. Default: all detail metrics. For counting/breakdown questions, always prefer summary + groupBy over distribution.',
+          description: 'Which metric groups to compute. summary = exact counts via count API (no issue cap, fastest) — use with groupBy for "how many by assignee/status/priority" questions. distribution = approximate counts from fetched issues (capped by maxResults — use summary + groupBy instead when you need exact counts). flow = status transition analysis from bulk changelogs — entries per status, avg time in each, bounce rates, top bouncers. cube_setup = discover dimensions before cube queries. points = earned value/SPI. time = effort estimates. schedule = overdue/risk. cycle = lead time/throughput. Default: all detail metrics (excluding flow — request flow explicitly). For counting/breakdown questions, always prefer summary + groupBy over distribution.',
         },
         groupBy: {
           type: 'string',

@@ -35,8 +35,8 @@ Operation 0 — Save the query as a reusable filter:
 Operation 1 — Summary with data quality signals (uses $0.filterId):
 {"tool":"analyze_jira_issues","args":{"filterId":"$0.filterId","metrics":["summary"],"groupBy":"priority","compute":["rot_pct = backlog_rot / open * 100","stale_pct = stale / open * 100","gap_pct = no_estimate / open * 100"]}}
 
-Operation 2 — Cycle metrics for staleness distribution:
-{"tool":"analyze_jira_issues","args":{"filterId":"$0.filterId","metrics":["cycle"],"maxResults":100}}
+Operation 2 — Flow analysis for transition patterns and bottlenecks:
+{"tool":"analyze_jira_issues","args":{"filterId":"$0.filterId","metrics":["flow"],"maxResults":100}}
 
 After the pipeline completes, summarize findings:
 - What percentage of the backlog is rotting (no owner, no dates, untouched)?
