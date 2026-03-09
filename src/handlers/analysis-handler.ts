@@ -8,9 +8,10 @@ import { normalizeArgs } from '../utils/normalize-args.js';
 
 // ── Types ──────────────────────────────────────────────────────────────
 
-type MetricGroup = 'points' | 'time' | 'schedule' | 'cycle' | 'distribution' | 'summary' | 'cube_setup';
+type MetricGroup = 'points' | 'time' | 'schedule' | 'cycle' | 'distribution' | 'flow' | 'summary' | 'cube_setup';
 
 const ALL_METRICS: MetricGroup[] = ['points', 'time', 'schedule', 'cycle', 'distribution'];
+// flow is opt-in only — requires extra bulk changelog API call
 const VALID_GROUP_BY = ['project', 'assignee', 'priority', 'issuetype'] as const;
 type GroupByField = typeof VALID_GROUP_BY[number];
 const MAX_ISSUES_HARD = 500;   // absolute ceiling for detail metrics — beyond this, context explodes
@@ -328,6 +329,127 @@ export function renderDistribution(issues: JiraIssueDetails[], groupLimit = DEFA
 
   const byType = countBy(issues, i => i.issueType || 'Unknown');
   lines.push(`**By type:** ${mapToString(byType, ' | ', groupLimit)}`);
+
+  return lines.join('\n');
+}
+
+// ── Flow (bulk changelog) ─────────────────────────────────────────────
+
+interface StatusFlowStats {
+  status: string;
+  entries: number;       // how many times issues entered this status
+  totalDaysIn: number;   // total days spent across all visits
+  issueCount: number;    // distinct issues that visited this status
+  bounces: number;       // re-entries (entered more than once by same issue)
+}
+
+export async function renderFlow(jiraClient: JiraClient, issues: JiraIssueDetails[]): Promise<string> {
+  if (issues.length === 0) return '## Flow\n\nNo issues to analyze.';
+
+  const issueKeys = issues.map(i => i.key);
+  // Build a map of issue key → issue ID for matching bulk response
+  const keyToId = new Map<string, string>();
+  const idToKey = new Map<string, string>();
+  for (const issue of issues) {
+    if (issue.id) {
+      keyToId.set(issue.key, issue.id);
+      idToKey.set(issue.id, issue.key);
+    }
+  }
+
+  const changelogs = await jiraClient.getBulkChangelogs(issueKeys);
+
+  // Aggregate per-status stats
+  const statusStats = new Map<string, StatusFlowStats>();
+  const issueBounceCounts = new Map<string, Map<string, number>>(); // issueId → status → entry count
+  let totalTransitions = 0;
+
+  for (const [issueId, transitions] of changelogs) {
+    if (transitions.length === 0) continue;
+    totalTransitions += transitions.length;
+
+    // Sort transitions by date
+    const sorted = [...transitions].sort((a, b) =>
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+
+    // Track entries per status for this issue
+    const issueStatusEntries = new Map<string, number>();
+
+    for (let i = 0; i < sorted.length; i++) {
+      const t = sorted[i];
+      const toStatus = t.to;
+
+      // Count entries into the target status
+      issueStatusEntries.set(toStatus, (issueStatusEntries.get(toStatus) || 0) + 1);
+
+      // Calculate time spent in the target status
+      const enteredAt = new Date(t.date).getTime();
+      const exitedAt = i + 1 < sorted.length
+        ? new Date(sorted[i + 1].date).getTime()
+        : Date.now();
+      const daysIn = (exitedAt - enteredAt) / (1000 * 60 * 60 * 24);
+
+      const stats = statusStats.get(toStatus) || { status: toStatus, entries: 0, totalDaysIn: 0, issueCount: 0, bounces: 0 };
+      stats.entries++;
+      stats.totalDaysIn += daysIn;
+      statusStats.set(toStatus, stats);
+    }
+
+    issueBounceCounts.set(issueId, issueStatusEntries);
+  }
+
+  // Count distinct issues and bounces per status
+  const issuesPerStatus = new Map<string, Set<string>>();
+  for (const [issueId, statusEntries] of issueBounceCounts) {
+    for (const [status, count] of statusEntries) {
+      if (!issuesPerStatus.has(status)) issuesPerStatus.set(status, new Set());
+      issuesPerStatus.get(status)!.add(issueId);
+
+      const stats = statusStats.get(status);
+      if (stats && count > 1) {
+        stats.bounces += count - 1;
+      }
+    }
+  }
+  for (const [status, issueSet] of issuesPerStatus) {
+    const stats = statusStats.get(status);
+    if (stats) stats.issueCount = issueSet.size;
+  }
+
+  if (statusStats.size === 0) {
+    return '## Flow\n\nNo status transitions found in these issues.';
+  }
+
+  // Render table
+  const lines = ['## Flow (Status Transitions)', ''];
+  lines.push(`${totalTransitions} transitions across ${changelogs.size} issues`);
+  lines.push('');
+  lines.push('| Status | Entries | Avg days in | Bounce rate | Issues |');
+  lines.push('|--------|--------:|------------:|------------:|-------:|');
+
+  const sorted = [...statusStats.values()].sort((a, b) => b.entries - a.entries);
+  for (const s of sorted) {
+    const avgDays = s.entries > 0 ? (s.totalDaysIn / s.entries).toFixed(1) : '—';
+    const bounceRate = s.issueCount > 0 ? Math.round((s.bounces / s.issueCount) * 100) : 0;
+    lines.push(`| ${s.status} | ${s.entries} | ${avgDays} | ${bounceRate}% | ${s.issueCount} |`);
+  }
+
+  // Top bouncers — issues with most re-entries to any status
+  const bouncerScores: Array<{ key: string; bounces: number }> = [];
+  for (const [issueId, statusEntries] of issueBounceCounts) {
+    const totalBounces = [...statusEntries.values()].reduce((sum, count) => sum + Math.max(0, count - 1), 0);
+    if (totalBounces > 0) {
+      const key = idToKey.get(issueId) || issueId;
+      bouncerScores.push({ key, bounces: totalBounces });
+    }
+  }
+  if (bouncerScores.length > 0) {
+    bouncerScores.sort((a, b) => b.bounces - a.bounces);
+    const top = bouncerScores.slice(0, 5);
+    lines.push('');
+    lines.push(`**Top bouncers:** ${top.map(b => `${b.key} (${b.bounces}×)`).join(', ')}`);
+  }
 
   return lines.join('\n');
 }
@@ -766,9 +888,12 @@ export async function handleAnalysisRequest(jiraClient: JiraClient, request: any
     : [];
   const hasSummary = requested.includes('summary');
   const hasCubeSetup = requested.includes('cube_setup');
+  const hasFlow = requested.includes('flow');
   const fetchMetrics = requested.length > 0
     ? requested.filter(m => ALL_METRICS.includes(m as MetricGroup)) as MetricGroup[]
     : ALL_METRICS;
+  // flow needs issue fetching but isn't in ALL_METRICS (opt-in only)
+  const needsIssueFetch = fetchMetrics.length > 0 || hasFlow;
 
   // Parse groupBy
   const groupBy = (typeof args.groupBy === 'string' && VALID_GROUP_BY.includes(args.groupBy as GroupByField))
@@ -798,8 +923,8 @@ export async function handleAnalysisRequest(jiraClient: JiraClient, request: any
     };
   }
 
-  // If only summary requested, skip issue fetching entirely
-  if (hasSummary && fetchMetrics.length === 0) {
+  // If only summary requested (no flow or detail metrics), skip issue fetching entirely
+  if (hasSummary && !needsIssueFetch) {
     const summaryText = await handleSummary(jiraClient, jql, groupBy, compute, groupLimit);
     const nextSteps = analysisNextSteps(jql, [], false, groupBy, filterSource);
     const banner = filterSource ? `*Using saved filter: ${filterSource}*\n\n` : '';
@@ -865,7 +990,7 @@ export async function handleAnalysisRequest(jiraClient: JiraClient, request: any
   }
 
   // Header for fetch-based metrics
-  if (fetchMetrics.length > 0 && allIssues.length > 0) {
+  if ((fetchMetrics.length > 0 || hasFlow) && allIssues.length > 0) {
     if (hasSummary) lines.push('');
     lines.push(`# Detail: ${jql}`);
     lines.push(`Analyzed ${allIssues.length} issues (as of ${formatDateShort(now)})`);
@@ -886,6 +1011,12 @@ export async function handleAnalysisRequest(jiraClient: JiraClient, request: any
       lines.push('');
       lines.push(renderers[metric]());
     }
+  }
+
+  // Flow is opt-in and requires async bulk changelog fetch
+  if (hasFlow && allIssues.length > 0) {
+    lines.push('');
+    lines.push(await renderFlow(jiraClient, allIssues));
   }
 
   // Next steps

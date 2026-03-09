@@ -539,6 +539,14 @@ function generateAnalysisToolDocumentation(schema: any) {
         ],
       },
       {
+        title: "Flow analysis — where do issues get stuck?",
+        description: "Analyze status transitions, time in status, and bounce patterns:",
+        steps: [
+          { description: "Flow metrics", code: { jql: "project = AA AND resolution = Unresolved", metrics: ["flow"] } },
+          { description: "Combined with summary", code: { jql: "project = AA", metrics: ["summary", "flow"], groupBy: "issuetype" } },
+        ],
+      },
+      {
         title: "Data cube — discover then compute",
         description: "Two-phase analysis with computed columns:",
         steps: [

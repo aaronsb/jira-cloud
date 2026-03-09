@@ -15,6 +15,7 @@ export interface JiraPerson {
 }
 
 export interface JiraIssueDetails {
+  id?: string;
   key: string;
   summary: string;
   description: string;

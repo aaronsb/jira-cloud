@@ -137,6 +137,7 @@ export class JiraClient {
     }
 
     return {
+      id: issue.id,
       key: issue.key,
       summary: fields?.summary,
       description: fields?.description
@@ -483,6 +484,43 @@ export class JiraClient {
         author: attachment.author!.displayName!,
         url: attachment.content || '',
       }));
+  }
+
+  async getBulkChangelogs(issueKeys: string[], fieldIds: string[] = ['status']): Promise<Map<string, Array<{ date: string; from: string; to: string }>>> {
+    const result = new Map<string, Array<{ date: string; from: string; to: string }>>();
+
+    let nextPageToken: string | undefined;
+    do {
+      const response = await this.client.issues.getBulkChangelogs({
+        issueIdsOrKeys: issueKeys,
+        fieldIds,
+        maxResults: 1000,
+        nextPageToken,
+      });
+
+      for (const issueLog of response.issueChangeLogs || []) {
+        const issueId = issueLog.issueId;
+        if (!issueId) continue;
+
+        const transitions = result.get(issueId) || [];
+        for (const history of issueLog.changeHistories || []) {
+          for (const item of history.items || []) {
+            if (item.field === 'status') {
+              transitions.push({
+                date: history.created || '',
+                from: item.fromString || '',
+                to: item.toString || '',
+              });
+            }
+          }
+        }
+        result.set(issueId, transitions);
+      }
+
+      nextPageToken = response.nextPageToken ?? undefined;
+    } while (nextPageToken);
+
+    return result;
   }
 
   async getFilter(filterId: string): Promise<{ name?: string; jql?: string }> {
