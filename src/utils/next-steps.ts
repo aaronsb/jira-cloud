@@ -202,13 +202,30 @@ export function boardNextSteps(operation: string, boardId?: number): string {
   return steps.length > 0 ? formatSteps(steps) : '';
 }
 
-export function analysisNextSteps(jql: string, issueKeys: string[], truncated = false): string {
+export function analysisNextSteps(jql: string, issueKeys: string[], truncated = false, groupBy?: string): string {
   const steps: NextStep[] = [];
   if (issueKeys.length > 0) {
     steps.push(
       { description: 'Get details on a specific issue', tool: 'manage_jira_issue', example: { operation: 'get', issueKey: issueKeys[0] } },
     );
   }
+
+  // Contextual cross-dimension suggestions based on groupBy
+  if (groupBy === 'assignee') {
+    steps.push(
+      { description: 'Break down a person\'s workload by status (active vs backlog vs review)', tool: 'analyze_jira_issues', example: { jql: `${jql} AND assignee = "<name>"`, metrics: ['summary'], groupBy: 'issuetype' } },
+      { description: 'Compare workload health with computed metrics', tool: 'analyze_jira_issues', example: { jql, metrics: ['summary'], groupBy: 'assignee', compute: ['overdue_pct = overdue / open * 100', 'stale_pct = stale / open * 100'] } },
+    );
+  } else if (groupBy === 'issuetype' || groupBy === 'priority') {
+    steps.push(
+      { description: 'See who owns these issues', tool: 'analyze_jira_issues', example: { jql, metrics: ['summary'], groupBy: 'assignee' } },
+    );
+  } else if (groupBy === 'project') {
+    steps.push(
+      { description: 'Drill into a project by assignee', tool: 'analyze_jira_issues', example: { jql: `${jql} AND project = <KEY>`, metrics: ['summary'], groupBy: 'assignee' } },
+    );
+  }
+
   steps.push(
     { description: 'Discover dimensions for cube analysis', tool: 'analyze_jira_issues', example: { jql, metrics: ['cube_setup'] } },
     { description: 'Add computed columns', tool: 'analyze_jira_issues', example: { jql, metrics: ['summary'], groupBy: 'project', compute: ['bug_pct = bugs / total * 100'] } },
