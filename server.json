@@ -8,13 +8,13 @@
     "url": "https://github.com/aaronsb/jira-cloud",
     "source": "github"
   },
-  "version": "0.5.10",
+  "version": "0.5.11",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@aaronsb/jira-cloud-mcp",
-      "version": "0.5.10",
+      "version": "0.5.11",
       "transport": {
         "type": "stdio"
       },
