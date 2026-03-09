@@ -525,11 +525,9 @@ async function handleSummary(jiraClient: JiraClient, jql: string, groupBy?: Grou
   // Effective group cap: user's preference vs API query budget (whichever is smaller)
   const effectiveGroupCap = Math.min(groupLimit, groupBudget);
 
-  if (groupBy === 'project') {
+  if (groupBy === 'project' && extractProjectKeys(jql).length > 0) {
+    // Fast path: project keys are explicit in JQL — no sampling needed
     let keys = extractProjectKeys(jql);
-    if (keys.length === 0) {
-      throw new McpError(ErrorCode.InvalidParams, 'groupBy "project" requires project keys in JQL (e.g., project in (AA, GC))');
-    }
     const capped = keys.length > effectiveGroupCap;
     if (capped) keys = keys.slice(0, effectiveGroupCap);
     const remaining = removeProjectClause(jql);

@@ -173,6 +173,7 @@ export class JiraClient {
     includeComments = false,
     includeAttachments = false,
     customFieldMeta?: Array<{ id: string; name: string; type: string; description: string }>,
+    includeHistory = false,
   ): Promise<JiraIssueDetails> {
     const fields = [...this.issueFields];
 
@@ -189,14 +190,38 @@ export class JiraClient {
       }
     }
 
+    const expands: string[] = [];
+    if (includeComments) expands.push('comments');
+    if (includeHistory) expands.push('changelog');
+
     const params: any = {
       issueIdOrKey: issueKey,
       fields,
-      expand: includeComments ? 'comments' : undefined
+      expand: expands.length > 0 ? expands.join(',') : undefined,
     };
 
     const issue = await this.client.issues.getIssue(params);
     const issueDetails = this.mapIssueFields(issue);
+
+    // Extract status transitions from changelog
+    if (includeHistory && (issue as any).changelog?.histories) {
+      const histories = (issue as any).changelog.histories as Array<{
+        created: string;
+        author?: { displayName?: string };
+        items: Array<{ field: string; fromString: string | null; toString: string | null }>;
+      }>;
+      issueDetails.statusHistory = histories
+        .flatMap(h => h.items
+          .filter(item => item.field === 'status')
+          .map(item => ({
+            date: h.created,
+            from: item.fromString || '',
+            to: item.toString || '',
+            author: h.author?.displayName || 'Unknown',
+          }))
+        )
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    }
 
     // Extract custom field values using catalog metadata
     if (customFieldMeta) {

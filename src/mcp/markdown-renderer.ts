@@ -166,6 +166,21 @@ export function renderIssue(issue: JiraIssueDetails, transitions?: TransitionDet
     }
   }
 
+  // Status history (if requested via expand: ["history"])
+  if (issue.statusHistory && issue.statusHistory.length > 0) {
+    lines.push('');
+    lines.push('Status History:');
+    for (const h of issue.statusHistory) {
+      lines.push(`${formatDate(h.date)}: ${h.from} → ${h.to} (by ${h.author})`);
+    }
+    // Show time in current status
+    const last = issue.statusHistory[issue.statusHistory.length - 1];
+    const daysSince = Math.floor((Date.now() - new Date(last.date).getTime()) / (1000 * 60 * 60 * 24));
+    if (daysSince > 0) {
+      lines.push(`*In "${last.to}" for ${daysSince} days*`);
+    }
+  }
+
   // Available transitions
   if (transitions && transitions.length > 0) {
     lines.push('');
