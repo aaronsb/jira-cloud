@@ -593,6 +593,12 @@ async function handleSummary(jiraClient: JiraClient, jql: string, groupBy?: Grou
     lines.push(renderSummaryTable([row], compute));
   }
 
+  // Workload interpretation hint — steer LLMs to decompose before reporting raw numbers
+  if (groupBy === 'assignee') {
+    lines.push('');
+    lines.push('*Interpretation tip: High open counts per person may include backlog, review, and future-planned work — not just active tasks. Before reporting workload, break down by status: `metrics: ["summary"], groupBy: "issuetype"` scoped to one assignee to distinguish active work from queued/backlog items.*');
+  }
+
   return lines.join('\n');
 }
 
@@ -778,7 +784,7 @@ export async function handleAnalysisRequest(jiraClient: JiraClient, request: any
   // If only summary requested, skip issue fetching entirely
   if (hasSummary && fetchMetrics.length === 0) {
     const summaryText = await handleSummary(jiraClient, jql, groupBy, compute, groupLimit);
-    const nextSteps = analysisNextSteps(jql, []);
+    const nextSteps = analysisNextSteps(jql, [], false, groupBy);
     return {
       content: [{
         type: 'text',
@@ -860,7 +866,7 @@ export async function handleAnalysisRequest(jiraClient: JiraClient, request: any
   }
 
   // Next steps
-  const nextSteps = analysisNextSteps(jql, allIssues.slice(0, 3).map(i => i.key), truncated);
+  const nextSteps = analysisNextSteps(jql, allIssues.slice(0, 3).map(i => i.key), truncated, groupBy);
   lines.push(nextSteps);
 
   return {
