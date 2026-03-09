@@ -121,11 +121,11 @@ export function renderIssue(issue: JiraIssueDetails, transitions?: TransitionDet
   }
   if (issue.resolution) lines.push(`Resolution: ${issue.resolution}`);
 
-  // Description — full for single issue view
+  // Description — already markdown from ADF conversion
   if (issue.description) {
     lines.push('');
     lines.push('Description:');
-    lines.push(stripHtml(issue.description));
+    lines.push(issue.description);
   }
 
   // Issue links
@@ -149,7 +149,8 @@ export function renderIssue(issue: JiraIssueDetails, transitions?: TransitionDet
     }
     for (let i = 0; i < recentComments.length; i++) {
       const comment = recentComments[i];
-      lines.push(`[${startIdx + i}/${issue.comments.length}] ${comment.author} (${formatDate(comment.created)}): ${stripHtml(comment.body)}`);
+      const preview = comment.body.split('\n').filter((l: string) => l.trim()).slice(0, 2).join(' | ');
+      lines.push(`[${startIdx + i}/${issue.comments.length}] ${comment.author} (${formatDate(comment.created)}): ${truncate(preview, 200)}`);
     }
   }
 
@@ -173,6 +174,20 @@ export function renderIssue(issue: JiraIssueDetails, transitions?: TransitionDet
       lines.push(`${t.name} -> ${t.to.name} (id: ${t.id})`);
     }
   }
+
+  // People — accountIds for @mentions and assignee operations
+  if (issue.people && issue.people.length > 0) {
+    lines.push('');
+    lines.push('People:');
+    for (const person of issue.people) {
+      lines.push(`${person.displayName} | ${person.role} | accountId: ${person.accountId}`);
+    }
+    lines.push('Use accountId to assign issues or @mention in comments');
+  }
+
+  // Formatting hint — remind the agent that descriptions/comments accept markdown
+  lines.push('');
+  lines.push('Formatting: write markdown for descriptions and comments (headings, **bold**, *italic*, ~~strikethrough~~, `code`, lists)');
 
   return lines.join('\n');
 }
@@ -217,7 +232,7 @@ export function renderIssueSearchResults(
     if (issue.dueDate) meta.push(`due ${formatDate(issue.dueDate)}`);
     lines.push(meta.join(' | '));
     if (issue.description) {
-      const desc = stripHtml(issue.description);
+      const desc = issue.description.split('\n').filter((l: string) => l.trim()).slice(0, 2).join(' | ');
       if (desc.length > 0) {
         lines.push(`  ${truncate(desc, 120)}`);
       }
