@@ -130,6 +130,23 @@ describe('adfToMarkdown', () => {
     expect(TextProcessor.adfToMarkdown(adf)).toBe('Click [here](https://example.com)');
   });
 
+  it('applies link mark outermost with combined bold+link', () => {
+    const adf = {
+      type: 'doc',
+      version: 1,
+      content: [{
+        type: 'paragraph',
+        content: [
+          { type: 'text', text: 'important', marks: [
+            { type: 'strong' },
+            { type: 'link', attrs: { href: 'https://example.com' } },
+          ]},
+        ],
+      }],
+    };
+    expect(TextProcessor.adfToMarkdown(adf)).toBe('[**important**](https://example.com)');
+  });
+
   it('converts bullet lists', () => {
     const adf = {
       type: 'doc',

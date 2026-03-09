@@ -149,7 +149,8 @@ export function renderIssue(issue: JiraIssueDetails, transitions?: TransitionDet
     }
     for (let i = 0; i < recentComments.length; i++) {
       const comment = recentComments[i];
-      lines.push(`[${startIdx + i}/${issue.comments.length}] ${comment.author} (${formatDate(comment.created)}): ${comment.body.replace(/\n+/g, ' ').trim()}`);
+      const preview = comment.body.split('\n').filter((l: string) => l.trim()).slice(0, 2).join(' | ');
+      lines.push(`[${startIdx + i}/${issue.comments.length}] ${comment.author} (${formatDate(comment.created)}): ${truncate(preview, 200)}`);
     }
   }
 
@@ -231,7 +232,7 @@ export function renderIssueSearchResults(
     if (issue.dueDate) meta.push(`due ${formatDate(issue.dueDate)}`);
     lines.push(meta.join(' | '));
     if (issue.description) {
-      const desc = issue.description.replace(/\n+/g, ' ').trim();
+      const desc = issue.description.split('\n').filter((l: string) => l.trim()).slice(0, 2).join(' | ');
       if (desc.length > 0) {
         lines.push(`  ${truncate(desc, 120)}`);
       }

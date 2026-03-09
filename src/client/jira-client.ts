@@ -192,7 +192,7 @@ export class JiraClient {
     const params: any = {
       issueIdOrKey: issueKey,
       fields,
-      expand: includeComments ? 'renderedFields,comments' : 'renderedFields'
+      expand: includeComments ? 'comments' : undefined
     };
 
     const issue = await this.client.issues.getIssue(params);
@@ -472,7 +472,6 @@ export class JiraClient {
     const searchResults = await this.client.issueSearch.searchForIssuesUsingJql({
       jql: filter.jql,
       fields: this.issueFields,
-      expand: 'renderedFields'
     });
 
     return (searchResults.issues || []).map(issue => this.mapIssueFields(issue));
@@ -593,7 +592,6 @@ export class JiraClient {
         jql: cleanJql,
         maxResults: Math.min(maxResults, 100),
         fields: this.issueFields,
-        expand: 'renderedFields',
       });
 
       const issues = (searchResults.issues || []).map(issue => this.mapIssueFields(issue));
@@ -718,7 +716,7 @@ export class JiraClient {
   async getPopulatedFields(issueKey: string): Promise<string> {
     const issue = await this.client.issues.getIssue({
       issueIdOrKey: issueKey,
-      expand: 'renderedFields,names',
+      expand: 'names',
     });
 
     const fieldNames = issue.names || {};

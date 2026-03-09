@@ -306,7 +306,11 @@ export class TextProcessor {
       case 'text': {
         let text = node.text || '';
         if (node.marks) {
-          for (const mark of node.marks) {
+          // Apply inline marks first (bold, italic, etc.), then link outermost
+          // so we get **[text](url)** not [**text**](url)
+          const inlineMarks = node.marks.filter((m: any) => m.type !== 'link');
+          const linkMark = node.marks.find((m: any) => m.type === 'link');
+          for (const mark of inlineMarks) {
             switch (mark.type) {
               case 'strong':
                 text = `**${text}**`;
@@ -320,10 +324,10 @@ export class TextProcessor {
               case 'code':
                 text = `\`${text}\``;
                 break;
-              case 'link':
-                text = `[${text}](${mark.attrs?.href || ''})`;
-                break;
             }
+          }
+          if (linkMark) {
+            text = `[${text}](${linkMark.attrs?.href || ''})`;
           }
         }
         return text;
