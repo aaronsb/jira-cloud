@@ -1212,6 +1212,55 @@ export class JiraClient {
     return { key: response.key };
   }
 
+  async createFilter(name: string, jql: string, description?: string, favourite?: boolean): Promise<FilterResponse> {
+    const result = await this.client.filters.createFilter({
+      name,
+      jql,
+      description: description || '',
+      favourite: favourite ?? false,
+    });
+    if (!result.id || !result.name) {
+      throw new Error('Invalid filter response from Jira');
+    }
+    return {
+      id: result.id,
+      name: result.name,
+      owner: result.owner?.displayName || 'Unknown',
+      favourite: result.favourite || false,
+      viewUrl: result.viewUrl || '',
+      description: result.description || '',
+      jql: result.jql || '',
+    };
+  }
+
+  async updateFilter(filterId: string, updates: { name?: string; jql?: string; description?: string; favourite?: boolean }): Promise<FilterResponse> {
+    // Fetch existing filter to merge with updates (API requires name)
+    const existing = await this.client.filters.getFilter({ id: parseInt(filterId, 10) });
+    const result = await this.client.filters.updateFilter({
+      id: parseInt(filterId, 10),
+      name: updates.name || existing.name || '',
+      jql: updates.jql ?? existing.jql,
+      description: updates.description ?? existing.description,
+      favourite: updates.favourite ?? existing.favourite,
+    });
+    if (!result.id || !result.name) {
+      throw new Error('Invalid filter response from Jira');
+    }
+    return {
+      id: result.id,
+      name: result.name,
+      owner: result.owner?.displayName || 'Unknown',
+      favourite: result.favourite || false,
+      viewUrl: result.viewUrl || '',
+      description: result.description || '',
+      jql: result.jql || '',
+    };
+  }
+
+  async deleteFilter(filterId: string): Promise<void> {
+    await this.client.filters.deleteFilter(filterId);
+  }
+
   async listMyFilters(expand = false): Promise<FilterResponse[]> {
     const filters = await this.client.filters.getMyFilters();
     

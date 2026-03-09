@@ -125,6 +125,10 @@ class JiraServer {
       return getPrompt(name, args);
     });
 
+    // Track consecutive single-issue calls to suggest queue tool
+    const QUEUE_HINT_THRESHOLD = 3;
+    let consecutiveIssueCalls = 0;
+
     // Set up tool handlers
     this.server.setRequestHandler(CallToolRequestSchema, async (request, _extra) => {
       console.error('Received request:', JSON.stringify(request, null, 2));
@@ -155,6 +159,17 @@ class JiraServer {
         const response = await handler(this.jiraClient, request);
         if (!response) {
           throw new McpError(ErrorCode.InternalError, `No response from handler for tool: ${name}`);
+        }
+
+        // Track consecutive manage_jira_issue calls and suggest queue tool
+        if (name === 'manage_jira_issue') {
+          consecutiveIssueCalls++;
+          if (consecutiveIssueCalls >= QUEUE_HINT_THRESHOLD && response.content?.[0]?.text) {
+            response.content[0].text += `\n\n---\n**💡 Efficiency tip:** You've made ${consecutiveIssueCalls} consecutive \`manage_jira_issue\` calls. Consider using \`queue_jira_operations\` to batch multiple issue operations into a single call — it's faster and uses less context.`;
+            consecutiveIssueCalls = 0;
+          }
+        } else {
+          consecutiveIssueCalls = 0;
         }
 
         return response;

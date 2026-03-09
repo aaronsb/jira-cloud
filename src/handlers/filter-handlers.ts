@@ -313,16 +313,69 @@ async function handleListFilters(jiraClient: JiraClient, args: ManageJiraFilterA
   };
 }
 
-async function handleCreateFilter(_jiraClient: JiraClient, _args: ManageJiraFilterArgs) {
-  throw new McpError(ErrorCode.InternalError, 'Create filter operation is not yet implemented');
+async function handleCreateFilter(jiraClient: JiraClient, args: ManageJiraFilterArgs) {
+  if (!args.name) {
+    throw new McpError(ErrorCode.InvalidParams, 'name is required for create operation');
+  }
+  if (!args.jql) {
+    throw new McpError(ErrorCode.InvalidParams, 'jql is required for create operation');
+  }
+
+  const filter = await jiraClient.createFilter(args.name, args.jql, args.description, args.favourite);
+
+  const lines = [
+    `# Filter Created: ${filter.name}`,
+    '',
+    `**ID:** ${filter.id}`,
+    `**JQL:** \`${filter.jql}\``,
+    `**Owner:** ${filter.owner}`,
+    filter.description ? `**Description:** ${filter.description}` : '',
+    `**Favourite:** ${filter.favourite ? 'Yes' : 'No'}`,
+    '',
+    `[View in Jira](${filter.viewUrl})`,
+  ].filter(Boolean);
+
+  return {
+    content: [{ type: 'text', text: lines.join('\n') + filterNextSteps('create', filter.id) }],
+  };
 }
 
-async function handleUpdateFilter(_jiraClient: JiraClient, _args: ManageJiraFilterArgs) {
-  throw new McpError(ErrorCode.InternalError, 'Update filter operation is not yet implemented');
+async function handleUpdateFilter(jiraClient: JiraClient, args: ManageJiraFilterArgs) {
+  if (!args.filterId) {
+    throw new McpError(ErrorCode.InvalidParams, 'filterId is required for update operation');
+  }
+
+  const updates: { name?: string; jql?: string; description?: string; favourite?: boolean } = {};
+  if (args.name) updates.name = args.name;
+  if (args.jql) updates.jql = args.jql;
+  if (args.description !== undefined) updates.description = args.description;
+  if (args.favourite !== undefined) updates.favourite = args.favourite;
+
+  const filter = await jiraClient.updateFilter(args.filterId, updates);
+
+  const lines = [
+    `# Filter Updated: ${filter.name}`,
+    '',
+    `**ID:** ${filter.id}`,
+    `**JQL:** \`${filter.jql}\``,
+    `**Owner:** ${filter.owner}`,
+  ];
+
+  return {
+    content: [{ type: 'text', text: lines.join('\n') + filterNextSteps('get', filter.id) }],
+  };
 }
 
-async function handleDeleteFilter(_jiraClient: JiraClient, _args: ManageJiraFilterArgs) {
-  throw new McpError(ErrorCode.InternalError, 'Delete filter operation is not yet implemented');
+async function handleDeleteFilter(jiraClient: JiraClient, args: ManageJiraFilterArgs) {
+  if (!args.filterId) {
+    throw new McpError(ErrorCode.InvalidParams, 'filterId is required for delete operation');
+  }
+
+  await jiraClient.deleteFilter(args.filterId);
+
+  return {
+    content: [{ type: 'text', text: `Filter ${args.filterId} deleted.` }],
+  };
 }
 
 async function handleExecuteFilter(jiraClient: JiraClient, _args: ManageJiraFilterArgs) {
