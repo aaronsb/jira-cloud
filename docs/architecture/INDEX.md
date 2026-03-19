@@ -28,3 +28,4 @@ _MCP tool API surface, LLM interaction patterns, schema design_
 | [ADR-205](./tools/ADR-205-count-based-analysis.md) | Count-Based Analysis for Cross-Project Summaries | Accepted |
 | [ADR-206](./tools/ADR-206-analysis-data-cube.md) | Analysis Data Cube | Accepted |
 | [ADR-207](./tools/ADR-207-plan-analysis-with-hierarchy-rollups.md) | Plan analysis via GraphQL hierarchy traversal | Draft |
+| [ADR-208](./tools/ADR-208-sprint-aware-analysis-and-navigation.md) | Sprint-aware analysis and navigation | Proposed |
