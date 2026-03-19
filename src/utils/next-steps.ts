@@ -72,6 +72,7 @@ export function issueNextSteps(operation: string, issueKey?: string): string {
     case 'hierarchy':
       steps.push(
         { description: 'View a specific issue from the tree', tool: 'manage_jira_issue', example: { operation: 'get', issueKey } },
+        { description: 'Analyze plan rollups (requires Jira Plans)', tool: 'analyze_jira_plan', example: { issueKey } },
         { description: 'Search for issues in this project', tool: 'manage_jira_filter', example: { operation: 'execute_jql', jql: `project = "${issueKey?.split('-')[0]}"` } },
       );
       break;
@@ -203,6 +204,65 @@ export function boardNextSteps(operation: string, boardId?: number): string {
   return steps.length > 0 ? formatSteps(steps) : '';
 }
 
+export function planNextSteps(issueKey: string, mode?: string, conflicts?: import('../types/index.js').RollupConflict[], rollup?: import('../types/index.js').RollupResult): string {
+  const steps: NextStep[] = [];
+  steps.push(
+    { description: 'View the issue details', tool: 'manage_jira_issue', example: { operation: 'get', issueKey } },
+    { description: 'Explore the hierarchy tree', tool: 'manage_jira_issue', example: { operation: 'hierarchy', issueKey } },
+  );
+  if (mode !== 'gaps') {
+    steps.push({ description: 'Check for data gaps and conflicts', tool: 'analyze_jira_plan', example: { issueKey, mode: 'gaps' } });
+  }
+  if (mode !== 'timeline') {
+    steps.push({ description: 'View the timeline', tool: 'analyze_jira_plan', example: { issueKey, mode: 'timeline' } });
+  }
+  steps.push(
+    { description: 'Run flat metrics on children', tool: 'analyze_jira_issues', example: { jql: `parent = ${issueKey}`, metrics: ['summary'], groupBy: 'assignee' } },
+  );
+
+  let result = formatSteps(steps);
+
+  // Append conflict fix operations if conflicts exist
+  if (conflicts && conflicts.length > 0 && rollup) {
+    result += conflictFixSteps(conflicts, rollup);
+  }
+
+  return result;
+}
+
+export function conflictFixSteps(conflicts: import('../types/index.js').RollupConflict[], rollup: import('../types/index.js').RollupResult): string {
+  const fixOps: Array<{ tool: string; args: Record<string, unknown> }> = [];
+  const lines: string[] = ['\n\n**Conflict fixes:**'];
+
+  for (const conflict of conflicts) {
+    switch (conflict.type) {
+      case 'due_date':
+        if (rollup.rolledUpEnd) {
+          lines.push(`- Update ${conflict.issueKey} due date to ${rollup.rolledUpEnd} — \`manage_jira_issue\` \`{ operation: "update", issueKey: "${conflict.issueKey}", dueDate: "${rollup.rolledUpEnd}" }\``);
+          fixOps.push({ tool: 'manage_jira_issue', args: { operation: 'update', issueKey: conflict.issueKey, dueDate: rollup.rolledUpEnd } });
+        }
+        break;
+      case 'start_date':
+        if (rollup.rolledUpStart) {
+          lines.push(`- Update ${conflict.issueKey} start date to ${rollup.rolledUpStart} — read \`jira://custom-fields\` to find the start date field ID, then use \`manage_jira_issue update\``);
+          // Don't auto-generate queue op for start date — field ID is instance-specific
+        }
+        break;
+      case 'resolved_with_open_children':
+        lines.push(`- ${conflict.issueKey}: ${conflict.message} — reopen parent or resolve open children (use \`manage_jira_issue get\` with \`expand: ["transitions"]\` to find transition IDs)`);
+        break;
+    }
+  }
+
+  if (fixOps.length > 0) {
+    lines.push('');
+    lines.push('**Fix all date conflicts in one call:**');
+    lines.push(`\`queue_jira_operations\` — \`${JSON.stringify({ operations: fixOps.map(op => ({ ...op, onError: 'continue' })) })}\``);
+  }
+
+  return lines.join('\n');
+}
+
 export function analysisNextSteps(jql: string, issueKeys: string[], truncated = false, groupBy?: string, filterSource?: string): string {
   const steps: NextStep[] = [];
   if (issueKeys.length > 0) {
@@ -237,6 +297,12 @@ export function analysisNextSteps(jql: string, issueKeys: string[], truncated = 
     steps.push(
       { description: 'Distribution counts above are approximate (issue cap hit). For exact breakdowns use summary + groupBy', tool: 'analyze_jira_issues', example: { jql, metrics: ['summary'], groupBy: 'assignee' } },
       { description: 'Or narrow JQL for precise detail metrics', tool: 'analyze_jira_issues', example: { jql: `${jql} AND assignee = currentUser()`, metrics: ['cycle'] } },
+    );
+  }
+  // Suggest plan analysis when issue keys suggest hierarchical structure
+  if (issueKeys.length > 0) {
+    steps.push(
+      { description: 'Analyze plan rollups for a parent issue (requires Jira Plans)', tool: 'analyze_jira_plan', example: { issueKey: issueKeys[0] } },
     );
   }
   // Suggest saving as filter if not already using one

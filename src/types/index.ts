@@ -155,3 +155,57 @@ export interface SprintResponse {
   goal?: string;
   boardId: number;
 }
+
+// GraphQL / Plan types (ADR-207)
+
+export interface GraphQLResponse<T> {
+  data?: T;
+  errors?: Array<{ message: string; path?: string[] }>;
+}
+
+export interface TenantContext {
+  cloudId: string;
+}
+
+/** Issue data as returned by AGG GraphQL queries */
+export interface GraphIssue {
+  key: string;
+  summary: string;
+  issueType: string;
+  hierarchyLevel: number | null;
+  status: string;
+  statusCategory: string;
+  assignee: string | null;
+  startDate: string | null;
+  dueDate: string | null;
+  storyPoints: number | null;
+  isResolved: boolean;
+  hasChildIssues: boolean;
+  parentKey: string | null;
+}
+
+/** Tree node for hierarchy walker */
+export interface GraphTreeNode {
+  issue: GraphIssue;
+  children: GraphTreeNode[];
+}
+
+/** Rollup result computed bottom-up from a tree */
+export interface RollupResult {
+  rolledUpStart: string | null;
+  rolledUpEnd: string | null;
+  totalItems: number;
+  resolvedItems: number;
+  progressPct: number;
+  totalPoints: number;
+  earnedPoints: number;
+  assignees: string[];
+  unassignedCount: number;
+  conflicts: RollupConflict[];
+}
+
+export interface RollupConflict {
+  issueKey: string;
+  type: 'due_date' | 'start_date' | 'resolved_with_open_children';
+  message: string;
+}

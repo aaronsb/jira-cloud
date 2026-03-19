@@ -348,14 +348,14 @@ export const toolSchemas = {
           type: 'array',
           items: {
             type: 'string',
-            enum: ['summary', 'points', 'time', 'schedule', 'cycle', 'distribution', 'flow', 'cube_setup'],
+            enum: ['summary', 'points', 'time', 'schedule', 'cycle', 'distribution', 'flow', 'hierarchy', 'cube_setup'],
           },
-          description: 'Which metric groups to compute. summary = exact counts via count API (no issue cap, fastest) — use with groupBy for "how many by assignee/status/priority" questions. distribution = approximate counts from fetched issues (capped by maxResults — use summary + groupBy instead when you need exact counts). flow = status transition analysis from bulk changelogs — entries per status, avg time in each, bounce rates, top bouncers. cube_setup = discover dimensions before cube queries. points = earned value/SPI. time = effort estimates. schedule = overdue/risk. cycle = lead time/throughput. Default: all detail metrics (excluding flow — request flow explicitly). For counting/breakdown questions, always prefer summary + groupBy over distribution.',
+          description: 'Which metric groups to compute. summary = exact counts via count API (no issue cap, fastest) — use with groupBy for "how many by assignee/status/priority" questions. distribution = approximate counts from fetched issues (capped by maxResults — use summary + groupBy instead when you need exact counts). flow = status transition analysis from bulk changelogs — entries per status, avg time in each, bounce rates, top bouncers. hierarchy = tree visualization with rollups for parent-child structures (requires GraphQL — opt-in like flow). cube_setup = discover dimensions before cube queries. points = earned value/SPI. time = effort estimates. schedule = overdue/risk. cycle = lead time/throughput. Default: all detail metrics (excluding flow and hierarchy — request explicitly). For counting/breakdown questions, always prefer summary + groupBy over distribution.',
         },
         groupBy: {
           type: 'string',
-          enum: ['project', 'assignee', 'priority', 'issuetype'],
-          description: 'Split counts by this dimension — produces a breakdown table. Use with metrics: ["summary"] for exact counts. This is the correct approach for "how many issues per assignee/priority/type" questions. "project" produces a per-project comparison.',
+          enum: ['project', 'assignee', 'priority', 'issuetype', 'parent'],
+          description: 'Split counts by this dimension — produces a breakdown table. Use with metrics: ["summary"] for exact counts. This is the correct approach for "how many issues per assignee/priority/type" questions. "project" produces a per-project comparison. "parent" groups by parent issue — useful for seeing rollups per epic/initiative.',
         },
         compute: {
           type: 'array',
@@ -375,6 +375,34 @@ export const toolSchemas = {
         },
       },
       required: [],
+    },
+  },
+
+  analyze_jira_plan: {
+    name: 'analyze_jira_plan',
+    description: 'Analyze hierarchy rollups for any parent issue. Walks the issue tree via GraphQL, computes rolled-up dates, points, progress, assignees, and detects date conflicts. Works on any Jira instance (no Plans/Premium required). For flat-set metrics use analyze_jira_issues; for structure without rollups use manage_jira_issue hierarchy.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        issueKey: {
+          type: 'string',
+          description: 'Issue key at the root of the plan tree (e.g., PROJ-100). Required.',
+        },
+        rollups: {
+          type: 'array',
+          items: {
+            type: 'string',
+            enum: ['dates', 'points', 'progress', 'assignees'],
+          },
+          description: 'Which rollup dimensions to include. Default: all.',
+        },
+        mode: {
+          type: 'string',
+          enum: ['rollup', 'gaps', 'timeline'],
+          description: 'Output focus. rollup (default): full tree with own vs derived values. gaps: missing/conflicting data only. timeline: date-sorted chronological view.',
+        },
+      },
+      required: ['issueKey'],
     },
   },
 

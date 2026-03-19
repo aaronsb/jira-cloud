@@ -16,8 +16,10 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 
 import { fieldDiscovery } from './client/field-discovery.js';
+import { discoverCloudId, GraphQLClient } from './client/graphql-client.js';
 import { JiraClient } from './client/jira-client.js';
 import { handleAnalysisRequest } from './handlers/analysis-handler.js';
+import { handlePlanRequest } from './handlers/plan-handler.js';
 import { handleBoardRequest } from './handlers/board-handlers.js';
 import { handleFilterRequest } from './handlers/filter-handlers.js';
 import { handleIssueRequest } from './handlers/issue-handlers.js';
@@ -51,6 +53,7 @@ const { version } = require('../package.json');
 class JiraServer {
   private server: Server;
   private jiraClient: JiraClient;
+  private graphqlClient: GraphQLClient | null = null;
 
   constructor() {
     const serverName = process.env.MCP_SERVER_NAME || 'jira-cloud';
@@ -81,6 +84,9 @@ class JiraServer {
     // Start async field discovery (non-blocking)
     fieldDiscovery.startAsync(this.jiraClient.v3Client);
 
+    // CloudId discovery happens in run() before server connects — must complete
+    // before ListTools so analyze_jira_plan is registered if available.
+
     this.server.onerror = (error) => console.error('[MCP Error]', error);
     process.on('SIGINT', async () => {
       await this.server.close();
@@ -92,6 +98,7 @@ class JiraServer {
     // Set up required MCP protocol handlers
     this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
       tools: Object.entries(toolSchemas)
+        .filter(([key]) => key !== 'analyze_jira_plan' || this.graphqlClient !== null)
         .map(([key, schema]) => ({
           name: key,
           description: schema.description,
@@ -143,12 +150,15 @@ class JiraServer {
           manage_jira_board: handleBoardRequest,
           manage_jira_sprint: handleSprintRequest,
           manage_jira_filter: handleFilterRequest,
-          analyze_jira_issues: handleAnalysisRequest,
+          analyze_jira_issues: (client, req) => handleAnalysisRequest(client, req, this.graphqlClient),
         };
 
         const handlers: Record<string, (client: JiraClient, req: typeof request) => Promise<any>> = {
           ...toolHandlers,
           queue_jira_operations: createQueueHandler(toolHandlers, JIRA_HOST),
+          ...(this.graphqlClient ? {
+            analyze_jira_plan: (_client, req) => handlePlanRequest(this.jiraClient, this.graphqlClient!, req),
+          } : {}),
         };
 
         const handler = handlers[name];
@@ -219,6 +229,19 @@ class JiraServer {
   }
 
   async run() {
+    // Discover cloudId before connecting — must complete before ListTools
+    try {
+      const cloudId = await discoverCloudId(JIRA_HOST!, JIRA_EMAIL!, JIRA_API_TOKEN!);
+      if (cloudId) {
+        this.graphqlClient = new GraphQLClient(JIRA_EMAIL!, JIRA_API_TOKEN!, cloudId);
+        console.error(`[jira-cloud] GraphQL client ready (cloudId: ${cloudId.slice(0, 8)}...)`);
+      } else {
+        console.error('[jira-cloud] GraphQL/Plans unavailable — analyze_jira_plan disabled');
+      }
+    } catch {
+      console.error('[jira-cloud] GraphQL discovery failed — analyze_jira_plan disabled');
+    }
+
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
     console.error('Jira MCP server running on stdio');
