@@ -358,8 +358,8 @@ export const toolSchemas = {
         },
         groupBy: {
           type: 'string',
-          enum: ['project', 'assignee', 'priority', 'issuetype', 'parent'],
-          description: 'Split counts by this dimension — produces a breakdown table. Use with metrics: ["summary"] for exact counts. This is the correct approach for "how many issues per assignee/priority/type" questions. "project" produces a per-project comparison. "parent" groups by parent issue — useful for seeing rollups per epic/initiative.',
+          enum: ['project', 'assignee', 'priority', 'issuetype', 'parent', 'sprint'],
+          description: 'Split counts by this dimension — produces a breakdown table. Use with metrics: ["summary"] for exact counts. This is the correct approach for "how many issues per assignee/priority/type" questions. "project" produces a per-project comparison. "parent" groups by parent issue. "sprint" groups by sprint name.',
         },
         compute: {
           type: 'array',

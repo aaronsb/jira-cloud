@@ -123,6 +123,18 @@ export class JiraClient {
     ];
   }
 
+  /** Extract the most relevant sprint name from the sprint field array */
+  private extractSprintName(sprints: any): string | null {
+    if (!Array.isArray(sprints) || sprints.length === 0) return null;
+    // Prefer active sprint, then future, then most recent closed
+    const active = sprints.find((s: any) => s.state === 'active');
+    if (active) return active.name ?? null;
+    const future = sprints.find((s: any) => s.state === 'future');
+    if (future) return future.name ?? null;
+    // Fall back to last sprint in array (most recent)
+    return sprints[sprints.length - 1]?.name ?? null;
+  }
+
   /** Maps a raw Jira API issue to our JiraIssueDetails shape */
   private mapIssueFields(issue: any): JiraIssueDetails {
     const fields = issue.fields ?? issue.fields;
@@ -160,6 +172,7 @@ export class JiraClient {
       startDate: fields?.[this.customFields.startDate] || null,
       storyPoints: fields?.[this.customFields.storyPoints] ?? null,
       timeEstimate: fields?.timeestimate ?? null,
+      sprint: this.extractSprintName(fields?.sprint),
       issueLinks: (fields?.issuelinks || []).map((link: any) => ({
         type: link.type?.name || '',
         outward: link.outwardIssue?.key || null,
@@ -611,6 +624,7 @@ export class JiraClient {
         'summary', 'issuetype', 'priority', 'assignee', 'reporter',
         'status', 'resolution', 'labels', 'created', 'updated',
         'resolutiondate', 'statuscategorychangedate', 'duedate', 'timeestimate',
+        'sprint',
         this.customFields.startDate, this.customFields.storyPoints,
       ];
 

@@ -36,6 +36,7 @@ export interface JiraIssueDetails {
   startDate: string | null;
   storyPoints: number | null;
   timeEstimate: number | null;
+  sprint: string | null;
   issueLinks: Array<{
     type: string;
     outward: string | null;
