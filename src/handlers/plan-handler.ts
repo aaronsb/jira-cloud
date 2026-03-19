@@ -50,6 +50,17 @@ export async function handlePlanRequest(
   if (cache) {
     const status = cache.getStatus(issueKey);
 
+    if (status.state === 'error') {
+      cache.release(issueKey);
+      return {
+        content: [{
+          type: 'text',
+          text: `Walk failed for ${issueKey}: ${status.error ?? 'unknown error'}. Cleared from cache — call again to retry.`,
+        }],
+        isError: true,
+      };
+    }
+
     if (status.state === 'walking') {
       return {
         content: [{
@@ -86,14 +97,15 @@ export async function handlePlanRequest(
       }
 
       // Default: summary + entry points (bounded)
+      const rollupResult = GraphQLHierarchyWalker.computeRollups(cached.tree);
       const output = mode === 'gaps'
-        ? renderGapsSummary(cached.tree, rollups)
-        : renderOverview(cached.tree, issueKey, cached.itemCount, rollups);
+        ? renderGapsSummary(cached.tree, rollups, rollupResult)
+        : renderOverview(cached.tree, issueKey, cached.itemCount, rollups, rollupResult);
 
       return {
         content: [{
           type: 'text',
-          text: staleNote + output + planNextSteps(issueKey, mode, GraphQLHierarchyWalker.computeRollups(cached.tree).conflicts, GraphQLHierarchyWalker.computeRollups(cached.tree)),
+          text: staleNote + output + planNextSteps(issueKey, mode, rollupResult.conflicts, rollupResult),
         }],
       };
     }
@@ -133,10 +145,11 @@ function renderOverview(
   issueKey: string,
   totalItems: number,
   rollups: string[],
+  rollupResult?: RollupResult,
 ): string {
   const lines: string[] = [];
   const depth = computeDepth(tree);
-  const rollupResult = GraphQLHierarchyWalker.computeRollups(tree);
+  rollupResult ??= GraphQLHierarchyWalker.computeRollups(tree);
 
   lines.push(`# Plan: ${issueKey} — ${tree.issue.summary}`);
   lines.push(`${totalItems} items, ${depth} levels deep | cached`);
@@ -291,9 +304,10 @@ function renderNodeLine(node: GraphTreeNode, lines: string[], rollups: string[])
 function renderGapsSummary(
   tree: GraphTreeNode,
   rollups: string[],
+  rollupResult?: RollupResult,
 ): string {
   const lines: string[] = [];
-  const rollupResult = GraphQLHierarchyWalker.computeRollups(tree);
+  rollupResult ??= GraphQLHierarchyWalker.computeRollups(tree);
 
   lines.push(`# Gaps: ${tree.issue.key} — ${tree.issue.summary}`);
   lines.push('');

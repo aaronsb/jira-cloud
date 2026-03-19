@@ -85,9 +85,8 @@ export class GraphObjectCache {
       });
     }).catch((err) => {
       console.error(`[graph-cache] Walk failed for ${rootKey}:`, err);
-      // Leave in walking state with error info — caller can retry
-      cached.state = 'complete';
-      cached.itemCount = 0;
+      cached.state = 'error';
+      cached.error = (err as Error).message ?? 'Unknown error';
     });
 
     this.walks.set(rootKey, cached);
@@ -99,6 +98,9 @@ export class GraphObjectCache {
     const walk = this.walks.get(rootKey);
     if (!walk) {
       return { state: 'not_found', itemCount: 0, stale: false };
+    }
+    if (walk.state === 'error') {
+      return { state: 'error', itemCount: walk.itemCount, stale: false, error: walk.error };
     }
     const stale = walk.state === 'complete' && (this.epoch - walk.createdEpoch) > STALE_EPOCH_DELTA;
     return {

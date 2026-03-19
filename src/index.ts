@@ -58,6 +58,15 @@ function extractChangedFields(args: Record<string, unknown>): Partial<GraphIssue
   if ('dueDate' in args) fields.dueDate = args.dueDate as string | null;
   if ('summary' in args) fields.summary = args.summary as string;
   if ('assignee' in args) fields.assignee = args.assignee as string | null;
+  if ('storyPoints' in args) fields.storyPoints = args.storyPoints as number | null;
+  // startDate may come via customFields — check both
+  if ('startDate' in args) fields.startDate = args.startDate as string | null;
+  const customFields = args.customFields as Record<string, unknown> | undefined;
+  if (customFields) {
+    for (const [key, val] of Object.entries(customFields)) {
+      if (key.toLowerCase().includes('start')) fields.startDate = val as string | null;
+    }
+  }
   return fields;
 }
 

@@ -212,7 +212,7 @@ export interface RollupConflict {
 
 // Graph Object Cache types (ADR-207)
 
-export type CachedWalkState = 'walking' | 'complete' | 'stale';
+export type CachedWalkState = 'walking' | 'complete' | 'error';
 
 export interface CachedWalk {
   rootKey: string;
@@ -222,11 +222,12 @@ export interface CachedWalk {
   itemCount: number;
   createdEpoch: number;
   walkPromise?: Promise<void>;
+  error?: string;
 }
 
 export interface CacheStatus {
-  state: CachedWalkState | 'not_found';
+  state: CachedWalkState | 'not_found' | 'stale';
   itemCount: number;
-  totalCount?: number;
   stale: boolean;
+  error?: string;
 }
