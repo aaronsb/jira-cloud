@@ -204,7 +204,7 @@ export function boardNextSteps(operation: string, boardId?: number): string {
   return steps.length > 0 ? formatSteps(steps) : '';
 }
 
-export function planNextSteps(issueKey: string, mode?: string): string {
+export function planNextSteps(issueKey: string, mode?: string, conflicts?: import('../types/index.js').RollupConflict[], rollup?: import('../types/index.js').RollupResult): string {
   const steps: NextStep[] = [];
   steps.push(
     { description: 'View the issue details', tool: 'manage_jira_issue', example: { operation: 'get', issueKey } },
@@ -219,7 +219,48 @@ export function planNextSteps(issueKey: string, mode?: string): string {
   steps.push(
     { description: 'Run flat metrics on children', tool: 'analyze_jira_issues', example: { jql: `parent = ${issueKey}`, metrics: ['summary'], groupBy: 'assignee' } },
   );
-  return formatSteps(steps);
+
+  let result = formatSteps(steps);
+
+  // Append conflict fix operations if conflicts exist
+  if (conflicts && conflicts.length > 0 && rollup) {
+    result += conflictFixSteps(conflicts, rollup);
+  }
+
+  return result;
+}
+
+export function conflictFixSteps(conflicts: import('../types/index.js').RollupConflict[], rollup: import('../types/index.js').RollupResult): string {
+  const fixOps: Array<{ tool: string; args: Record<string, unknown> }> = [];
+  const lines: string[] = ['\n\n**Conflict fixes:**'];
+
+  for (const conflict of conflicts) {
+    switch (conflict.type) {
+      case 'due_date':
+        if (rollup.rolledUpEnd) {
+          lines.push(`- Update ${conflict.issueKey} due date to ${rollup.rolledUpEnd} — \`manage_jira_issue\` \`{ operation: "update", issueKey: "${conflict.issueKey}", dueDate: "${rollup.rolledUpEnd}" }\``);
+          fixOps.push({ tool: 'manage_jira_issue', args: { operation: 'update', issueKey: conflict.issueKey, dueDate: rollup.rolledUpEnd } });
+        }
+        break;
+      case 'start_date':
+        if (rollup.rolledUpStart) {
+          lines.push(`- Update ${conflict.issueKey} start date to ${rollup.rolledUpStart} — \`manage_jira_issue\` \`{ operation: "update", issueKey: "${conflict.issueKey}", customFields: { "customfield_10015": "${rollup.rolledUpStart}" } }\``);
+          fixOps.push({ tool: 'manage_jira_issue', args: { operation: 'update', issueKey: conflict.issueKey, customFields: { customfield_10015: rollup.rolledUpStart } } });
+        }
+        break;
+      case 'resolved_with_open_children':
+        lines.push(`- ${conflict.issueKey}: ${conflict.message} — reopen parent or resolve open children (use \`manage_jira_issue get\` with \`expand: ["transitions"]\` to find transition IDs)`);
+        break;
+    }
+  }
+
+  if (fixOps.length > 0) {
+    lines.push('');
+    lines.push('**Fix all date conflicts in one call:**');
+    lines.push(`\`queue_jira_operations\` — \`${JSON.stringify({ operations: fixOps.map(op => ({ ...op, onError: 'continue' })) })}\``);
+  }
+
+  return lines.join('\n');
 }
 
 export function analysisNextSteps(jql: string, issueKeys: string[], truncated = false, groupBy?: string, filterSource?: string): string {

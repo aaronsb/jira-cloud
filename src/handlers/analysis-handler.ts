@@ -1,18 +1,21 @@
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
+import type { GraphQLClient } from '../client/graphql-client.js';
+import { GraphQLHierarchyWalker } from '../client/graphql-hierarchy.js';
 import { JiraClient } from '../client/jira-client.js';
 import { JiraIssueDetails } from '../types/index.js';
 import { ComputeColumn, evaluateRow, extractColumnRefs, parseComputeList } from '../utils/cube-dsl.js';
 import { analysisNextSteps } from '../utils/next-steps.js';
 import { normalizeArgs } from '../utils/normalize-args.js';
+import { renderRollupTree } from './plan-handler.js';
 
 // ── Types ──────────────────────────────────────────────────────────────
 
-type MetricGroup = 'points' | 'time' | 'schedule' | 'cycle' | 'distribution' | 'flow' | 'summary' | 'cube_setup';
+type MetricGroup = 'points' | 'time' | 'schedule' | 'cycle' | 'distribution' | 'flow' | 'hierarchy' | 'summary' | 'cube_setup';
 
 const ALL_METRICS: MetricGroup[] = ['points', 'time', 'schedule', 'cycle', 'distribution'];
-// flow is opt-in only — requires extra bulk changelog API call
-const VALID_GROUP_BY = ['project', 'assignee', 'priority', 'issuetype'] as const;
+// flow and hierarchy are opt-in only
+const VALID_GROUP_BY = ['project', 'assignee', 'priority', 'issuetype', 'parent'] as const;
 type GroupByField = typeof VALID_GROUP_BY[number];
 const MAX_ISSUES_HARD = 500;   // absolute ceiling for detail metrics — beyond this, context explodes
 const MAX_ISSUES_DEFAULT = 100;
@@ -542,6 +545,10 @@ export function groupByJqlClause(dimension: GroupByField, values: string[]): str
       return values.map(v => `priority = "${v}"`);
     case 'issuetype':
       return values.map(v => `issuetype = "${v}"`);
+    case 'parent':
+      return values.map(v =>
+        v === '(no parent)' ? 'issue not in childIssuesOf("")' : `parent = ${v}`
+      );
   }
 }
 
@@ -744,6 +751,7 @@ export function extractDimensions(issues: JiraIssueDetails[], groupLimit = DEFAU
     { name: 'assignee', extractor: i => i.assignee || 'Unassigned' },
     { name: 'priority', extractor: i => i.priority || 'None' },
     { name: 'issuetype', extractor: i => i.issueType || 'Unknown' },
+    { name: 'parent', extractor: i => i.parent || '(no parent)' },
   ];
 
   return dims.map(({ name, extractor }) => {
@@ -854,9 +862,71 @@ async function handleCubeSetup(jiraClient: JiraClient, jql: string): Promise<str
   return renderCubeSetup(jql, issues.length, dimensions);
 }
 
+// ── Hierarchy Metric ──────────────────────────────────────────────────
+
+const MAX_HIERARCHY_ROOTS = 3;
+const HIERARCHY_MAX_DEPTH = 3;
+const HIERARCHY_MAX_ITEMS = 50;
+
+async function renderHierarchy(issues: JiraIssueDetails[], graphqlClient: GraphQLClient): Promise<string> {
+  const lines = ['## Hierarchy Rollups'];
+
+  // Find root issues: those with parents not in the result set
+  const issueKeys = new Set(issues.map(i => i.key));
+  const parentKeys = new Set<string>();
+  for (const issue of issues) {
+    if (issue.parent && !issueKeys.has(issue.parent)) {
+      parentKeys.add(issue.parent);
+    }
+  }
+  // Also include issues in the set that have no parent (they are roots)
+  for (const issue of issues) {
+    if (!issue.parent) {
+      parentKeys.add(issue.key);
+    }
+  }
+
+  // If no hierarchy detected, say so
+  if (parentKeys.size === 0) {
+    lines.push('', '*No parent-child relationships detected in this issue set.*');
+    return lines.join('\n');
+  }
+
+  // Walk each root (cap at MAX_HIERARCHY_ROOTS)
+  const roots = [...parentKeys].slice(0, MAX_HIERARCHY_ROOTS);
+  const walker = new GraphQLHierarchyWalker(graphqlClient);
+
+  for (const rootKey of roots) {
+    try {
+      const { tree } = await walker.walkDown(rootKey, HIERARCHY_MAX_DEPTH, HIERARCHY_MAX_ITEMS);
+      const rollup = GraphQLHierarchyWalker.computeRollups(tree);
+
+      lines.push('');
+      lines.push(`### ${rootKey}: ${tree.issue.summary}`);
+      lines.push(`Progress: ${rollup.resolvedItems}/${rollup.totalItems} (${rollup.progressPct}%) | Points: ${rollup.totalPoints} (${rollup.earnedPoints} earned)`);
+      if (rollup.rolledUpStart || rollup.rolledUpEnd) {
+        lines.push(`Dates: ${rollup.rolledUpStart ?? '—'} – ${rollup.rolledUpEnd ?? '—'}`);
+      }
+      if (rollup.conflicts.length > 0) {
+        lines.push(`Conflicts: ${rollup.conflicts.map(c => `${c.issueKey}: ${c.message}`).join('; ')}`);
+      }
+      lines.push('');
+      renderRollupTree(tree, lines, ['dates', 'points', 'progress'], '', true);
+    } catch {
+      lines.push('', `*Could not walk hierarchy for ${rootKey}*`);
+    }
+  }
+
+  if (parentKeys.size > MAX_HIERARCHY_ROOTS) {
+    lines.push('', `*Showing ${MAX_HIERARCHY_ROOTS} of ${parentKeys.size} root issues. Use analyze_jira_plan for a focused subtree.*`);
+  }
+
+  return lines.join('\n');
+}
+
 // ── Main Handler ───────────────────────────────────────────────────────
 
-export async function handleAnalysisRequest(jiraClient: JiraClient, request: any) {
+export async function handleAnalysisRequest(jiraClient: JiraClient, request: any, graphqlClient?: GraphQLClient | null) {
   const args = normalizeArgs(request.params?.arguments || {});
 
   // Resolve JQL: filterId takes precedence over inline jql
@@ -889,11 +959,12 @@ export async function handleAnalysisRequest(jiraClient: JiraClient, request: any
   const hasSummary = requested.includes('summary');
   const hasCubeSetup = requested.includes('cube_setup');
   const hasFlow = requested.includes('flow');
+  const hasHierarchy = requested.includes('hierarchy');
   const fetchMetrics = requested.length > 0
     ? requested.filter(m => ALL_METRICS.includes(m as MetricGroup)) as MetricGroup[]
     : ALL_METRICS;
-  // flow needs issue fetching but isn't in ALL_METRICS (opt-in only)
-  const needsIssueFetch = fetchMetrics.length > 0 || hasFlow;
+  // flow and hierarchy need issue fetching but aren't in ALL_METRICS (opt-in only)
+  const needsIssueFetch = fetchMetrics.length > 0 || hasFlow || hasHierarchy;
 
   // Parse groupBy
   const groupBy = (typeof args.groupBy === 'string' && VALID_GROUP_BY.includes(args.groupBy as GroupByField))
@@ -1017,6 +1088,16 @@ export async function handleAnalysisRequest(jiraClient: JiraClient, request: any
   if (hasFlow && allIssues.length > 0) {
     lines.push('');
     lines.push(await renderFlow(jiraClient, allIssues));
+  }
+
+  // Hierarchy is opt-in and requires GraphQL client
+  if (hasHierarchy && allIssues.length > 0) {
+    lines.push('');
+    if (graphqlClient) {
+      lines.push(await renderHierarchy(allIssues, graphqlClient));
+    } else {
+      lines.push('## Hierarchy\n\n*Hierarchy metric requires GraphQL (cloudId discovery). Not available for this instance.*');
+    }
   }
 
   // Next steps

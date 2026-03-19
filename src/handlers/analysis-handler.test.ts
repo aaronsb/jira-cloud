@@ -445,12 +445,12 @@ describe('extractDimensions', () => {
     expect(project.count).toBe(2);
   });
 
-  it('extracts all five dimensions', () => {
+  it('extracts all six dimensions', () => {
     const issues = [
       makeIssue({ key: 'AA-1', status: 'Backlog', assignee: 'Alice', priority: 'High', issueType: 'Story' }),
     ];
     const dims = extractDimensions(issues);
-    expect(dims.map(d => d.name)).toEqual(['project', 'status', 'assignee', 'priority', 'issuetype']);
+    expect(dims.map(d => d.name)).toEqual(['project', 'status', 'assignee', 'priority', 'issuetype', 'parent']);
   });
 
   it('sorts values by count descending', () => {

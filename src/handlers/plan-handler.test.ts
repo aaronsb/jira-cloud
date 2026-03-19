@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import type { GraphIssue, GraphTreeNode } from '../types/index.js';
+import type { GraphIssue, GraphTreeNode, RollupConflict, RollupResult } from '../types/index.js';
 import { GraphQLHierarchyWalker, collectLeaves, computeDepth } from '../client/graphql-hierarchy.js';
 import { renderRollupTree } from './plan-handler.js';
+import { conflictFixSteps } from '../utils/next-steps.js';
 
 function makeIssue(overrides: Partial<GraphIssue> = {}): GraphIssue {
   return {
@@ -163,5 +164,68 @@ describe('renderRollupTree', () => {
     renderRollupTree(tree, lines, [], '', true);
     expect(lines.some(l => l.includes('Child A'))).toBe(true);
     expect(lines.some(l => l.includes('Child B'))).toBe(true);
+  });
+});
+
+describe('conflictFixSteps', () => {
+  const baseRollup: RollupResult = {
+    rolledUpStart: '2026-01-15',
+    rolledUpEnd: '2026-04-15',
+    totalItems: 10,
+    resolvedItems: 3,
+    progressPct: 30,
+    totalPoints: 50,
+    earnedPoints: 15,
+    assignees: ['alice'],
+    unassignedCount: 2,
+    conflicts: [],
+  };
+
+  it('generates update operation for due date conflict', () => {
+    const conflicts: RollupConflict[] = [{
+      issueKey: 'PROJ-1',
+      type: 'due_date',
+      message: 'Children end 15d after parent due date',
+    }];
+    const result = conflictFixSteps(conflicts, baseRollup);
+    expect(result).toContain('PROJ-1');
+    expect(result).toContain('2026-04-15');
+    expect(result).toContain('queue_jira_operations');
+    expect(result).toContain('"operation":"update"');
+  });
+
+  it('generates update for start date conflict', () => {
+    const conflicts: RollupConflict[] = [{
+      issueKey: 'PROJ-2',
+      type: 'start_date',
+      message: 'Children start before parent',
+    }];
+    const result = conflictFixSteps(conflicts, baseRollup);
+    expect(result).toContain('PROJ-2');
+    expect(result).toContain('2026-01-15');
+  });
+
+  it('suggests manual fix for resolved-with-open-children', () => {
+    const conflicts: RollupConflict[] = [{
+      issueKey: 'PROJ-3',
+      type: 'resolved_with_open_children',
+      message: 'Resolved but has 2 open children',
+    }];
+    const result = conflictFixSteps(conflicts, baseRollup);
+    expect(result).toContain('PROJ-3');
+    expect(result).toContain('reopen parent or resolve');
+    // Should NOT generate a queue operation for this type
+    expect(result).not.toContain('"PROJ-3"');
+  });
+
+  it('generates batch queue for multiple fixable conflicts', () => {
+    const conflicts: RollupConflict[] = [
+      { issueKey: 'A-1', type: 'due_date', message: 'late' },
+      { issueKey: 'A-2', type: 'start_date', message: 'early' },
+    ];
+    const result = conflictFixSteps(conflicts, baseRollup);
+    expect(result).toContain('Fix all date conflicts');
+    expect(result).toContain('A-1');
+    expect(result).toContain('A-2');
   });
 });

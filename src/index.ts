@@ -157,7 +157,7 @@ class JiraServer {
           manage_jira_board: handleBoardRequest,
           manage_jira_sprint: handleSprintRequest,
           manage_jira_filter: handleFilterRequest,
-          analyze_jira_issues: handleAnalysisRequest,
+          analyze_jira_issues: (client, req) => handleAnalysisRequest(client, req, this.graphqlClient),
         };
 
         const handlers: Record<string, (client: JiraClient, req: typeof request) => Promise<any>> = {

@@ -48,7 +48,7 @@ export async function handlePlanRequest(
   return {
     content: [{
       type: 'text',
-      text: output + planNextSteps(issueKey, mode),
+      text: output + planNextSteps(issueKey, mode, rollupResult.conflicts, rollupResult),
     }],
   };
 }
