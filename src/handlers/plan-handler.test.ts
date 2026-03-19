@@ -1,166 +1,166 @@
 import { describe, it, expect } from 'vitest';
-import type { DerivedField, PlanNode, RoadmapItem } from '../types/index.js';
-import { renderRollupTree, detectDateConflict, computeProgress } from './plan-handler.js';
+import type { GraphIssue, GraphTreeNode } from '../types/index.js';
+import { GraphQLHierarchyWalker, collectLeaves, computeDepth } from '../client/graphql-hierarchy.js';
+import { renderRollupTree } from './plan-handler.js';
 
-function makeItem(overrides: Partial<RoadmapItem> = {}): RoadmapItem {
+function makeIssue(overrides: Partial<GraphIssue> = {}): GraphIssue {
   return {
-    id: 'item-1',
-    title: 'Test Item',
-    issueKey: 'PROJ-1',
-    issueId: '10001',
-    status: { statusCategory: 'indeterminate' },
-    childItems: [],
-    schedule: { startDate: '2026-01-01', dueDate: '2026-03-31' },
-    storyPoints: null,
+    key: 'PROJ-1',
+    summary: 'Test Issue',
+    issueType: 'Story',
+    hierarchyLevel: 1,
+    status: 'In Progress',
+    statusCategory: 'In Progress',
     assignee: null,
+    startDate: null,
+    dueDate: null,
+    storyPoints: null,
+    isResolved: false,
+    hasChildIssues: false,
+    parentKey: null,
     ...overrides,
   };
 }
 
-function makeDerived(overrides: Partial<DerivedField> = {}): DerivedField {
+function makeNode(issue?: Partial<GraphIssue>, children: GraphTreeNode[] = []): GraphTreeNode {
   return {
-    itemId: 'item-1',
-    derivedStartDate: '2026-01-05',
-    derivedDueDate: '2026-04-15',
-    derivedProgress: 0.38,
-    ...overrides,
+    issue: makeIssue(issue),
+    children,
   };
 }
 
-function makeNode(overrides: Partial<PlanNode> = {}): PlanNode {
-  return {
-    item: makeItem(),
-    derived: null,
-    children: [],
-    ...overrides,
-  };
-}
-
-describe('detectDateConflict', () => {
-  it('returns null when no derived data', () => {
-    const node = makeNode();
-    expect(detectDateConflict(node)).toBeNull();
+describe('collectLeaves', () => {
+  it('returns the node itself if no children', () => {
+    const node = makeNode({ key: 'A' });
+    expect(collectLeaves(node).map(l => l.key)).toEqual(['A']);
   });
 
-  it('detects children ending after parent due date', () => {
-    const node = makeNode({
-      item: makeItem({ schedule: { startDate: '2026-01-01', dueDate: '2026-03-31' } }),
-      derived: makeDerived({ derivedDueDate: '2026-04-15' }),
-    });
-    const result = detectDateConflict(node);
-    expect(result).toContain('CONFLICT');
-    expect(result).toContain('15d');
-  });
-
-  it('detects children starting before parent start date', () => {
-    const node = makeNode({
-      item: makeItem({ schedule: { startDate: '2026-02-01', dueDate: '2026-06-30' } }),
-      derived: makeDerived({ derivedStartDate: '2026-01-15', derivedDueDate: '2026-05-01' }),
-    });
-    const result = detectDateConflict(node);
-    expect(result).toContain('CONFLICT');
-    expect(result).toContain('start');
-  });
-
-  it('returns null when dates are consistent', () => {
-    const node = makeNode({
-      item: makeItem({ schedule: { startDate: '2026-01-01', dueDate: '2026-06-30' } }),
-      derived: makeDerived({ derivedStartDate: '2026-01-05', derivedDueDate: '2026-04-15' }),
-    });
-    expect(detectDateConflict(node)).toBeNull();
+  it('returns only leaf nodes', () => {
+    const tree = makeNode({ key: 'ROOT' }, [
+      makeNode({ key: 'A' }),
+      makeNode({ key: 'B' }, [
+        makeNode({ key: 'C' }),
+        makeNode({ key: 'D' }),
+      ]),
+    ]);
+    expect(collectLeaves(tree).map(l => l.key)).toEqual(['A', 'C', 'D']);
   });
 });
 
-describe('computeProgress', () => {
-  it('computes progress from leaf nodes', () => {
-    const node = makeNode({
-      children: [
-        makeNode({ item: makeItem({ id: 'c1', status: { statusCategory: 'done' } }) }),
-        makeNode({ item: makeItem({ id: 'c2', status: { statusCategory: 'indeterminate' } }) }),
-        makeNode({ item: makeItem({ id: 'c3', status: { statusCategory: 'done' } }) }),
-        makeNode({ item: makeItem({ id: 'c4', status: { statusCategory: 'new' } }) }),
-      ],
-    });
-    const result = computeProgress(node);
-    expect(result.resolved).toBe(2);
-    expect(result.total).toBe(4);
+describe('computeDepth', () => {
+  it('returns 1 for leaf', () => {
+    expect(computeDepth(makeNode())).toBe(1);
+  });
+
+  it('returns correct depth for nested tree', () => {
+    const tree = makeNode({}, [
+      makeNode({}, [makeNode({}, [makeNode()])]),
+    ]);
+    expect(computeDepth(tree)).toBe(4);
+  });
+});
+
+describe('computeRollups', () => {
+  it('rolls up dates from leaves', () => {
+    const tree = makeNode({ key: 'ROOT' }, [
+      makeNode({ key: 'A', startDate: '2026-02-01', dueDate: '2026-03-15' }),
+      makeNode({ key: 'B', startDate: '2026-01-15', dueDate: '2026-04-01' }),
+      makeNode({ key: 'C', startDate: '2026-03-01', dueDate: '2026-03-31' }),
+    ]);
+    const result = GraphQLHierarchyWalker.computeRollups(tree);
+    expect(result.rolledUpStart).toBe('2026-01-15');
+    expect(result.rolledUpEnd).toBe('2026-04-01');
+  });
+
+  it('computes progress from leaves', () => {
+    const tree = makeNode({ key: 'ROOT' }, [
+      makeNode({ key: 'A', isResolved: true }),
+      makeNode({ key: 'B', isResolved: false }),
+      makeNode({ key: 'C', isResolved: true }),
+      makeNode({ key: 'D', isResolved: false }),
+    ]);
+    const result = GraphQLHierarchyWalker.computeRollups(tree);
+    expect(result.resolvedItems).toBe(2);
     expect(result.progressPct).toBe(50);
   });
 
-  it('returns 0% for no leaf nodes', () => {
-    const node = makeNode();
-    const result = computeProgress(node);
-    expect(result.total).toBe(1); // root itself is a leaf
+  it('sums points from leaves', () => {
+    const tree = makeNode({ key: 'ROOT' }, [
+      makeNode({ key: 'A', storyPoints: 5, isResolved: true }),
+      makeNode({ key: 'B', storyPoints: 8, isResolved: false }),
+      makeNode({ key: 'C', storyPoints: 3, isResolved: true }),
+    ]);
+    const result = GraphQLHierarchyWalker.computeRollups(tree);
+    expect(result.totalPoints).toBe(16);
+    expect(result.earnedPoints).toBe(8);
   });
 
-  it('handles nested children', () => {
-    const node = makeNode({
-      children: [
-        makeNode({
-          item: makeItem({ id: 'c1', childItems: [{ id: 'gc1' }] }),
-          children: [
-            makeNode({ item: makeItem({ id: 'gc1', status: { statusCategory: 'done' } }) }),
-          ],
-        }),
-        makeNode({ item: makeItem({ id: 'c2', status: { statusCategory: 'new' } }) }),
-      ],
-    });
-    const result = computeProgress(node);
-    expect(result.resolved).toBe(1);
-    expect(result.total).toBe(2); // only leaves count
+  it('collects unique assignees', () => {
+    const tree = makeNode({ key: 'ROOT' }, [
+      makeNode({ key: 'A', assignee: 'alice' }),
+      makeNode({ key: 'B', assignee: 'bob' }),
+      makeNode({ key: 'C', assignee: 'alice' }),
+      makeNode({ key: 'D', assignee: null }),
+    ]);
+    const result = GraphQLHierarchyWalker.computeRollups(tree);
+    expect(result.assignees).toEqual(['alice', 'bob']);
+    expect(result.unassignedCount).toBe(2); // ROOT and D are unassigned and not resolved
+  });
+
+  it('detects due date conflict', () => {
+    const tree = makeNode({ key: 'ROOT', dueDate: '2026-03-31' }, [
+      makeNode({ key: 'A', dueDate: '2026-04-15' }),
+      makeNode({ key: 'B', dueDate: '2026-03-20' }),
+    ]);
+    const result = GraphQLHierarchyWalker.computeRollups(tree);
+    expect(result.conflicts.length).toBe(1);
+    expect(result.conflicts[0].type).toBe('due_date');
+    expect(result.conflicts[0].issueKey).toBe('ROOT');
+  });
+
+  it('detects resolved parent with open children', () => {
+    const tree = makeNode({ key: 'ROOT', isResolved: true }, [
+      makeNode({ key: 'A', isResolved: true }),
+      makeNode({ key: 'B', isResolved: false }),
+    ]);
+    const result = GraphQLHierarchyWalker.computeRollups(tree);
+    expect(result.conflicts.some(c => c.type === 'resolved_with_open_children')).toBe(true);
+  });
+
+  it('handles tree with no dates', () => {
+    const tree = makeNode({ key: 'ROOT' }, [
+      makeNode({ key: 'A' }),
+      makeNode({ key: 'B' }),
+    ]);
+    const result = GraphQLHierarchyWalker.computeRollups(tree);
+    expect(result.rolledUpStart).toBeNull();
+    expect(result.rolledUpEnd).toBeNull();
   });
 });
 
 describe('renderRollupTree', () => {
-  it('renders a single node', () => {
-    const node = makeNode({
-      item: makeItem({ title: 'Root Epic', status: { statusCategory: 'indeterminate' } }),
-    });
+  it('renders a single node with status icon', () => {
+    const node = makeNode({ key: 'PROJ-1', summary: 'Root', statusCategory: 'In Progress' });
     const lines: string[] = [];
-    renderRollupTree(node, lines, ['dates', 'points', 'progress'], '', true);
-    expect(lines[0]).toContain('Root Epic');
-    expect(lines[0]).toContain('●'); // in-progress icon
+    renderRollupTree(node, lines, [], '', true);
+    expect(lines[0]).toContain('●');
+    expect(lines[0]).toContain('PROJ-1');
   });
 
   it('renders done items with checkmark', () => {
-    const node = makeNode({
-      item: makeItem({ title: 'Done Task', status: { statusCategory: 'done' } }),
-    });
+    const node = makeNode({ key: 'PROJ-1', summary: 'Done', statusCategory: 'Done' });
     const lines: string[] = [];
     renderRollupTree(node, lines, [], '', true);
     expect(lines[0]).toContain('✓');
   });
 
-  it('renders date conflict warnings', () => {
-    const node = makeNode({
-      item: makeItem({
-        title: 'Late Epic',
-        schedule: { startDate: '2026-01-01', dueDate: '2026-03-31' },
-      }),
-      derived: makeDerived({ derivedDueDate: '2026-04-15' }),
-      children: [makeNode()],
-    });
+  it('renders children', () => {
+    const tree = makeNode({ key: 'ROOT', summary: 'Parent' }, [
+      makeNode({ key: 'A', summary: 'Child A' }),
+      makeNode({ key: 'B', summary: 'Child B' }),
+    ]);
     const lines: string[] = [];
-    renderRollupTree(node, lines, ['dates'], '', true);
-    const dateLines = lines.filter(l => l.includes('Dates:'));
-    expect(dateLines.length).toBeGreaterThanOrEqual(1);
-    // The parent's date line should show the conflict
-    const parentDateLine = dateLines.find(l => l.includes('derived'));
-    expect(parentDateLine).toBeDefined();
-    expect(parentDateLine).toContain('⚠️');
-    expect(parentDateLine).toContain('CONFLICT');
-  });
-
-  it('renders children with tree connectors', () => {
-    const node = makeNode({
-      item: makeItem({ title: 'Parent', childItems: [{ id: 'c1' }, { id: 'c2' }] }),
-      children: [
-        makeNode({ item: makeItem({ id: 'c1', title: 'Child A' }) }),
-        makeNode({ item: makeItem({ id: 'c2', title: 'Child B' }) }),
-      ],
-    });
-    const lines: string[] = [];
-    renderRollupTree(node, lines, [], '', true);
+    renderRollupTree(tree, lines, [], '', true);
     expect(lines.some(l => l.includes('Child A'))).toBe(true);
     expect(lines.some(l => l.includes('Child B'))).toBe(true);
   });
