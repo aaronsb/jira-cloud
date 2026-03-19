@@ -46,10 +46,19 @@ const RECENCY_HALF_LIFE_DAYS = 30;
 
 // ── Field Discovery ────────────────────────────────────────────────────
 
+/** Well-known locked fields identified by schema custom type */
+const WELL_KNOWN_FIELDS: Record<string, string> = {
+  'com.pyxis.greenhopper.jira:gh-sprint': 'sprint',
+  'com.pyxis.greenhopper.jira:jsw-story-points': 'storyPoints',
+  'com.atlassian.jpo:jpo-custom-field-baseline-start': 'startDate',
+  'com.atlassian.jpo:jpo-custom-field-baseline-end': 'targetDate',
+};
+
 export class FieldDiscovery {
   private catalog: CatalogField[] = [];
   private nameToId: Map<string, string> = new Map();
   private idToField: Map<string, CatalogField> = new Map();
+  private wellKnown: Map<string, string> = new Map(); // logical name → field ID
   private stats: DiscoveryStats | null = null;
   private ready = false;
   private error: string | null = null;
@@ -72,6 +81,16 @@ export class FieldDiscovery {
   /** Discovery stats (available after catalog build) */
   getStats(): DiscoveryStats | null {
     return this.stats;
+  }
+
+  /** Get a well-known field ID by logical name (e.g., 'sprint', 'storyPoints') */
+  getWellKnownFieldId(logicalName: string): string | null {
+    return this.wellKnown.get(logicalName) ?? null;
+  }
+
+  /** All discovered well-known field mappings */
+  getWellKnownFields(): Record<string, string> {
+    return Object.fromEntries(this.wellKnown);
   }
 
   /** Resolve a human-readable field name to its Jira field ID */
@@ -164,6 +183,15 @@ export class FieldDiscovery {
 
       const rawFields = await this.fetchAllCustomFields(client);
       console.error(`[field-discovery] Fetched ${rawFields.length} custom fields`);
+
+      // Detect well-known locked fields by schema type (before filtering)
+      for (const field of rawFields) {
+        const logicalName = WELL_KNOWN_FIELDS[field.schemaCustom];
+        if (logicalName) {
+          this.wellKnown.set(logicalName, field.id);
+          console.error(`[field-discovery] Well-known: ${logicalName} → ${field.id} (${field.name})`);
+        }
+      }
 
       const { qualified, stats } = this.filterAndClassify(rawFields);
       console.error(`[field-discovery] ${qualified.length} fields passed filters`);

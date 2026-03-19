@@ -94,6 +94,7 @@ export interface JiraConfig {
   customFields?: {
     startDate?: string;  // e.g. 'customfield_10015'
     storyPoints?: string;  // e.g. 'customfield_10016'
+    sprint?: string;  // e.g. 'customfield_10020' — auto-discovered at runtime
   };
 }
 
