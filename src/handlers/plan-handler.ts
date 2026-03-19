@@ -115,10 +115,9 @@ export async function handlePlanRequest(
   const walker = new GraphQLHierarchyWalker(graphqlClient);
   let tree: GraphTreeNode;
   let totalItems: number;
-  let truncated: boolean;
 
   try {
-    ({ tree, totalItems, truncated } = await walker.walkDown(issueKey));
+    ({ tree, totalItems } = await walker.walkDown(issueKey));
   } catch (err) {
     const message = (err as Error).message;
     if (message.includes('not found')) {
