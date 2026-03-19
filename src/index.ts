@@ -84,15 +84,8 @@ class JiraServer {
     // Start async field discovery (non-blocking)
     fieldDiscovery.startAsync(this.jiraClient.v3Client);
 
-    // Discover cloudId for GraphQL/Plans API (non-blocking)
-    discoverCloudId(JIRA_HOST!, JIRA_EMAIL!, JIRA_API_TOKEN!).then(cloudId => {
-      if (cloudId) {
-        this.graphqlClient = new GraphQLClient(JIRA_EMAIL!, JIRA_API_TOKEN!, cloudId);
-        console.error(`[jira-cloud] GraphQL client ready (cloudId: ${cloudId.slice(0, 8)}...)`);
-      } else {
-        console.error('[jira-cloud] GraphQL/Plans unavailable — analyze_jira_plan disabled');
-      }
-    }).catch(() => {});
+    // CloudId discovery happens in run() before server connects — must complete
+    // before ListTools so analyze_jira_plan is registered if available.
 
     this.server.onerror = (error) => console.error('[MCP Error]', error);
     process.on('SIGINT', async () => {
@@ -236,6 +229,19 @@ class JiraServer {
   }
 
   async run() {
+    // Discover cloudId before connecting — must complete before ListTools
+    try {
+      const cloudId = await discoverCloudId(JIRA_HOST!, JIRA_EMAIL!, JIRA_API_TOKEN!);
+      if (cloudId) {
+        this.graphqlClient = new GraphQLClient(JIRA_EMAIL!, JIRA_API_TOKEN!, cloudId);
+        console.error(`[jira-cloud] GraphQL client ready (cloudId: ${cloudId.slice(0, 8)}...)`);
+      } else {
+        console.error('[jira-cloud] GraphQL/Plans unavailable — analyze_jira_plan disabled');
+      }
+    } catch {
+      console.error('[jira-cloud] GraphQL discovery failed — analyze_jira_plan disabled');
+    }
+
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
     console.error('Jira MCP server running on stdio');
