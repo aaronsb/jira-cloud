@@ -1,13 +1,14 @@
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
+import type { GraphObjectCache } from '../client/graph-object-cache.js';
 import type { GraphQLClient } from '../client/graphql-client.js';
-import { GraphQLHierarchyWalker } from '../client/graphql-hierarchy.js';
+import { GraphQLHierarchyWalker, walkTree } from '../client/graphql-hierarchy.js';
 import { JiraClient } from '../client/jira-client.js';
-import { JiraIssueDetails } from '../types/index.js';
+import { renderRollupTree } from '../handlers/plan-handler.js';
+import { JiraIssueDetails, GraphIssue, GraphTreeNode } from '../types/index.js';
 import { ComputeColumn, evaluateRow, extractColumnRefs, parseComputeList } from '../utils/cube-dsl.js';
 import { analysisNextSteps } from '../utils/next-steps.js';
 import { normalizeArgs } from '../utils/normalize-args.js';
-import { renderRollupTree } from './plan-handler.js';
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -924,10 +925,153 @@ async function renderHierarchy(issues: JiraIssueDetails[], graphqlClient: GraphQ
   return lines.join('\n');
 }
 
+// ── Cache → Issue Mapping ─────────────────────────────────────────────
+
+/** Map a GraphIssue from cache to JiraIssueDetails for metric renderers */
+function graphIssueToDetails(issue: GraphIssue): JiraIssueDetails {
+  const statusCategoryMap: Record<string, JiraIssueDetails['statusCategory']> = {
+    'To Do': 'new',
+    'In Progress': 'indeterminate',
+    'Done': 'done',
+  };
+  return {
+    key: issue.key,
+    summary: issue.summary,
+    description: '',
+    issueType: issue.issueType,
+    priority: null,
+    parent: issue.parentKey,
+    assignee: issue.assignee,
+    reporter: '',
+    status: issue.status,
+    statusCategory: statusCategoryMap[issue.statusCategory] ?? 'unknown',
+    resolution: issue.isResolved ? 'Done' : null,
+    labels: [],
+    created: '',
+    updated: '',
+    resolutionDate: null,
+    statusCategoryChanged: null,
+    dueDate: issue.dueDate,
+    startDate: issue.startDate,
+    storyPoints: issue.storyPoints,
+    timeEstimate: null,
+    issueLinks: [],
+  };
+}
+
+/** Flatten a cached hierarchy tree to JiraIssueDetails[] for existing metric renderers */
+export function flattenCacheToIssueDetails(tree: GraphTreeNode): JiraIssueDetails[] {
+  const issues: JiraIssueDetails[] = [];
+  walkTree(tree, (node) => {
+    issues.push(graphIssueToDetails(node.issue));
+  });
+  return issues;
+}
+
+// ── DataRef Handler (cached plan data) ─────────────────────────────────
+
+async function handleDataRefAnalysis(
+  cached: import('../types/index.js').CachedWalk,
+  args: Record<string, unknown>,
+  graphqlClient?: GraphQLClient | null,
+  groupLimit = DEFAULT_GROUP_LIMIT,
+) {
+  const allIssues = flattenCacheToIssueDetails(cached.tree);
+
+  const requested = (args.metrics && Array.isArray(args.metrics))
+    ? args.metrics as string[]
+    : [];
+  const fetchMetrics = requested.length > 0
+    ? requested.filter(m => ALL_METRICS.includes(m as MetricGroup)) as MetricGroup[]
+    : ALL_METRICS;
+  const hasHierarchy = requested.includes('hierarchy');
+
+  const now = new Date();
+  const lines: string[] = [];
+  lines.push(`# Analysis: ${cached.rootKey} (from cache)`);
+  lines.push(`Analyzing ${allIssues.length} issues from cached hierarchy walk`);
+  lines.push('');
+
+  const renderers: Record<string, () => string> = {
+    points: () => renderPoints(allIssues),
+    time: () => renderTime(allIssues),
+    schedule: () => renderSchedule(allIssues, now),
+    cycle: () => renderCycle(allIssues, now),
+    distribution: () => renderDistribution(allIssues, groupLimit),
+  };
+
+  for (const metric of fetchMetrics) {
+    if (renderers[metric]) {
+      lines.push(renderers[metric]());
+      lines.push('');
+    }
+  }
+
+  // Hierarchy renders the cached tree directly (no re-walk)
+  if (hasHierarchy) {
+    lines.push('## Hierarchy Rollups');
+    lines.push('');
+    const rollup = GraphQLHierarchyWalker.computeRollups(cached.tree);
+    lines.push(`Progress: ${rollup.resolvedItems}/${rollup.totalItems} (${rollup.progressPct}%) | Points: ${rollup.totalPoints} (${rollup.earnedPoints} earned)`);
+    if (rollup.rolledUpStart || rollup.rolledUpEnd) {
+      lines.push(`Dates: ${rollup.rolledUpStart ?? '—'} – ${rollup.rolledUpEnd ?? '—'}`);
+    }
+    lines.push('');
+    renderRollupTree(cached.tree, lines, ['dates', 'points', 'progress'], '', true);
+  }
+
+  // Flow not supported from cache — no changelog data
+  if (requested.includes('flow')) {
+    lines.push('');
+    lines.push('## Flow\n\n*Flow metric requires changelog data and is not available from cached plan data. Use jql or filterId instead.*');
+  }
+
+  // Summary not supported from cache — needs count API
+  if (requested.includes('summary')) {
+    lines.push('');
+    lines.push('## Summary\n\n*Summary metric uses the count API and is not available from cached plan data. Use jql or filterId instead.*');
+  }
+
+  const nextSteps = analysisNextSteps(`dataRef:${cached.rootKey}`, allIssues.slice(0, 3).map(i => i.key), false, undefined);
+  lines.push(nextSteps);
+
+  return {
+    content: [{
+      type: 'text',
+      text: lines.join('\n'),
+    }],
+  };
+}
+
 // ── Main Handler ───────────────────────────────────────────────────────
 
-export async function handleAnalysisRequest(jiraClient: JiraClient, request: any, graphqlClient?: GraphQLClient | null) {
+export async function handleAnalysisRequest(jiraClient: JiraClient, request: any, graphqlClient?: GraphQLClient | null, cache?: GraphObjectCache) {
   const args = normalizeArgs(request.params?.arguments || {});
+
+  // Parse groupLimit early — needed by dataRef path and summary path
+  const rawGroupLimit = Number(args.groupLimit);
+  const groupLimit = rawGroupLimit > 0 ? rawGroupLimit : DEFAULT_GROUP_LIMIT;
+
+  // dataRef: analyze cached plan data instead of fetching from Jira
+  const dataRef = args.dataRef as string | undefined;
+  if (dataRef && typeof dataRef === 'string' && dataRef.trim() !== '') {
+    if (!cache) {
+      throw new McpError(ErrorCode.InvalidParams, 'dataRef requires the graph object cache (start a walk with analyze_jira_plan first).');
+    }
+    const cached = cache.get(dataRef);
+    if (!cached) {
+      throw new McpError(ErrorCode.InvalidParams, `No cached walk for "${dataRef}". Start one with analyze_jira_plan first.`);
+    }
+    if (cached.state === 'walking') {
+      return {
+        content: [{
+          type: 'text',
+          text: `Walk for ${dataRef} is still in progress (${cached.itemCount} items so far). Try again shortly.`,
+        }],
+      };
+    }
+    return handleDataRefAnalysis(cached, args, graphqlClient, groupLimit);
+  }
 
   // Resolve JQL: filterId takes precedence over inline jql
   let jql: string;
@@ -948,7 +1092,7 @@ export async function handleAnalysisRequest(jiraClient: JiraClient, request: any
   } else {
     jql = args.jql as string;
     if (!jql || typeof jql !== 'string' || jql.trim() === '') {
-      throw new McpError(ErrorCode.InvalidParams, 'Either jql or filterId parameter is required.');
+      throw new McpError(ErrorCode.InvalidParams, 'Either jql, filterId, or dataRef parameter is required.');
     }
   }
 
@@ -976,10 +1120,6 @@ export async function handleAnalysisRequest(jiraClient: JiraClient, request: any
   if (args.compute && Array.isArray(args.compute) && args.compute.length > 0) {
     compute = parseComputeList(args.compute as string[]);
   }
-
-  // Parse groupLimit — soft cap on group/dimension values (no hard cap for summary metrics)
-  const rawGroupLimit = Number(args.groupLimit);
-  const groupLimit = rawGroupLimit > 0 ? rawGroupLimit : DEFAULT_GROUP_LIMIT;
 
   // Cube setup — discover dimensions from sample, no issue fetching
   if (hasCubeSetup) {

@@ -16,13 +16,14 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 
 import { fieldDiscovery } from './client/field-discovery.js';
+import { GraphObjectCache } from './client/graph-object-cache.js';
 import { discoverCloudId, GraphQLClient } from './client/graphql-client.js';
 import { JiraClient } from './client/jira-client.js';
 import { handleAnalysisRequest } from './handlers/analysis-handler.js';
-import { handlePlanRequest } from './handlers/plan-handler.js';
 import { handleBoardRequest } from './handlers/board-handlers.js';
 import { handleFilterRequest } from './handlers/filter-handlers.js';
 import { handleIssueRequest } from './handlers/issue-handlers.js';
+import { handlePlanRequest } from './handlers/plan-handler.js';
 import { handleProjectRequest } from './handlers/project-handlers.js';
 import { createQueueHandler } from './handlers/queue-handler.js';
 import { setupResourceHandlers } from './handlers/resource-handlers.js';
@@ -30,6 +31,7 @@ import { handleSprintRequest } from './handlers/sprint-handlers.js';
 import { promptDefinitions } from './prompts/prompt-definitions.js';
 import { getPrompt } from './prompts/prompt-messages.js';
 import { toolSchemas } from './schemas/tool-schemas.js';
+import type { GraphIssue } from './types/index.js';
 
 // Jira credentials from environment variables
 const JIRA_EMAIL = process.env.JIRA_EMAIL;
@@ -50,10 +52,29 @@ if (!JIRA_EMAIL || !JIRA_API_TOKEN || !JIRA_HOST) {
 const require = createRequire(import.meta.url);
 const { version } = require('../package.json');
 
+/** Map manage_jira_issue update args to GraphIssue field patches */
+function extractChangedFields(args: Record<string, unknown>): Partial<GraphIssue> {
+  const fields: Partial<GraphIssue> = {};
+  if ('dueDate' in args) fields.dueDate = args.dueDate as string | null;
+  if ('summary' in args) fields.summary = args.summary as string;
+  if ('assignee' in args) fields.assignee = args.assignee as string | null;
+  if ('storyPoints' in args) fields.storyPoints = args.storyPoints as number | null;
+  // startDate may come via customFields — check both
+  if ('startDate' in args) fields.startDate = args.startDate as string | null;
+  const customFields = args.customFields as Record<string, unknown> | undefined;
+  if (customFields) {
+    for (const [key, val] of Object.entries(customFields)) {
+      if (key.toLowerCase().includes('start')) fields.startDate = val as string | null;
+    }
+  }
+  return fields;
+}
+
 class JiraServer {
   private server: Server;
   private jiraClient: JiraClient;
   private graphqlClient: GraphQLClient | null = null;
+  private cache = new GraphObjectCache();
 
   constructor() {
     const serverName = process.env.MCP_SERVER_NAME || 'jira-cloud';
@@ -139,6 +160,7 @@ class JiraServer {
     // Set up tool handlers
     this.server.setRequestHandler(CallToolRequestSchema, async (request, _extra) => {
       console.error('Received request:', JSON.stringify(request, null, 2));
+      this.cache.tick();
 
       const { name } = request.params;
       console.error(`Handling tool request: ${name}`);
@@ -150,14 +172,14 @@ class JiraServer {
           manage_jira_board: handleBoardRequest,
           manage_jira_sprint: handleSprintRequest,
           manage_jira_filter: handleFilterRequest,
-          analyze_jira_issues: (client, req) => handleAnalysisRequest(client, req, this.graphqlClient),
+          analyze_jira_issues: (client, req) => handleAnalysisRequest(client, req, this.graphqlClient, this.cache),
         };
 
         const handlers: Record<string, (client: JiraClient, req: typeof request) => Promise<any>> = {
           ...toolHandlers,
           queue_jira_operations: createQueueHandler(toolHandlers, JIRA_HOST),
           ...(this.graphqlClient ? {
-            analyze_jira_plan: (_client, req) => handlePlanRequest(this.jiraClient, this.graphqlClient!, req),
+            analyze_jira_plan: (_client, req) => handlePlanRequest(this.jiraClient, this.graphqlClient!, req, this.cache),
           } : {}),
         };
 
@@ -177,6 +199,22 @@ class JiraServer {
           if (consecutiveIssueCalls >= QUEUE_HINT_THRESHOLD && response.content?.[0]?.text) {
             response.content[0].text += `\n\n---\n**💡 Efficiency tip:** You've made ${consecutiveIssueCalls} consecutive \`manage_jira_issue\` calls. Consider using \`queue_jira_operations\` to batch multiple issue operations into a single call — it's faster and uses less context.`;
             consecutiveIssueCalls = 0;
+          }
+
+          // Surgical cache patching — update cached issues on mutations
+          const reqArgs = request.params.arguments as Record<string, unknown> | undefined;
+          const op = reqArgs?.operation as string | undefined;
+          if ((op === 'update' || op === 'transition') && this.cache.walks.size > 0) {
+            const issueKey = reqArgs?.issueKey as string | undefined;
+            if (issueKey) {
+              const changedFields = extractChangedFields(reqArgs!);
+              if (Object.keys(changedFields).length > 0) {
+                const patched = this.cache.patch(issueKey, changedFields);
+                if (patched) {
+                  console.error(`[graph-cache] Patched ${issueKey} in cache`);
+                }
+              }
+            }
           }
         } else {
           consecutiveIssueCalls = 0;

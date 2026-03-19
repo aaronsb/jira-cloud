@@ -338,11 +338,15 @@ export const toolSchemas = {
       properties: {
         jql: {
           type: 'string',
-          description: 'JQL query selecting the issues to analyze. Either jql or filterId is required (filterId takes precedence). Examples: "project in (AA, GC, LGS)", "sprint in openSprints()", "assignee = currentUser() AND resolution = Unresolved".',
+          description: 'JQL query selecting the issues to analyze. Either jql, filterId, or dataRef is required (dataRef > filterId > jql precedence). Examples: "project in (AA, GC, LGS)", "sprint in openSprints()", "assignee = currentUser() AND resolution = Unresolved".',
         },
         filterId: {
           type: 'string',
           description: 'ID of a saved Jira filter to use as the query source. The filter\'s JQL is resolved automatically. Use this to run different analyses against a saved query without repeating the JQL. Create filters with manage_jira_filter.',
+        },
+        dataRef: {
+          type: 'string',
+          description: 'Root issue key of a cached hierarchy walk. Analyzes cached plan data without re-fetching from Jira. Start a walk with analyze_jira_plan first. Supports all metrics except flow. Takes precedence over jql/filterId.',
         },
         metrics: {
           type: 'array',
@@ -380,10 +384,15 @@ export const toolSchemas = {
 
   analyze_jira_plan: {
     name: 'analyze_jira_plan',
-    description: 'Analyze hierarchy rollups for any parent issue. Walks the issue tree via GraphQL, computes rolled-up dates, points, progress, assignees, and detects date conflicts. Works on any Jira instance (no Plans/Premium required). For flat-set metrics use analyze_jira_issues; for structure without rollups use manage_jira_issue hierarchy.',
+    description: 'Analyze hierarchy rollups for any parent issue. Walks the issue tree via GraphQL, computes rolled-up dates, points, progress, assignees, and detects date conflicts. Results are cached server-side for fast re-analysis. Works on any Jira instance (no Plans/Premium required). For flat-set metrics use analyze_jira_issues (with dataRef to analyze cached plan data); for structure without rollups use manage_jira_issue hierarchy.',
     inputSchema: {
       type: 'object',
       properties: {
+        operation: {
+          type: 'string',
+          enum: ['analyze', 'release'],
+          description: 'Operation to perform. analyze (default): walk hierarchy and compute rollups. release: free cached walk data for this issueKey.',
+        },
         issueKey: {
           type: 'string',
           description: 'Issue key at the root of the plan tree (e.g., PROJ-100). Required.',
@@ -396,10 +405,14 @@ export const toolSchemas = {
           },
           description: 'Which rollup dimensions to include. Default: all.',
         },
+        focus: {
+          type: 'string',
+          description: 'Issue key to focus on within the cached plan. Shows the node, its parent, siblings, and children — a windowed view for navigating large plans. Requires a completed walk.',
+        },
         mode: {
           type: 'string',
-          enum: ['rollup', 'gaps', 'timeline'],
-          description: 'Output focus. rollup (default): full tree with own vs derived values. gaps: missing/conflicting data only. timeline: date-sorted chronological view.',
+          enum: ['rollup', 'gaps'],
+          description: 'Output mode. rollup (default): summary + entry points. gaps: conflicts and missing data only.',
         },
       },
       required: ['issueKey'],
