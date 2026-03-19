@@ -209,3 +209,24 @@ export interface RollupConflict {
   type: 'due_date' | 'start_date' | 'resolved_with_open_children';
   message: string;
 }
+
+// Graph Object Cache types (ADR-207)
+
+export type CachedWalkState = 'walking' | 'complete' | 'stale';
+
+export interface CachedWalk {
+  rootKey: string;
+  tree: GraphTreeNode;
+  flatIndex: Map<string, GraphIssue>;
+  state: CachedWalkState;
+  itemCount: number;
+  createdEpoch: number;
+  walkPromise?: Promise<void>;
+}
+
+export interface CacheStatus {
+  state: CachedWalkState | 'not_found';
+  itemCount: number;
+  totalCount?: number;
+  stale: boolean;
+}

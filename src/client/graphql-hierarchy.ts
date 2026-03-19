@@ -63,9 +63,15 @@ export class GraphQLHierarchyWalker {
   private client: GraphQLClient;
   private itemCount = 0;
   private truncated = false;
+  private onProgress?: (count: number) => void;
 
   constructor(client: GraphQLClient) {
     this.client = client;
+  }
+
+  /** Get current item count (useful for progress reporting during async walks). */
+  getItemCount(): number {
+    return this.itemCount;
   }
 
   /**
@@ -76,9 +82,11 @@ export class GraphQLHierarchyWalker {
     issueKey: string,
     maxDepth = DEFAULT_MAX_DEPTH,
     maxItems = DEFAULT_MAX_ITEMS,
+    onProgress?: (count: number) => void,
   ): Promise<{ tree: GraphTreeNode; totalItems: number; truncated: boolean }> {
     this.itemCount = 0;
     this.truncated = false;
+    this.onProgress = onProgress;
 
     if (!ISSUE_KEY_PATTERN.test(issueKey)) {
       throw new Error(`Invalid issue key format: ${issueKey}`);
@@ -154,6 +162,7 @@ export class GraphQLHierarchyWalker {
 
       const issue = mapIssueNode(edge.node);
       this.itemCount++;
+      this.onProgress?.(this.itemCount);
 
       const childNode: GraphTreeNode = { issue, children: [] };
       parent.children.push(childNode);

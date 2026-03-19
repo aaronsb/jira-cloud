@@ -1,10 +1,12 @@
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+
+import type { GraphObjectCache } from '../client/graph-object-cache.js';
 import type { GraphQLClient } from '../client/graphql-client.js';
 import { GraphQLHierarchyWalker, collectLeaves, computeDepth, walkTree } from '../client/graphql-hierarchy.js';
 import type { JiraClient } from '../client/jira-client.js';
 import type { GraphTreeNode, RollupResult } from '../types/index.js';
-import { normalizeArgs } from '../utils/normalize-args.js';
 import { planNextSteps } from '../utils/next-steps.js';
+import { normalizeArgs } from '../utils/normalize-args.js';
 
 const ALL_ROLLUPS = ['dates', 'points', 'progress', 'assignees'];
 
@@ -12,6 +14,7 @@ export async function handlePlanRequest(
   _jiraClient: JiraClient,
   graphqlClient: GraphQLClient,
   request: { params: { name: string; arguments?: Record<string, unknown> } },
+  cache?: GraphObjectCache,
 ) {
   const args = normalizeArgs(request.params?.arguments ?? {});
   const issueKey = args.issueKey as string | undefined;
@@ -20,10 +23,78 @@ export async function handlePlanRequest(
     throw new McpError(ErrorCode.InvalidParams, 'issueKey is required for analyze_jira_plan');
   }
 
+  const operation = (args.operation as string) ?? 'analyze';
+
+  // Handle release operation
+  if (operation === 'release') {
+    if (!cache) {
+      return { content: [{ type: 'text', text: 'Cache not available.' }] };
+    }
+    const released = cache.release(issueKey);
+    return {
+      content: [{
+        type: 'text',
+        text: released
+          ? `Released cached walk for ${issueKey}.`
+          : `No cached walk found for ${issueKey}.`,
+      }],
+    };
+  }
+
   const rollups = (Array.isArray(args.rollups) ? args.rollups : ALL_ROLLUPS) as string[];
   const mode = (args.mode as string) ?? 'rollup';
 
-  // Walk the hierarchy via GraphQL
+  // Try cache-first path
+  if (cache) {
+    const status = cache.getStatus(issueKey);
+
+    if (status.state === 'walking') {
+      return {
+        content: [{
+          type: 'text',
+          text: `Walking hierarchy for ${issueKey}... ${status.itemCount} items collected so far.\nCall again to check progress or wait for completion.`,
+        }],
+      };
+    }
+
+    if (status.state === 'not_found') {
+      // Start a new walk and await it (first call triggers + waits)
+      const walk = cache.startWalk(issueKey, graphqlClient);
+      await walk.walkPromise;
+      const cached = cache.get(issueKey)!;
+      const rollupResult = GraphQLHierarchyWalker.computeRollups(cached.tree);
+      const output = renderPlanOutput(cached.tree, issueKey, cached.itemCount, false, rollups, mode, rollupResult);
+      return {
+        content: [{
+          type: 'text',
+          text: output + planNextSteps(issueKey, mode, rollupResult.conflicts, rollupResult),
+        }],
+      };
+    }
+
+    if (status.state === 'complete' || status.state === 'stale') {
+      const cached = cache.get(issueKey)!;
+      const rollupResult = GraphQLHierarchyWalker.computeRollups(cached.tree);
+      const staleNote = status.stale
+        ? '\n> **Note:** This data may be stale. Call again to refresh, or use `operation: "release"` to clear.\n'
+        : '';
+
+      // If stale, start a background re-walk
+      if (status.stale) {
+        cache.startWalk(issueKey, graphqlClient);
+      }
+
+      const output = renderPlanOutput(cached.tree, issueKey, cached.itemCount, false, rollups, mode, rollupResult);
+      return {
+        content: [{
+          type: 'text',
+          text: staleNote + output + planNextSteps(issueKey, mode, rollupResult.conflicts, rollupResult),
+        }],
+      };
+    }
+  }
+
+  // Fallback: no cache, walk synchronously (backward compat)
   const walker = new GraphQLHierarchyWalker(graphqlClient);
   let tree: GraphTreeNode;
   let totalItems: number;
@@ -39,10 +110,7 @@ export async function handlePlanRequest(
     throw new McpError(ErrorCode.InternalError, `Hierarchy walk failed: ${message}`);
   }
 
-  // Compute rollups
   const rollupResult = GraphQLHierarchyWalker.computeRollups(tree);
-
-  // Render output
   const output = renderPlanOutput(tree, issueKey, totalItems, truncated, rollups, mode, rollupResult);
 
   return {
@@ -128,7 +196,7 @@ export function renderRollupTree(
   const statusCat = node.issue.statusCategory.toLowerCase();
   const icon = statusCat === 'done' ? '✓' : statusCat === 'in progress' ? '●' : '○';
 
-  let label = `${icon} **${node.issue.key}**: ${node.issue.summary} [${node.issue.issueType}]`;
+  const label = `${icon} **${node.issue.key}**: ${node.issue.summary} [${node.issue.issueType}]`;
   lines.push(`${prefix}${connector}${label}`);
 
   const indent = prefix + (prefix === '' ? '' : (isLast ? '    ' : '│   '));
