@@ -405,10 +405,14 @@ export const toolSchemas = {
           },
           description: 'Which rollup dimensions to include. Default: all.',
         },
+        focus: {
+          type: 'string',
+          description: 'Issue key to focus on within the cached plan. Shows the node, its parent, siblings, and children — a windowed view for navigating large plans. Requires a completed walk.',
+        },
         mode: {
           type: 'string',
-          enum: ['rollup', 'gaps', 'timeline'],
-          description: 'Output focus. rollup (default): full tree with own vs derived values. gaps: missing/conflicting data only. timeline: date-sorted chronological view.',
+          enum: ['rollup', 'gaps'],
+          description: 'Output mode. rollup (default): summary + entry points. gaps: conflicts and missing data only.',
         },
       },
       required: ['issueKey'],

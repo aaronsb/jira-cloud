@@ -9,6 +9,7 @@ import { planNextSteps } from '../utils/next-steps.js';
 import { normalizeArgs } from '../utils/normalize-args.js';
 
 const ALL_ROLLUPS = ['dates', 'points', 'progress', 'assignees'];
+const MAX_CHILDREN_DISPLAY = 20;
 
 export async function handlePlanRequest(
   _jiraClient: JiraClient,
@@ -43,6 +44,7 @@ export async function handlePlanRequest(
 
   const rollups = (Array.isArray(args.rollups) ? args.rollups : ALL_ROLLUPS) as string[];
   const mode = (args.mode as string) ?? 'rollup';
+  const focus = args.focus as string | undefined;
 
   // Try cache-first path
   if (cache) {
@@ -58,7 +60,6 @@ export async function handlePlanRequest(
     }
 
     if (status.state === 'not_found') {
-      // Start background walk, return immediately with status
       cache.startWalk(issueKey, graphqlClient);
       return {
         content: [{
@@ -70,27 +71,35 @@ export async function handlePlanRequest(
 
     if (status.state === 'complete' || status.state === 'stale') {
       const cached = cache.get(issueKey)!;
-      const rollupResult = GraphQLHierarchyWalker.computeRollups(cached.tree);
       const staleNote = status.stale
-        ? '\n> **Note:** This data may be stale. Call again to refresh, or use `operation: "release"` to clear.\n'
+        ? '> **Note:** This data may be stale. Call again to refresh, or use `operation: "release"` to clear.\n\n'
         : '';
 
-      // If stale, start a background re-walk
       if (status.stale) {
         cache.startWalk(issueKey, graphqlClient);
       }
 
-      const output = renderPlanOutput(cached.tree, issueKey, cached.itemCount, false, rollups, mode, rollupResult);
+      // Focus mode: windowed view of a specific node
+      if (focus) {
+        const output = renderFocusView(cached.tree, focus, rollups);
+        return { content: [{ type: 'text', text: staleNote + output }] };
+      }
+
+      // Default: summary + entry points (bounded)
+      const output = mode === 'gaps'
+        ? renderGapsSummary(cached.tree, rollups)
+        : renderOverview(cached.tree, issueKey, cached.itemCount, rollups);
+
       return {
         content: [{
           type: 'text',
-          text: staleNote + output + planNextSteps(issueKey, mode, rollupResult.conflicts, rollupResult),
+          text: staleNote + output + planNextSteps(issueKey, mode, GraphQLHierarchyWalker.computeRollups(cached.tree).conflicts, GraphQLHierarchyWalker.computeRollups(cached.tree)),
         }],
       };
     }
   }
 
-  // Fallback: no cache, walk synchronously (backward compat)
+  // Fallback: no cache, walk synchronously with original limits
   const walker = new GraphQLHierarchyWalker(graphqlClient);
   let tree: GraphTreeNode;
   let totalItems: number;
@@ -107,7 +116,7 @@ export async function handlePlanRequest(
   }
 
   const rollupResult = GraphQLHierarchyWalker.computeRollups(tree);
-  const output = renderPlanOutput(tree, issueKey, totalItems, truncated, rollups, mode, rollupResult);
+  const output = renderOverview(tree, issueKey, totalItems, rollups);
 
   return {
     content: [{
@@ -117,44 +126,227 @@ export async function handlePlanRequest(
   };
 }
 
-// --- Rendering ---
+// --- Rendering: Overview (summary + entry points) ---
 
-function renderPlanOutput(
+function renderOverview(
   tree: GraphTreeNode,
   issueKey: string,
   totalItems: number,
-  truncated: boolean,
   rollups: string[],
-  mode: string,
-  rollupResult: RollupResult,
 ): string {
   const lines: string[] = [];
   const depth = computeDepth(tree);
+  const rollupResult = GraphQLHierarchyWalker.computeRollups(tree);
 
   lines.push(`# Plan: ${issueKey} — ${tree.issue.summary}`);
-  lines.push(`Depth: ${depth} levels, ${totalItems} items`);
-  lines.push('Source: GraphQL hierarchy (computed rollups)');
-  if (truncated) {
-    lines.push('⚠️ Truncated — consider analyzing a narrower subtree');
-  }
+  lines.push(`${totalItems} items, ${depth} levels deep | cached`);
   lines.push('');
 
-  switch (mode) {
-    case 'gaps':
-      renderGaps(tree, lines, rollups, rollupResult);
-      break;
-    case 'timeline':
-      renderTimeline(tree, lines);
-      break;
-    default:
-      renderSummaryBlock(tree, lines, rollups, rollupResult);
-      lines.push('');
-      renderRollupTree(tree, lines, rollups, '', true);
-      break;
+  renderSummaryBlock(tree, lines, rollups, rollupResult);
+  lines.push('');
+
+  // Entry points: immediate children with their rollup summaries
+  if (tree.children.length > 0) {
+    lines.push('## Children');
+    lines.push('');
+    const shown = tree.children.slice(0, MAX_CHILDREN_DISPLAY);
+    for (const child of shown) {
+      renderNodeLine(child, lines, rollups);
+    }
+    if (tree.children.length > MAX_CHILDREN_DISPLAY) {
+      lines.push(`*...and ${tree.children.length - MAX_CHILDREN_DISPLAY} more — use \`focus\` to navigate*`);
+    }
+    lines.push('');
+    lines.push('*Use `focus: "ISSUE-KEY"` to explore any node and its neighborhood.*');
   }
 
   return lines.join('\n');
 }
+
+// --- Rendering: Focus (windowed view of a specific node) ---
+
+function findInTree(
+  node: GraphTreeNode,
+  key: string,
+  parent: GraphTreeNode | null = null,
+): { node: GraphTreeNode; parent: GraphTreeNode | null } | null {
+  if (node.issue.key === key) return { node, parent };
+  for (const child of node.children) {
+    const found = findInTree(child, key, node);
+    if (found) return found;
+  }
+  return null;
+}
+
+function renderFocusView(
+  tree: GraphTreeNode,
+  focusKey: string,
+  rollups: string[],
+): string {
+  const found = findInTree(tree, focusKey);
+  if (!found) {
+    return `Issue ${focusKey} not found in cached hierarchy. Available root: ${tree.issue.key}`;
+  }
+
+  const focusNode = found.node;
+  const parentNode = found.parent;
+
+  const lines: string[] = [];
+  const rollupResult = GraphQLHierarchyWalker.computeRollups(focusNode);
+
+  lines.push(`# Focus: ${focusNode.issue.key} — ${focusNode.issue.summary}`);
+  lines.push(`[${focusNode.issue.issueType}] ${focusNode.issue.status}`);
+  lines.push('');
+
+  // Parent context
+  if (parentNode) {
+    const parentRollup = GraphQLHierarchyWalker.computeRollups(parentNode);
+    lines.push(`**Parent:** ${parentNode.issue.key} — ${parentNode.issue.summary} [${parentNode.issue.issueType}]`);
+    lines.push(`  Progress: ${parentRollup.resolvedItems}/${parentRollup.totalItems} (${parentRollup.progressPct}%)`);
+    lines.push('');
+  }
+
+  // This node's details
+  renderSummaryBlock(focusNode, lines, rollups, rollupResult);
+  lines.push('');
+
+  // Siblings (if has parent)
+  if (parentNode) {
+    const siblings = parentNode.children.filter(c => c.issue.key !== focusKey);
+    if (siblings.length > 0) {
+      lines.push(`## Siblings (${siblings.length})`);
+      lines.push('');
+      const shown = siblings.slice(0, MAX_CHILDREN_DISPLAY);
+      for (const sib of shown) {
+        renderNodeLine(sib, lines, rollups);
+      }
+      if (siblings.length > MAX_CHILDREN_DISPLAY) {
+        lines.push(`*...and ${siblings.length - MAX_CHILDREN_DISPLAY} more*`);
+      }
+      lines.push('');
+    }
+  }
+
+  // Children
+  if (focusNode.children.length > 0) {
+    lines.push(`## Children (${focusNode.children.length})`);
+    lines.push('');
+    const shown = focusNode.children.slice(0, MAX_CHILDREN_DISPLAY);
+    for (const child of shown) {
+      renderNodeLine(child, lines, rollups);
+    }
+    if (focusNode.children.length > MAX_CHILDREN_DISPLAY) {
+      lines.push(`*...and ${focusNode.children.length - MAX_CHILDREN_DISPLAY} more*`);
+    }
+  } else {
+    lines.push('*Leaf node — no children*');
+  }
+
+  return lines.join('\n');
+}
+
+/** Render a single node as a compact line with rollup summary */
+function renderNodeLine(node: GraphTreeNode, lines: string[], rollups: string[]): void {
+  const statusCat = node.issue.statusCategory.toLowerCase();
+  const icon = statusCat === 'done' ? '✓' : statusCat === 'in progress' ? '●' : '○';
+
+  const parts: string[] = [];
+  parts.push(`${icon} **${node.issue.key}**: ${node.issue.summary} [${node.issue.issueType}]`);
+
+  const details: string[] = [];
+  if (node.children.length > 0) {
+    const rollup = GraphQLHierarchyWalker.computeRollups(node);
+    if (rollups.includes('progress')) {
+      details.push(`${rollup.resolvedItems}/${rollup.totalItems} (${rollup.progressPct}%)`);
+    }
+    if (rollups.includes('points') && rollup.totalPoints > 0) {
+      details.push(`${rollup.earnedPoints}/${rollup.totalPoints} pts`);
+    }
+    if (rollups.includes('dates') && (rollup.rolledUpStart || rollup.rolledUpEnd)) {
+      details.push(`${rollup.rolledUpStart ?? '—'} – ${rollup.rolledUpEnd ?? '—'}`);
+    }
+    if (rollup.conflicts.length > 0) {
+      details.push(`${rollup.conflicts.length} conflicts`);
+    }
+  } else {
+    if (node.issue.assignee) details.push(node.issue.assignee);
+    if (rollups.includes('dates') && (node.issue.startDate || node.issue.dueDate)) {
+      details.push(`${node.issue.startDate ?? '—'} – ${node.issue.dueDate ?? '—'}`);
+    }
+    if (rollups.includes('points') && node.issue.storyPoints != null) {
+      details.push(`${node.issue.storyPoints} pts`);
+    }
+  }
+
+  if (details.length > 0) {
+    lines.push(`- ${parts[0]}`);
+    lines.push(`  ${details.join(' | ')}`);
+  } else {
+    lines.push(`- ${parts[0]}`);
+  }
+}
+
+// --- Rendering: Gaps summary (bounded) ---
+
+function renderGapsSummary(
+  tree: GraphTreeNode,
+  rollups: string[],
+): string {
+  const lines: string[] = [];
+  const rollupResult = GraphQLHierarchyWalker.computeRollups(tree);
+
+  lines.push(`# Gaps: ${tree.issue.key} — ${tree.issue.summary}`);
+  lines.push('');
+
+  const gaps: string[] = [];
+
+  for (const c of rollupResult.conflicts) {
+    gaps.push(`- **${c.issueKey}** [${c.type}]: ${c.message}`);
+  }
+
+  walkTree(tree, (node) => {
+    if (node.children.length === 0) return;
+
+    if (rollups.includes('dates')) {
+      const undated = node.children.filter(c => !c.issue.startDate && !c.issue.dueDate);
+      const dated = node.children.length - undated.length;
+      if (undated.length > 0 && dated > 0) {
+        gaps.push(`- **${node.issue.key}**: ${undated.length}/${node.children.length} children have no dates`);
+      }
+    }
+
+    if (rollups.includes('points')) {
+      const unestimated = node.children.filter(c => c.issue.storyPoints == null);
+      const estimated = node.children.length - unestimated.length;
+      if (unestimated.length > 0 && estimated > 0) {
+        gaps.push(`- **${node.issue.key}**: ${unestimated.length}/${node.children.length} children have no story points`);
+      }
+    }
+
+    if (rollups.includes('assignees')) {
+      const unassigned = node.children.filter(c => !c.issue.assignee && !c.issue.isResolved);
+      if (unassigned.length > 0) {
+        gaps.push(`- **${node.issue.key}**: ${unassigned.length} active children unassigned`);
+      }
+    }
+  });
+
+  if (gaps.length === 0) {
+    lines.push('No gaps or conflicts detected.');
+  } else {
+    const unique = [...new Set(gaps)];
+    // Cap output to first 30 gaps
+    const shown = unique.slice(0, 30);
+    lines.push(...shown);
+    if (unique.length > 30) {
+      lines.push(`\n*...and ${unique.length - 30} more. Use \`focus\` on a specific subtree to narrow down.*`);
+    }
+  }
+
+  return lines.join('\n');
+}
+
+// --- Shared rendering ---
 
 function renderSummaryBlock(
   tree: GraphTreeNode,
@@ -181,6 +373,7 @@ function renderSummaryBlock(
   }
 }
 
+/** Full tree renderer — kept for analysis-handler hierarchy metric (small trees only) */
 export function renderRollupTree(
   node: GraphTreeNode,
   lines: string[],
@@ -232,95 +425,4 @@ export function renderRollupTree(
   node.children.forEach((child, i) => {
     renderRollupTree(child, lines, rollups, childPrefix, i === node.children.length - 1);
   });
-}
-
-function renderGaps(
-  tree: GraphTreeNode,
-  lines: string[],
-  rollups: string[],
-  rollupResult: RollupResult,
-): void {
-  lines.push('## Gaps and Conflicts\n');
-
-  const gaps: string[] = [];
-
-  // Conflicts from rollup computation
-  for (const c of rollupResult.conflicts) {
-    gaps.push(`- **${c.issueKey}**: ${c.message}`);
-  }
-
-  // Additional gap detection
-  walkTree(tree, (node) => {
-    if (node.children.length === 0) return;
-
-    if (rollups.includes('dates')) {
-      const undated = node.children.filter(c =>
-        !c.issue.startDate && !c.issue.dueDate
-      );
-      const dated = node.children.length - undated.length;
-      if (undated.length > 0 && dated > 0) {
-        gaps.push(`- **${node.issue.key}**: ${undated.length}/${node.children.length} children have no dates`);
-      }
-    }
-
-    if (rollups.includes('points')) {
-      const unestimated = node.children.filter(c => c.issue.storyPoints == null);
-      const estimated = node.children.length - unestimated.length;
-      if (unestimated.length > 0 && estimated > 0) {
-        gaps.push(`- **${node.issue.key}**: ${unestimated.length}/${node.children.length} children have no story points`);
-      }
-    }
-
-    if (rollups.includes('assignees')) {
-      const unassigned = node.children.filter(c =>
-        !c.issue.assignee && !c.issue.isResolved
-      );
-      if (unassigned.length > 0) {
-        gaps.push(`- **${node.issue.key}**: ${unassigned.length} active children unassigned`);
-      }
-    }
-  });
-
-  if (gaps.length === 0) {
-    lines.push('No gaps or conflicts detected.');
-  } else {
-    // Deduplicate (conflicts may overlap with gap detection)
-    const unique = [...new Set(gaps)];
-    lines.push(...unique);
-  }
-}
-
-function renderTimeline(tree: GraphTreeNode, lines: string[]): void {
-  lines.push('## Timeline\n');
-
-  const items: Array<{ key: string; title: string; start: string | null; due: string | null; depth: number; resolved: boolean }> = [];
-  function collect(node: GraphTreeNode, depth: number) {
-    items.push({
-      key: node.issue.key,
-      title: node.issue.summary,
-      start: node.issue.startDate,
-      due: node.issue.dueDate,
-      depth,
-      resolved: node.issue.isResolved,
-    });
-    for (const child of node.children) {
-      collect(child, depth + 1);
-    }
-  }
-  collect(tree, 0);
-
-  // Sort by start date (nulls last), then by due date
-  items.sort((a, b) => {
-    const aDate = a.start ?? a.due ?? 'z';
-    const bDate = b.start ?? b.due ?? 'z';
-    return aDate.localeCompare(bDate);
-  });
-
-  lines.push('| Item | Start | Due | Status |');
-  lines.push('|------|-------|-----|--------|');
-  for (const item of items) {
-    const indent = '  '.repeat(item.depth);
-    const status = item.resolved ? '✓' : '';
-    lines.push(`| ${indent}${item.key}: ${item.title} | ${item.start ?? '—'} | ${item.due ?? '—'} | ${status} |`);
-  }
 }
