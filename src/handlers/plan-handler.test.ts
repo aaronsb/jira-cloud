@@ -194,7 +194,7 @@ describe('conflictFixSteps', () => {
     expect(result).toContain('"operation":"update"');
   });
 
-  it('generates update for start date conflict', () => {
+  it('suggests manual lookup for start date conflict', () => {
     const conflicts: RollupConflict[] = [{
       issueKey: 'PROJ-2',
       type: 'start_date',
@@ -202,7 +202,7 @@ describe('conflictFixSteps', () => {
     }];
     const result = conflictFixSteps(conflicts, baseRollup);
     expect(result).toContain('PROJ-2');
-    expect(result).toContain('2026-01-15');
+    expect(result).toContain('jira://custom-fields');
   });
 
   it('suggests manual fix for resolved-with-open-children', () => {
@@ -218,14 +218,14 @@ describe('conflictFixSteps', () => {
     expect(result).not.toContain('"PROJ-3"');
   });
 
-  it('generates batch queue for multiple fixable conflicts', () => {
+  it('generates batch queue for multiple due date conflicts', () => {
     const conflicts: RollupConflict[] = [
       { issueKey: 'A-1', type: 'due_date', message: 'late' },
-      { issueKey: 'A-2', type: 'start_date', message: 'early' },
+      { issueKey: 'A-3', type: 'due_date', message: 'also late' },
     ];
     const result = conflictFixSteps(conflicts, baseRollup);
     expect(result).toContain('Fix all date conflicts');
     expect(result).toContain('A-1');
-    expect(result).toContain('A-2');
+    expect(result).toContain('A-3');
   });
 });

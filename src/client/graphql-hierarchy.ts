@@ -35,30 +35,10 @@ const ISSUE_SEARCH_QUERY = `
   }
 `;
 
-const ISSUE_BY_ID_QUERY = `
-  query GetIssue($issueId: ID!) {
-    jira {
-      issueById(id: $issueId) {
-        key
-        summary
-        issueTypeField { issueType { name hierarchy { level } } }
-        statusField { status { name statusCategory { name } } }
-        assigneeField { user { name } }
-        dueDateField { date }
-        startDateField { date }
-        storyPointsField { number }
-        storyPointEstimateField { number }
-        isResolved
-        hasChildIssues
-        parentIssueField { parentIssue { key } }
-      }
-    }
-  }
-`;
-
 const DEFAULT_MAX_DEPTH = 4;
 const DEFAULT_MAX_ITEMS = 200;
 const PAGE_SIZE = 50;
+const ISSUE_KEY_PATTERN = /^[A-Z][A-Z0-9_]+-\d+$/;
 
 /** Map a raw AGG issue node to our clean GraphIssue type */
 function mapIssueNode(node: any): GraphIssue {
@@ -100,9 +80,10 @@ export class GraphQLHierarchyWalker {
     this.itemCount = 0;
     this.truncated = false;
 
-    // Fetch root issue via REST issue ID → ARI → issueById
-    // We need the numeric ID to build the ARI, but the caller gives us a key.
-    // Use issueSearch with a key-based JQL to get the root issue.
+    if (!ISSUE_KEY_PATTERN.test(issueKey)) {
+      throw new Error(`Invalid issue key format: ${issueKey}`);
+    }
+
     const rootResult = await this.client.query<any>(ISSUE_SEARCH_QUERY, {
       jql: `key = ${issueKey}`,
       first: 1,

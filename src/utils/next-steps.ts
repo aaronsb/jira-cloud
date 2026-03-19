@@ -244,8 +244,8 @@ export function conflictFixSteps(conflicts: import('../types/index.js').RollupCo
         break;
       case 'start_date':
         if (rollup.rolledUpStart) {
-          lines.push(`- Update ${conflict.issueKey} start date to ${rollup.rolledUpStart} — \`manage_jira_issue\` \`{ operation: "update", issueKey: "${conflict.issueKey}", customFields: { "customfield_10015": "${rollup.rolledUpStart}" } }\``);
-          fixOps.push({ tool: 'manage_jira_issue', args: { operation: 'update', issueKey: conflict.issueKey, customFields: { customfield_10015: rollup.rolledUpStart } } });
+          lines.push(`- Update ${conflict.issueKey} start date to ${rollup.rolledUpStart} — read \`jira://custom-fields\` to find the start date field ID, then use \`manage_jira_issue update\``);
+          // Don't auto-generate queue op for start date — field ID is instance-specific
         }
         break;
       case 'resolved_with_open_children':
