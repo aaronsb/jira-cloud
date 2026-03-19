@@ -380,7 +380,7 @@ export const toolSchemas = {
 
   analyze_jira_plan: {
     name: 'analyze_jira_plan',
-    description: 'Analyze Jira Plans (Advanced Roadmaps) rollups for hierarchy items. Shows Atlassian-derived dates, point totals, progress, and date conflicts by querying the Plans rollup engine. Requires the issue to be in a configured Plan. For flat-set metrics use analyze_jira_issues; for structure without rollups use manage_jira_issue hierarchy.',
+    description: 'Analyze hierarchy rollups for any parent issue. Walks the issue tree via GraphQL, computes rolled-up dates, points, progress, assignees, and detects date conflicts. Works on any Jira instance (no Plans/Premium required). For flat-set metrics use analyze_jira_issues; for structure without rollups use manage_jira_issue hierarchy.',
     inputSchema: {
       type: 'object',
       properties: {
