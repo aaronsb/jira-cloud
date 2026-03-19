@@ -72,6 +72,7 @@ export function issueNextSteps(operation: string, issueKey?: string): string {
     case 'hierarchy':
       steps.push(
         { description: 'View a specific issue from the tree', tool: 'manage_jira_issue', example: { operation: 'get', issueKey } },
+        { description: 'Analyze plan rollups (requires Jira Plans)', tool: 'analyze_jira_plan', example: { issueKey } },
         { description: 'Search for issues in this project', tool: 'manage_jira_filter', example: { operation: 'execute_jql', jql: `project = "${issueKey?.split('-')[0]}"` } },
       );
       break;
@@ -203,6 +204,24 @@ export function boardNextSteps(operation: string, boardId?: number): string {
   return steps.length > 0 ? formatSteps(steps) : '';
 }
 
+export function planNextSteps(issueKey: string, mode?: string): string {
+  const steps: NextStep[] = [];
+  steps.push(
+    { description: 'View the issue details', tool: 'manage_jira_issue', example: { operation: 'get', issueKey } },
+    { description: 'Explore the hierarchy tree', tool: 'manage_jira_issue', example: { operation: 'hierarchy', issueKey } },
+  );
+  if (mode !== 'gaps') {
+    steps.push({ description: 'Check for data gaps and conflicts', tool: 'analyze_jira_plan', example: { issueKey, mode: 'gaps' } });
+  }
+  if (mode !== 'timeline') {
+    steps.push({ description: 'View the timeline', tool: 'analyze_jira_plan', example: { issueKey, mode: 'timeline' } });
+  }
+  steps.push(
+    { description: 'Run flat metrics on children', tool: 'analyze_jira_issues', example: { jql: `parent = ${issueKey}`, metrics: ['summary'], groupBy: 'assignee' } },
+  );
+  return formatSteps(steps);
+}
+
 export function analysisNextSteps(jql: string, issueKeys: string[], truncated = false, groupBy?: string, filterSource?: string): string {
   const steps: NextStep[] = [];
   if (issueKeys.length > 0) {
@@ -237,6 +256,12 @@ export function analysisNextSteps(jql: string, issueKeys: string[], truncated = 
     steps.push(
       { description: 'Distribution counts above are approximate (issue cap hit). For exact breakdowns use summary + groupBy', tool: 'analyze_jira_issues', example: { jql, metrics: ['summary'], groupBy: 'assignee' } },
       { description: 'Or narrow JQL for precise detail metrics', tool: 'analyze_jira_issues', example: { jql: `${jql} AND assignee = currentUser()`, metrics: ['cycle'] } },
+    );
+  }
+  // Suggest plan analysis when issue keys suggest hierarchical structure
+  if (issueKeys.length > 0) {
+    steps.push(
+      { description: 'Analyze plan rollups for a parent issue (requires Jira Plans)', tool: 'analyze_jira_plan', example: { issueKey: issueKeys[0] } },
     );
   }
   // Suggest saving as filter if not already using one

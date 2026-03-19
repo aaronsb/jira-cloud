@@ -16,8 +16,10 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 
 import { fieldDiscovery } from './client/field-discovery.js';
+import { discoverCloudId, GraphQLClient } from './client/graphql-client.js';
 import { JiraClient } from './client/jira-client.js';
 import { handleAnalysisRequest } from './handlers/analysis-handler.js';
+import { handlePlanRequest } from './handlers/plan-handler.js';
 import { handleBoardRequest } from './handlers/board-handlers.js';
 import { handleFilterRequest } from './handlers/filter-handlers.js';
 import { handleIssueRequest } from './handlers/issue-handlers.js';
@@ -51,6 +53,7 @@ const { version } = require('../package.json');
 class JiraServer {
   private server: Server;
   private jiraClient: JiraClient;
+  private graphqlClient: GraphQLClient | null = null;
 
   constructor() {
     const serverName = process.env.MCP_SERVER_NAME || 'jira-cloud';
@@ -81,6 +84,16 @@ class JiraServer {
     // Start async field discovery (non-blocking)
     fieldDiscovery.startAsync(this.jiraClient.v3Client);
 
+    // Discover cloudId for GraphQL/Plans API (non-blocking)
+    discoverCloudId(JIRA_HOST!, JIRA_EMAIL!, JIRA_API_TOKEN!).then(cloudId => {
+      if (cloudId) {
+        this.graphqlClient = new GraphQLClient(JIRA_EMAIL!, JIRA_API_TOKEN!, cloudId);
+        console.error(`[jira-cloud] GraphQL client ready (cloudId: ${cloudId.slice(0, 8)}...)`);
+      } else {
+        console.error('[jira-cloud] GraphQL/Plans unavailable — analyze_jira_plan disabled');
+      }
+    }).catch(() => {});
+
     this.server.onerror = (error) => console.error('[MCP Error]', error);
     process.on('SIGINT', async () => {
       await this.server.close();
@@ -92,6 +105,7 @@ class JiraServer {
     // Set up required MCP protocol handlers
     this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
       tools: Object.entries(toolSchemas)
+        .filter(([key]) => key !== 'analyze_jira_plan' || this.graphqlClient !== null)
         .map(([key, schema]) => ({
           name: key,
           description: schema.description,
@@ -149,6 +163,9 @@ class JiraServer {
         const handlers: Record<string, (client: JiraClient, req: typeof request) => Promise<any>> = {
           ...toolHandlers,
           queue_jira_operations: createQueueHandler(toolHandlers, JIRA_HOST),
+          ...(this.graphqlClient ? {
+            analyze_jira_plan: (_client, req) => handlePlanRequest(this.jiraClient, this.graphqlClient!, req),
+          } : {}),
         };
 
         const handler = handlers[name];

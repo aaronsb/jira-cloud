@@ -155,3 +155,39 @@ export interface SprintResponse {
   goal?: string;
   boardId: number;
 }
+
+// GraphQL / Plan types (ADR-207)
+
+export interface GraphQLResponse<T> {
+  data?: T;
+  errors?: Array<{ message: string; path?: string[] }>;
+}
+
+export interface TenantContext {
+  cloudId: string;
+}
+
+export interface RoadmapItem {
+  id: string;
+  title: string;
+  issueKey: string | null;
+  issueId: string | null;
+  status: { statusCategory: string } | null;
+  childItems: Array<{ id: string }>;
+  schedule: { startDate: string | null; dueDate: string | null } | null;
+  storyPoints: number | null;
+  assignee: { displayName: string } | null;
+}
+
+export interface DerivedField {
+  itemId: string;
+  derivedStartDate: string | null;
+  derivedDueDate: string | null;
+  derivedProgress: number | null;
+}
+
+export interface PlanNode {
+  item: RoadmapItem;
+  derived: DerivedField | null;
+  children: PlanNode[];
+}

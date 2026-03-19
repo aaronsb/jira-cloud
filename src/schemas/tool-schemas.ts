@@ -378,6 +378,34 @@ export const toolSchemas = {
     },
   },
 
+  analyze_jira_plan: {
+    name: 'analyze_jira_plan',
+    description: 'Analyze Jira Plans (Advanced Roadmaps) rollups for hierarchy items. Shows Atlassian-derived dates, point totals, progress, and date conflicts by querying the Plans rollup engine. Requires the issue to be in a configured Plan. For flat-set metrics use analyze_jira_issues; for structure without rollups use manage_jira_issue hierarchy.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        issueKey: {
+          type: 'string',
+          description: 'Issue key at the root of the plan tree (e.g., PROJ-100). Required.',
+        },
+        rollups: {
+          type: 'array',
+          items: {
+            type: 'string',
+            enum: ['dates', 'points', 'progress', 'assignees'],
+          },
+          description: 'Which rollup dimensions to include. Default: all.',
+        },
+        mode: {
+          type: 'string',
+          enum: ['rollup', 'gaps', 'timeline'],
+          description: 'Output focus. rollup (default): full tree with own vs derived values. gaps: missing/conflicting data only. timeline: date-sorted chronological view.',
+        },
+      },
+      required: ['issueKey'],
+    },
+  },
+
   queue_jira_operations: {
     name: 'queue_jira_operations',
     description: 'Execute multiple Jira operations in a single call. Operations run sequentially with result references ($0.key) and per-operation error strategies (bail/continue). Powerful for analysis pipelines: create a filter, then run multiple analyze_jira_issues calls against $0.filterId with different groupBy/compute — all in one call.',

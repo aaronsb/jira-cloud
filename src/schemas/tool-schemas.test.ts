@@ -9,10 +9,10 @@ const DOMAIN_TOOLS = [
   'manage_jira_sprint',
 ];
 
-const ALL_TOOLS = [...DOMAIN_TOOLS, 'analyze_jira_issues', 'queue_jira_operations'];
+const ALL_TOOLS = [...DOMAIN_TOOLS, 'analyze_jira_issues', 'analyze_jira_plan', 'queue_jira_operations'];
 
 describe('toolSchemas', () => {
-  it('exports all 7 tools', () => {
+  it('exports all 8 tools', () => {
     expect(Object.keys(toolSchemas).sort()).toEqual(ALL_TOOLS.sort());
   });
 
