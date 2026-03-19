@@ -9,6 +9,7 @@ import type { CachedWalk, CacheStatus, GraphIssue, GraphTreeNode } from '../type
 export const MAX_ITEMS = 10_000;
 export const MAX_WALKS = 5;
 export const STALE_EPOCH_DELTA = 100;
+export const DEFAULT_WALK_DEPTH = 3;
 
 export class GraphObjectCache {
   readonly walks = new Map<string, CachedWalk>();
@@ -71,7 +72,7 @@ export class GraphObjectCache {
 
     // Start async walk with progress reporting
     const walker = new GraphQLHierarchyWalker(graphqlClient);
-    cached.walkPromise = walker.walkDown(rootKey, 5, MAX_ITEMS, (count) => {
+    cached.walkPromise = walker.walkDown(rootKey, DEFAULT_WALK_DEPTH, MAX_ITEMS, (count) => {
       cached.itemCount = count;
     }).then(({ tree: walked, totalItems }) => {
       cached.tree = walked;
