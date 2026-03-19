@@ -71,7 +71,7 @@ export class GraphObjectCache {
 
     // Start async walk with progress reporting
     const walker = new GraphQLHierarchyWalker(graphqlClient);
-    cached.walkPromise = walker.walkDown(rootKey, 8, MAX_ITEMS, (count) => {
+    cached.walkPromise = walker.walkDown(rootKey, 5, MAX_ITEMS, (count) => {
       cached.itemCount = count;
     }).then(({ tree: walked, totalItems }) => {
       cached.tree = walked;

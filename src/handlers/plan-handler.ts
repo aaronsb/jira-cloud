@@ -58,16 +58,12 @@ export async function handlePlanRequest(
     }
 
     if (status.state === 'not_found') {
-      // Start a new walk and await it (first call triggers + waits)
-      const walk = cache.startWalk(issueKey, graphqlClient);
-      await walk.walkPromise;
-      const cached = cache.get(issueKey)!;
-      const rollupResult = GraphQLHierarchyWalker.computeRollups(cached.tree);
-      const output = renderPlanOutput(cached.tree, issueKey, cached.itemCount, false, rollups, mode, rollupResult);
+      // Start background walk, return immediately with status
+      cache.startWalk(issueKey, graphqlClient);
       return {
         content: [{
           type: 'text',
-          text: output + planNextSteps(issueKey, mode, rollupResult.conflicts, rollupResult),
+          text: `Started hierarchy walk for ${issueKey}. Call again to check progress.\n\n*The walk runs in the background — subsequent calls will show progress or full results once complete.*`,
         }],
       };
     }
