@@ -126,6 +126,7 @@ export class JiraClient {
       this.customFields.startDate,
       this.customFields.storyPoints,
       'timeestimate',
+      ...(this.customFields.sprint ? [this.customFields.sprint] : []),
       'issuelinks',
     ];
   }
