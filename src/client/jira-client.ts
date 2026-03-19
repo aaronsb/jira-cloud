@@ -30,6 +30,7 @@ export class JiraClient {
   private customFields: {
     startDate: string;
     storyPoints: string;
+    sprint: string | null;
   };
 
   /** Expose the underlying Version3Client for field discovery and other direct API access */
@@ -38,7 +39,7 @@ export class JiraClient {
   }
 
   /** Expose custom field IDs for JQL construction outside the client */
-  get customFieldIds(): { startDate: string; storyPoints: string } {
+  get customFieldIds(): { startDate: string; storyPoints: string; sprint: string | null } {
     return this.customFields;
   }
 
@@ -60,7 +61,13 @@ export class JiraClient {
     this.customFields = {
       startDate: config.customFields?.startDate ?? 'customfield_10015',
       storyPoints: config.customFields?.storyPoints ?? 'customfield_10016',
+      sprint: config.customFields?.sprint ?? null,  // Discovered at runtime via field-discovery
     };
+  }
+
+  /** Update sprint field ID after runtime discovery */
+  setSprintFieldId(fieldId: string): void {
+    this.customFields.sprint = fieldId;
   }
 
   /** Standard Jira fields that require ADF format in v3 API */
@@ -119,8 +126,21 @@ export class JiraClient {
       this.customFields.startDate,
       this.customFields.storyPoints,
       'timeestimate',
+      ...(this.customFields.sprint ? [this.customFields.sprint] : []),
       'issuelinks',
     ];
+  }
+
+  /** Extract the most relevant sprint name from the sprint field array */
+  private extractSprintName(sprints: any): string | null {
+    if (!Array.isArray(sprints) || sprints.length === 0) return null;
+    // Prefer active sprint, then future, then most recent closed
+    const active = sprints.find((s: any) => s.state === 'active');
+    if (active) return active.name ?? null;
+    const future = sprints.find((s: any) => s.state === 'future');
+    if (future) return future.name ?? null;
+    // Fall back to last sprint in array (most recent)
+    return sprints[sprints.length - 1]?.name ?? null;
   }
 
   /** Maps a raw Jira API issue to our JiraIssueDetails shape */
@@ -160,6 +180,7 @@ export class JiraClient {
       startDate: fields?.[this.customFields.startDate] || null,
       storyPoints: fields?.[this.customFields.storyPoints] ?? null,
       timeEstimate: fields?.timeestimate ?? null,
+      sprint: this.customFields.sprint ? this.extractSprintName(fields?.[this.customFields.sprint]) : null,
       issueLinks: (fields?.issuelinks || []).map((link: any) => ({
         type: link.type?.name || '',
         outward: link.outwardIssue?.key || null,
@@ -612,6 +633,7 @@ export class JiraClient {
         'status', 'resolution', 'labels', 'created', 'updated',
         'resolutiondate', 'statuscategorychangedate', 'duedate', 'timeestimate',
         this.customFields.startDate, this.customFields.storyPoints,
+        ...(this.customFields.sprint ? [this.customFields.sprint] : []),
       ];
 
       const params: any = {

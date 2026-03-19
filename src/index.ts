@@ -103,7 +103,13 @@ class JiraServer {
     this.setupHandlers();
 
     // Start async field discovery (non-blocking)
-    fieldDiscovery.startAsync(this.jiraClient.v3Client);
+    fieldDiscovery.startAsync(this.jiraClient.v3Client).then(() => {
+      const sprintId = fieldDiscovery.getWellKnownFieldId('sprint');
+      if (sprintId) {
+        this.jiraClient.setSprintFieldId(sprintId);
+        console.error(`[jira-cloud] Sprint field: ${sprintId}`);
+      }
+    }).catch(() => {});
 
     // CloudId discovery happens in run() before server connects — must complete
     // before ListTools so analyze_jira_plan is registered if available.

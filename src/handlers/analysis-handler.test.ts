@@ -26,6 +26,7 @@ function makeIssue(overrides: Partial<JiraIssueDetails> = {}): JiraIssueDetails 
     startDate: null,
     storyPoints: null,
     timeEstimate: null,
+    sprint: null,
     issueLinks: [],
     ...overrides,
   };
@@ -445,12 +446,12 @@ describe('extractDimensions', () => {
     expect(project.count).toBe(2);
   });
 
-  it('extracts all six dimensions', () => {
+  it('extracts all seven dimensions', () => {
     const issues = [
       makeIssue({ key: 'AA-1', status: 'Backlog', assignee: 'Alice', priority: 'High', issueType: 'Story' }),
     ];
     const dims = extractDimensions(issues);
-    expect(dims.map(d => d.name)).toEqual(['project', 'status', 'assignee', 'priority', 'issuetype', 'parent']);
+    expect(dims.map(d => d.name)).toEqual(['project', 'status', 'assignee', 'priority', 'issuetype', 'parent', 'sprint']);
   });
 
   it('sorts values by count descending', () => {

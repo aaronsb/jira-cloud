@@ -16,7 +16,7 @@ type MetricGroup = 'points' | 'time' | 'schedule' | 'cycle' | 'distribution' | '
 
 const ALL_METRICS: MetricGroup[] = ['points', 'time', 'schedule', 'cycle', 'distribution'];
 // flow and hierarchy are opt-in only
-const VALID_GROUP_BY = ['project', 'assignee', 'priority', 'issuetype', 'parent'] as const;
+const VALID_GROUP_BY = ['project', 'assignee', 'priority', 'issuetype', 'parent', 'sprint'] as const;
 type GroupByField = typeof VALID_GROUP_BY[number];
 const MAX_ISSUES_HARD = 500;   // absolute ceiling for detail metrics — beyond this, context explodes
 const MAX_ISSUES_DEFAULT = 100;
@@ -334,6 +334,11 @@ export function renderDistribution(issues: JiraIssueDetails[], groupLimit = DEFA
   const byType = countBy(issues, i => i.issueType || 'Unknown');
   lines.push(`**By type:** ${mapToString(byType, ' | ', groupLimit)}`);
 
+  const bySprint = countBy(issues, i => i.sprint || '(no sprint)');
+  if (bySprint.size > 1 || !bySprint.has('(no sprint)')) {
+    lines.push(`**By sprint:** ${mapToString(bySprint, ' | ', groupLimit)}`);
+  }
+
   return lines.join('\n');
 }
 
@@ -550,6 +555,10 @@ export function groupByJqlClause(dimension: GroupByField, values: string[]): str
       return values.map(v =>
         v === '(no parent)' ? 'issue not in childIssuesOf("")' : `parent = ${v}`
       );
+    case 'sprint':
+      return values.map(v =>
+        v === '(no sprint)' ? 'sprint is EMPTY' : `sprint = "${v}"`
+      );
   }
 }
 
@@ -753,6 +762,7 @@ export function extractDimensions(issues: JiraIssueDetails[], groupLimit = DEFAU
     { name: 'priority', extractor: i => i.priority || 'None' },
     { name: 'issuetype', extractor: i => i.issueType || 'Unknown' },
     { name: 'parent', extractor: i => i.parent || '(no parent)' },
+    { name: 'sprint', extractor: i => i.sprint || '(no sprint)' },
   ];
 
   return dims.map(({ name, extractor }) => {
@@ -954,6 +964,7 @@ function graphIssueToDetails(issue: GraphIssue): JiraIssueDetails {
     dueDate: issue.dueDate,
     startDate: issue.startDate,
     storyPoints: issue.storyPoints,
+    sprint: null,
     timeEstimate: null,
     issueLinks: [],
   };
