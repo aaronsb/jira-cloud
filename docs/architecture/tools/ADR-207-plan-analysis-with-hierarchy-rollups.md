@@ -1,14 +1,15 @@
 ---
 status: Draft
-date: 2026-03-18
+date: 2026-03-19
 deciders:
   - aaronsb
 related:
   - ADR-200
   - ADR-204
+  - ADR-206
 ---
 
-# ADR-207: Plan analysis via Atlassian GraphQL rollups
+# ADR-207: Plan analysis via GraphQL hierarchy traversal
 
 ## Context
 
@@ -21,19 +22,6 @@ Our existing tools don't do this:
 
 When a user asks "when will this epic actually finish?" or "how much work is left under this initiative?", the LLM must manually fetch children, extract dates, and do the math — the same arithmetic problem ADR-204 solved for flat sets.
 
-The real question is date and schedule coherence across hierarchy levels: intermediate items (epics, features) often lack direct dates or estimates because they're meant to be derived from their children. Without rollups, these gaps look like missing data rather than intentional delegation.
-
-### What Jira Plans Does
-
-Plans constructs rollups across these dimensions:
-- **Dates**: Start date = earliest child start; end date = latest child due
-- **Story points**: Sum of children's points
-- **Time estimates**: Sum of children's time
-- **Progress**: Resolved children / total children (and by points)
-- **Assignments/Teams**: Union of children's assignees
-
-It also detects conflicts: a parent with a due date earlier than its latest child, or an epic marked done while children remain open.
-
 ### Why a Separate Tool
 
 The input model, traversal pattern, and output shape are fundamentally different from `analyze_jira_issues`:
@@ -42,317 +30,189 @@ The input model, traversal pattern, and output shape are fundamentally different
 |-----------|----------------------|---------------|
 | **Input** | JQL query (flat set) | Root issue key |
 | **Data shape** | Statistical tables | Tree with aggregated values |
-| **Data source** | REST search API | GraphQL `roadmaps` queries |
+| **Data source** | REST search API | GraphQL hierarchy walk |
 | **Core question** | "What patterns exist in these issues?" | "What does this plan actually imply?" |
 | **Output** | Metrics, distributions, counts | Tree with own vs rolled-up values + conflicts |
 
-### Why GraphQL, Not REST
+### Why GraphQL (Atlassian Gateway Graph)
 
-Atlassian exposes a unified GraphQL API at `https://api.atlassian.com/graphql` (Atlassian Gateway Graph / AGG) that spans all cloud products. The `roadmaps` root query provides direct access to plan/rollup data:
+Atlassian exposes a unified GraphQL API at `https://api.atlassian.com/graphql` (AGG). Live testing against a real Jira Cloud instance confirmed that the following work with **standard API token authentication**:
 
-| Query | Purpose |
-|-------|---------|
-| `roadmapForSource` | Get a roadmap by its backing source (project, board) |
-| `roadmapItemByIds` | Fetch specific roadmap items with their fields |
-| `roadmapFilterItems` | Filtered views of roadmap items |
-| `roadmapDeriveFields` | **Computed/derived fields** — Atlassian's own rollup engine |
-| `roadmapSubtasksByIds` | Subtask hierarchy with status categories |
+| Capability | Query | Opt-in Required |
+|---|---|---|
+| CloudId discovery | `tenantContexts(hostNames: [...])` | None |
+| Plan discovery | `jira.recentPlans` | `@optIn(to: "JiraPlan")` + header |
+| Plan metadata | `jira.planById(id: $ari)` | `@optIn(to: "JiraPlan")` + header |
+| Issue by ID | `jira.issueById(id: $ari)` | None |
+| JQL search | `jira.issueSearch(issueSearchInput: {jql: $jql})` | `@optIn(to: "JiraSpreadsheetComponent-M1")` |
+| All issue fields | status, dates, points, assignee, type, hierarchy level | None |
+| Plan view fields | `startDateViewField` / `endDateViewField` | `@optIn(to: "JiraPlansSupport")` |
+| Has children | `hasChildIssues` boolean | None |
+| Is resolved | `isResolved` boolean | None |
+| Parent link | `parentIssueField.parentIssue` | None |
 
-The `roadmapDeriveFields` query returns the same rolled-up values that the Plans UI displays. Atlassian has already solved the rollup problem; we query the answer rather than recomputing it.
+**Required HTTP headers:**
+- `X-ExperimentalApi: JiraPlan,JiraPlansSupport` for plan-related queries
+- Standard Basic auth with existing `JIRA_EMAIL` + `JIRA_API_TOKEN`
 
-**Why not recompute rollups from REST data?** Two code paths doubles implementation and testing cost. Worse, our computed rollups would diverge from what users see in Plans — Atlassian handles edge cases around partial estimation, cross-project plans, and custom hierarchy levels that we'd need to reverse-engineer. And if Plans isn't configured, there are no rollups to compute — the existing `getHierarchy()` already covers the "show me structure" case.
+**What does NOT work with API tokens:**
+- `roadmaps.*` queries — 401 from underlying roadmaps service (requires session auth)
+- `planScenarioValues` — returns null (field exists, no error, but data withheld)
 
-### Connection Requirements
+These limitations don't matter because we compute rollups ourselves from the raw hierarchy data.
 
-The GraphQL endpoint uses the same basic auth credentials (`email:apiToken`) we already have. The one additional requirement is **cloudId discovery** — the GraphQL API is multi-tenant and requires a cloud identifier to route queries:
+### Why Not REST
 
-```graphql
-query GetTenantContexts($hostNames: [String!]!) {
-  tenantContexts(hostNames: $hostNames) {
-    cloudId
-  }
-}
-```
+The GraphQL path has structural advantages over our existing REST hierarchy walker:
 
-The hostname comes from our existing `JIRA_HOST` environment variable. CloudId is resolved once and cached for the session. No new environment variables required.
+1. **Single-query field richness** — REST `getHierarchy()` fetches 4 fields per node, then needs a separate bulk enrichment call. GraphQL returns all fields in the hierarchy walk query itself.
+2. **JQL-based child discovery** — `parent = KEY` via `issueSearch` returns paginated, sortable results. REST requires BFS with per-node child fetches.
+3. **`hasChildIssues` flag** — tells us whether to recurse without an extra API call.
+4. **Data cube integration** — the same `issueSearch` query powers both flat analysis and hierarchy walks, enabling a future where the data cube understands tree structure (ADR-206).
 
-### Reference Implementation
+### ARI Format Discovery
 
-The `atlassian-graph` MCP server demonstrates the full pattern:
-- `src/site-config.js` — cloudId discovery via `tenantContexts` query
-- `src/graphql-client.js` — GraphQL client with auth and automatic cloudId injection
-- 200+ roadmap/plan/hierarchy-related types in the AGG schema
+The GraphQL API uses Atlassian Resource Identifiers (ARIs). Live testing revealed:
 
-We borrow the patterns, not the dependency.
+- **Issue ARI**: `ari:cloud:jira:${cloudId}:issue/${numericIssueId}`
+- **Plan ARI**: `ari:cloud:jira:${cloudId}:plan/activation/${activationUUID}/${planId}` — the activation UUID is not guessable; must be discovered via `recentPlans`
+- CloudId discovered via `tenantContexts` query at startup
 
 ## Decision
 
-Add a new tool `analyze_jira_plan` that queries Atlassian's GraphQL API for plan-level rollup data. The tool requires Jira Plans (Advanced Roadmaps) to be configured for the target issues. No REST fallback — if an issue isn't in a plan, the tool says so clearly and steers to the right alternative.
+Build a **reusable GraphQL hierarchy walker** that traverses issue hierarchies via AGG and computes bottom-up rollups. Expose it through:
 
-### Interface
+1. **`analyze_jira_plan`** — new tool for plan-level rollup views
+2. **Integration with `analyze_jira_issues`** — hierarchy-aware analysis for the data cube
+
+The walker is a standalone module (`src/client/graphql-hierarchy.ts`) that can be used by any handler.
+
+### GraphQL Client Updates
+
+The existing `src/client/graphql-client.ts` adds:
+- `X-ExperimentalApi: JiraPlan,JiraPlansSupport` header on all queries
+- CloudId discovery at startup (already implemented)
+
+### Hierarchy Walker Module
+
+```typescript
+// src/client/graphql-hierarchy.ts
+class GraphQLHierarchyWalker {
+  constructor(graphqlClient: GraphQLClient);
+
+  // Walk down from a root issue, collecting all descendants
+  async walkDown(issueKey: string, maxDepth?: number, maxItems?: number): Promise<HierarchyTree>;
+
+  // Compute rollups on a collected tree
+  computeRollups(tree: HierarchyTree, dimensions: string[]): RollupResult;
+}
+```
+
+**Walk algorithm:**
+1. Fetch root issue via `issueById` with full fields
+2. If `hasChildIssues`, query `issueSearch` with `parent = KEY`
+3. Recurse for each child that has children
+4. Cap at `maxDepth` (default 4) and `maxItems` (default 200)
+5. Return tree with all fields populated at every node
+
+**Rollup computation (bottom-up):**
+- **dates**: Earliest `startDate` among leaves → rolled-up start; latest `dueDate` → rolled-up end
+- **points**: Sum of leaf story points; by status category
+- **progress**: Resolved leaves / total leaves (count and point-weighted)
+- **assignees**: Distinct assignees across subtree
+- **conflicts**: Own due < rolled-up due, own start > rolled-up start
+
+### Tool Interface
 
 ```typescript
 {
   tool: "analyze_jira_plan",
   args: {
     issueKey: string,       // Required — root of the plan tree
-    rollups?: string[],     // Which rollups to compute
-                            // Default: all. Values: "dates", "points", "time", "progress", "assignees"
-    mode?: string           // Output focus: "rollup" (default), "gaps", "timeline"
+    rollups?: string[],     // Default: all. Values: "dates", "points", "progress", "assignees"
+    mode?: string           // "rollup" (default), "gaps", "timeline"
   }
 }
 ```
 
-Note: no `depth` parameter. The GraphQL API returns the full plan hierarchy as configured in Plans — depth is a plan configuration concern, not a query parameter.
-
-### Architecture: GraphQL Only
-
-```
-┌─────────────────────────────────┐
-│      analyze_jira_plan          │
-│  (tool interface)               │
-├─────────────────────────────────┤
-│        GraphQL Client           │
-│  cloudId discovery at startup   │
-│  Basic auth (existing creds)    │
-├─────────────────────────────────┤
-│   api.atlassian.com/graphql     │
-│   roadmaps.* queries            │
-└─────────────────────────────────┘
-```
-
-**Availability:**
-- CloudId discovery fails at startup → tool is not registered (log warning)
-- Issue not in any plan → clear error: "PROJ-123 is not in a Jira Plan. Use `manage_jira_issue hierarchy` for structure or `analyze_jira_issues` for flat metrics."
-
-### GraphQL Client
-
-A lightweight client (~50 lines, no framework dependency):
-
-```typescript
-// src/client/graphql-client.ts
-class GraphQLClient {
-  constructor(email: string, apiToken: string, cloudId: string);
-  async query<T>(query: string, variables?: Record<string, unknown>): Promise<T>;
-}
-```
-
-- POST to `https://api.atlassian.com/graphql`
-- Basic auth with existing credentials
-- Injects `cloudId` into query variables automatically
-- Returns typed responses
-
-### Key Queries
-
-#### 1. Resolve Roadmap from Issue
-
-```graphql
-query RoadmapForSource($cloudId: ID!, $sourceAri: ID!) {
-  roadmaps {
-    roadmapForSource(cloudId: $cloudId, sourceAri: $sourceAri) {
-      id
-      configuration { hierarchyConfiguration { levels } }
-    }
-  }
-}
-```
-
-#### 2. Get Derived Fields (Rollups)
-
-The core query — Atlassian computes the values:
-
-```graphql
-query DeriveFields($cloudId: ID!, $roadmapId: ID!, $itemIds: [ID!]!) {
-  roadmaps {
-    roadmapDeriveFields(
-      cloudId: $cloudId
-      roadmapId: $roadmapId
-      itemIds: $itemIds
-    ) {
-      itemId
-      derivedStartDate
-      derivedDueDate
-      derivedProgress
-    }
-  }
-}
-```
-
-#### 3. Get Roadmap Items with Hierarchy
-
-```graphql
-query RoadmapItems($cloudId: ID!, $roadmapId: ID!, $itemIds: [ID!]!) {
-  roadmaps {
-    roadmapItemByIds(
-      cloudId: $cloudId
-      roadmapId: $roadmapId
-      itemIds: $itemIds
-    ) {
-      id
-      title
-      status { statusCategory }
-      childItems { id }
-      schedule { startDate, dueDate }
-      storyPoints
-      assignee { displayName }
-    }
-  }
-}
-```
-
-### Rollup Dimensions
-
-#### `dates` — Schedule Window Rollup
-
-For each node with children:
-- **Rolled-up start**: Earliest `startDate` among descendants
-- **Rolled-up end**: Latest `dueDate` among descendants
-- **Own vs derived**: Show both the node's own dates and what Atlassian derives
-- **Conflicts**: Flag when own due date < derived due date, or own start > derived start
-
-#### `points` — Story Point Rollup
-
-- **Sum**: Total story points across descendants
-- **By status category**: To Do / In Progress / Done point subtotals
-- **Unestimated**: Count of descendants missing story points (estimation coverage)
-
-#### `time` — Time Estimate Rollup
-
-- **Sum**: Total `timeEstimate` across descendants
-- **By status category**: Remaining vs completed effort
-
-#### `progress` — Completion Rollup
-
-- **By count**: Resolved descendants / total descendants
-- **By points**: Resolved points / total points (weighted progress)
-- **By status category**: Distribution of children across To Do / In Progress / Done
-
-#### `assignees` — Team Rollup
-
-- **Team**: Distinct assignees across descendants
-- **Unassigned**: Count of unassigned descendants
-- **Workload**: Issue count per assignee under this subtree
-
-### Output Modes
-
-#### `rollup` (default) — Full Tree View
+### Output
 
 ```markdown
-# Plan: PROJ-100 — Q1 Platform Initiative
+# Plan: IP-89 — Game Production
 Depth: 3 levels, 47 issues
-Source: Atlassian Plans (derived fields)
+Source: GraphQL hierarchy (computed rollups)
 
-## PROJ-100: Q1 Platform Initiative [Epic]
-Status: In Progress
-Dates: own Jan 1 – Mar 31 | derived Jan 3 – Apr 15 ⚠️ CONFLICT (children end 15d late)
-Points: own — | derived 234 pts (89 earned)
-Progress: 18/47 resolved (38%) | by points 38%
-Team: alice, bob, carol, dave | 3 unassigned
+○ IP-89: Game Production [Value Stream]
+  Status: Active Item (To Do)
+  Dates: own — | rolled-up 2024-01-15 – 2025-03-31
+  Progress: 15/20 resolved (75%)
+  Team: alice, bob, carol | 3 unassigned
 
-├── PROJ-110: Auth Redesign [Story]
-│   Dates: own Jan 3 – Feb 15 | derived Jan 5 – Feb 20 ⚠️
-│   Points: own — | derived 55 pts (40 earned)
-│   Progress: 8/12 resolved (67%)
-│   ├── PROJ-111: OAuth provider [Sub-task] ✓ 8pts
-│   ├── PROJ-112: Session migration [Sub-task] ● 13pts due Feb 20
-│   └── ... (10 more)
-│
-├── PROJ-120: API v2 [Story]
-│   Dates: own Feb 1 – Mar 15 | derived Feb 3 – Apr 15 ⚠️
-│   Points: own — | derived 89 pts (21 earned)
-│   Progress: 4/20 resolved (20%)
-│   └── ...
+  ├── ● IP-446: GA COAM Games Production [Initiative]
+  │   Progress: 8/20 resolved (40%)
+  │   └── ...
+  ├── ● IP-459: South Dakota VLT Games Production [Initiative]
+  │   Progress: 2/20 resolved (10%)
+  │   └── ...
+  └── ✓ IP-472: Prototype for Flex C development [Initiative]
 ```
-
-#### `gaps` — What's Missing or Inconsistent
-
-Focuses on actionable problems:
-- Date conflicts between own values and derived values
-- Unestimated issues in otherwise-estimated subtrees
-- Open children under resolved parents
-- Assignee gaps in active subtrees
-
-#### `timeline` — Date-Focused View
-
-Chronological view of the plan's date windows, showing how child windows compose into parent windows. Highlights the critical path — the chain of children that determines the parent's derived end date.
-
-### ARI Mapping
-
-The GraphQL API uses Atlassian Resource Identifiers (ARIs) not issue keys. We need to map between them:
-
-- Issue key `PROJ-123` → ARI `ari:cloud:jira:${cloudId}:issue/${issueId}`
-- The numeric `issueId` comes from a REST lookup (we already fetch this when getting issue details)
-- Roadmap items reference issues by ARI, so responses need reverse mapping back to human-readable keys
 
 ### What This Does NOT Do
 
-- **Replace Jira Plans UI** — no Gantt charts, no drag-and-drop scheduling
-- **Write back rolled-up values** — read-only analysis (consistent with all our tools)
-- **Work without Plans** — requires Advanced Roadmaps; steers to hierarchy/analyze for instances without it
+- **Replace Jira Plans UI** — no Gantt charts, no drag-and-drop
+- **Write back rolled-up values** — read-only analysis
+- **Use Plans-computed rollups** — computes from raw issue data (more portable, works without Plans)
 - **Cross-plan comparison** — single root scope; user can run multiple analyses
-- **Dependency chain analysis** — issue links are a separate concern
-- **Historical rollups** — shows current state, not how the plan evolved over time
-
-### Schema Discovery (Future)
-
-The AGG schema is vast (388+ types, 200+ roadmap-related). For v1, we hardcode the specific queries we need. Future iterations could introspect the schema to discover available rollup fields dynamically — similar to how ADR-201 discovers custom fields via the REST API.
 
 ## Consequences
 
 ### Positive
 
-- Rollup values match what users see in the Jira Plans UI — no discrepancies from recomputing
-- `roadmapDeriveFields` handles edge cases we'd otherwise need to code: partial estimation, cross-project plans, custom hierarchy levels
+- **Works on any Jira Cloud instance** — doesn't require Plans/Premium license
+- **Reusable module** — hierarchy walker serves plan analysis, data cube, and future tools
+- **Single code path** — no REST/GraphQL dual-source complexity
+- **Computes rollups we control** — can add dimensions Atlassian doesn't offer
+- **Graph traversal is efficient** — JQL `parent = KEY` returns paginated children with all fields in one call
 - "What does this plan actually imply?" becomes a single tool call
-- No new credentials required — existing env vars are sufficient
-- Single code path — no dual-source complexity
-- Opens the door to other AGG capabilities: goals, cross-product search, DevOps metrics
 
 ### Negative
 
 - 8th tool in the catalog — increases tool selection surface
-- Requires Jira Plans (Advanced Roadmaps) — not available on all instances/tiers
-- New API surface to maintain — GraphQL queries need updating if Atlassian changes the schema
-- CloudId discovery adds a startup step (one extra HTTP call, cached for session)
-- Schema is large and beta-flagged — some queries may change without notice
-- ARIs add a mapping layer between issue keys and GraphQL identifiers
+- GraphQL API is experimental — requires opt-in headers/directives that may change
+- Rollup values may differ from Plans UI (we compute from raw data; Plans has its own logic)
+- Hierarchy walks are chatty — one query per parent level
+- Large trees (200+ items across 4+ levels) may hit rate limits
 
 ### Neutral
 
 - Tool is conditionally registered — only appears when GraphQL/cloudId is available
 - The GraphQL client is deliberately minimal — not a general-purpose AGG integration
-- `atlassian-graph` project serves as reference but is not a dependency
-- CloudId is a session-level concern, not per-request — discovered once at startup
+- `atlassian-graph` project serves as reference for patterns but is not a dependency
 - Tool description must clearly differentiate from `analyze_jira_issues` and `manage_jira_issue hierarchy`
-- Bidirectional steering: hierarchy can suggest plan analysis for rollups; plan analysis steers to hierarchy/analyze when Plans isn't available
-- The `filterId` pattern from analyze doesn't apply here — plan analysis is rooted in a specific issue, not a query
+- Bidirectional steering: hierarchy suggests plan analysis; plan analysis steers to hierarchy/analyze
 
 ## Alternatives Considered
 
-### A. REST-Only Rollups (Compute from Issue Fields)
+### A. Atlassian roadmaps.* GraphQL queries
 
-Traverse hierarchy via REST, fetch rich fields at each level, aggregate bottom-up. Works on any instance without Plans. **Rejected** — reinvents Atlassian's rollup logic, results diverge from Plans UI, doubles code paths. If Plans isn't configured, there are no rollups to compute; the existing hierarchy view covers the "show me structure" case. Not worth building a second rollup engine that will always be a worse approximation.
+Use `roadmapForSource`, `roadmapDeriveFields`, `roadmapItemByIds` for Atlassian-computed rollups. **Rejected** — the `roadmaps` service returns 401 for API token auth. Requires session/cookie auth which is a worse security story and more fragile. The data is also only available for issues in configured Plans.
 
-### B. Dual-Source with REST Fallback
+### B. planScenarioValues on JiraIssue
 
-Try GraphQL first, fall back to REST-computed rollups when Plans isn't available. **Rejected** — the fallback creates false confidence. REST-computed rollups for instances without Plans would invent semantics that the user never configured. Two code paths double maintenance and testing cost. Clear steering to the right tool is better than a degraded approximation.
+The `planScenarioValues` field exists on `JiraIssue` and returns plan-derived field values. **Rejected** — returns null with API token auth despite no error. Likely gated behind session auth. Even if it worked, it only returns values for issues explicitly in a Plan.
 
-### C. Add Rollup Mode to `analyze_jira_issues`
+### C. REST-only rollups via existing getHierarchy()
 
-Would require overloading the interface: sometimes it takes JQL (flat), sometimes an issue key (hierarchy). The input model, data source, and output shape are different enough that combining them creates a confusing "god tool." Rejected for the same reasons we split analysis from filter/issue tools.
+Enhance the existing REST hierarchy walker to fetch rich fields and compute rollups. **Rejected as primary path** — REST hierarchy fetches 4 fields per node requiring a separate bulk enrichment call. GraphQL returns all fields in the traversal query. REST remains as fallback if GraphQL is unavailable.
 
-### D. Add Rollup Fields to `manage_jira_issue hierarchy`
+### D. JPO REST API
 
-The hierarchy operation is intentionally lightweight — it shows structure for orientation. Adding computation there conflates "show me the tree" with "analyze the tree." Rejected to preserve the simplicity of hierarchy traversal.
+The Plans REST API (`/rest/jpo/1.0/plans/{id}`) returns plan configuration (sources, date fields, hierarchy config) but not plan content or computed values. **Retained for plan discovery** — useful for finding which plan an issue belongs to and what date fields it uses. Not sufficient for rollup data.
 
-### E. Let the LLM Compose Hierarchy + Analyze Calls
+### E. Depend on atlassian-graph MCP Server
 
-The LLM could fetch children via hierarchy, then run analyze on each subtree. But this requires multiple round-trips, the LLM must coordinate results across calls, and it still can't do bottom-up aggregation without arithmetic. This is exactly the "LLM doing math" problem ADR-204 identified. Rejected.
+Require users to run both MCP servers. **Rejected** — forces second server configuration, agent must coordinate across servers. We borrow patterns, not the dependency.
 
-### F. Depend on atlassian-graph MCP Server
+### F. OAuth 2.0 / Atlassian App for session-level access
 
-Require users to run both MCP servers and let them compose. Rejected — forces users to configure a second server, agent must coordinate across servers. We borrow the patterns, not the dependency.
-
-### G. Jira Plans REST API (`/rest/align/...`)
-
-The Plans feature has its own REST API separate from both standard Jira REST and AGG. Poorly documented, opaque data structures, not part of the public API contract. Rejected for stability and documentation concerns — AGG's `roadmaps` queries expose the same data through a supported interface.
+Create an Atlassian Connect/Forge app to get session-equivalent auth for `roadmaps` and `planScenarioValues`. **Rejected** — disproportionate complexity for the user (app registration, consent flow, token management), and Forge now bills execution time. The whole point of this MCP server is to work outside Atlassian's runtime.

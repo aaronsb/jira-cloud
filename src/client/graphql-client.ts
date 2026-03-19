@@ -94,6 +94,7 @@ export class GraphQLClient {
           'Authorization': this.authHeader,
           'Content-Type': 'application/json',
           'Accept': 'application/json',
+          'X-ExperimentalApi': 'JiraPlan,JiraPlansSupport',
         },
         body: JSON.stringify({
           query,
