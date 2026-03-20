@@ -104,10 +104,13 @@ class JiraServer {
 
     // Start async field discovery (non-blocking)
     fieldDiscovery.startAsync(this.jiraClient.v3Client).then(() => {
-      const sprintId = fieldDiscovery.getWellKnownFieldId('sprint');
-      if (sprintId) {
-        this.jiraClient.setSprintFieldId(sprintId);
-        console.error(`[jira-cloud] Sprint field: ${sprintId}`);
+      const wirable = ['sprint', 'storyPoints', 'startDate'] as const;
+      for (const name of wirable) {
+        const fieldId = fieldDiscovery.getWellKnownFieldId(name);
+        if (fieldId) {
+          this.jiraClient.setCustomFieldId(name, fieldId);
+          console.error(`[jira-cloud] ${name} field: ${fieldId}`);
+        }
       }
     }).catch(() => {});
 
@@ -253,6 +256,53 @@ class JiraServer {
                 'or ask them to perform the operation for you.',
               ].join('\n'),
             }],
+            isError: true,
+          };
+        }
+
+        if (status === 400) {
+          const fieldErrors = (error as any)?.response?.data?.errors;
+          const errorMessages = (error as any)?.response?.data?.errorMessages;
+
+          const lines = ['**Jira rejected this request:**'];
+          if (errorMessages?.length > 0) {
+            lines.push(...errorMessages.map((m: string) => `- ${m}`));
+          }
+          if (fieldErrors && Object.keys(fieldErrors).length > 0) {
+            lines.push('', '**Field errors:**');
+            for (const [field, msg] of Object.entries(fieldErrors)) {
+              lines.push(`- \`${field}\`: ${msg}`);
+            }
+          }
+
+          // On create failures, invalidate cache and append required fields guidance
+          const reqArgs = request.params.arguments as Record<string, unknown> | undefined;
+          if (reqArgs?.operation === 'create' && reqArgs?.projectKey) {
+            const pKey = reqArgs.projectKey as string;
+            fieldDiscovery.invalidateRequiredFields(pKey);
+            const iType = reqArgs.issueType as string | undefined;
+            try {
+              // Show valid issue types
+              const issueTypes = await fieldDiscovery.getIssueTypes(this.jiraClient.v3Client, pKey);
+              if (issueTypes.length > 0) {
+                lines.push('', `**Valid issue types for ${pKey}:** ${issueTypes.map(t => t.name).join(', ')}`);
+              }
+              // Show required fields for the requested type
+              if (iType) {
+                const required = await fieldDiscovery.getRequiredFields(this.jiraClient.v3Client, pKey, iType);
+                if (required.length > 0) {
+                  lines.push(`**Required fields for ${pKey}/${iType}:** ${required.map(f => {
+                    const vals = f.allowedValues ? ` (${f.schemaType}: ${f.allowedValues.slice(0, 5).join(', ')}${f.allowedValues.length > 5 ? '...' : ''})` : '';
+                    return f.name + vals;
+                  }).join(', ')}`);
+                }
+              }
+            } catch { /* best-effort */ }
+            lines.push('', '*Tip: Use `manage_jira_project get` to see valid issue types before creating.*');
+          }
+
+          return {
+            content: [{ type: 'text', text: lines.join('\n') }],
             isError: true,
           };
         }

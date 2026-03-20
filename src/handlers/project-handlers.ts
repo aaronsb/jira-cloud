@@ -1,5 +1,6 @@
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
+import { fieldDiscovery } from '../client/field-discovery.js';
 import { JiraClient } from '../client/jira-client.js';
 import { MarkdownRenderer, ProjectData } from '../mcp/markdown-renderer.js';
 import { projectNextSteps } from '../utils/next-steps.js';
@@ -123,6 +124,16 @@ async function handleGetProject(jiraClient: JiraClient, args: ManageJiraProjectA
     lead: project.lead || undefined,
   };
 
+  // Fetch issue types (always — essential context for creating issues)
+  try {
+    const issueTypes = await fieldDiscovery.getIssueTypes(jiraClient.v3Client, projectKey);
+    if (issueTypes.length > 0) {
+      projectData.issueTypes = issueTypes.map(t => ({ name: t.name, subtask: t.subtask }));
+    }
+  } catch {
+    // Non-fatal — continue without issue types
+  }
+
   // If status counts are requested, get them
   if (includeStatusCounts) {
     try {
@@ -188,6 +199,7 @@ async function handleGetProject(jiraClient: JiraClient, args: ManageJiraProjectA
     name: projectData.name,
     description: projectData.description,
     lead: projectData.lead,
+    issueTypes: projectData.issueTypes,
     statusCounts: projectData.statusCounts,
     boards: projectData.boards,
     recentIssues: projectData.recentIssues,

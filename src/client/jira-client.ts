@@ -65,9 +65,9 @@ export class JiraClient {
     };
   }
 
-  /** Update sprint field ID after runtime discovery */
-  setSprintFieldId(fieldId: string): void {
-    this.customFields.sprint = fieldId;
+  /** Update a custom field ID after runtime discovery */
+  setCustomFieldId(logicalName: 'startDate' | 'storyPoints' | 'sprint', fieldId: string): void {
+    this.customFields[logicalName] = fieldId;
   }
 
   /** Standard Jira fields that require ADF format in v3 API */
