@@ -67,7 +67,7 @@ mcpb: build     ## Build .mcpb desktop extension bundle
 	cp -r build/* mcpb/server/
 	cp package.json mcpb/server/package.json
 	cd mcpb/server && npm install --production --ignore-scripts --silent
-	rm -f mcpb/server/package.json mcpb/server/package-lock.json
+	rm -f mcpb/server/package-lock.json
 	mcpb pack mcpb jira-cloud-mcp.mcpb
 	@echo ""
 	@echo "Built: jira-cloud-mcp.mcpb ($$(du -h jira-cloud-mcp.mcpb | cut -f1))"

@@ -36,7 +36,11 @@ import type { GraphIssue } from './types/index.js';
 // Jira credentials from environment variables
 const JIRA_EMAIL = process.env.JIRA_EMAIL;
 const JIRA_API_TOKEN = process.env.JIRA_API_TOKEN;
-const JIRA_HOST = process.env.JIRA_HOST;
+// Normalize host: ensure https:// prefix, strip trailing slashes
+const rawHost = process.env.JIRA_HOST?.trim();
+const JIRA_HOST = rawHost
+  ? (rawHost.startsWith('http') ? rawHost : `https://${rawHost}`).replace(/\/+$/, '')
+  : undefined;
 
 if (!JIRA_EMAIL || !JIRA_API_TOKEN || !JIRA_HOST) {
   const missing = [
@@ -50,7 +54,8 @@ if (!JIRA_EMAIL || !JIRA_API_TOKEN || !JIRA_HOST) {
 }
 
 const require = createRequire(import.meta.url);
-const { version } = require('../package.json');
+let version = '0.0.0';
+try { version = require('../package.json').version; } catch { /* MCPB bundle — version unavailable */ }
 
 /** Map manage_jira_issue update args to GraphIssue field patches */
 function extractChangedFields(args: Record<string, unknown>): Partial<GraphIssue> {
