@@ -391,3 +391,141 @@ describe('FieldDiscovery.getContextFields', () => {
     expect(result).toHaveLength(2);
   });
 });
+
+describe('getIssueTypes', () => {
+  let discovery: FieldDiscovery;
+
+  beforeEach(() => {
+    discovery = new FieldDiscovery();
+  });
+
+  it('returns issue types for a project', async () => {
+    const client = {
+      issues: {
+        getCreateIssueMetaIssueTypes: async () => ({
+          issueTypes: [
+            { id: '10001', name: 'Story', subtask: false },
+            { id: '10002', name: 'Bug', subtask: false },
+            { id: '10003', name: 'Sub-task', subtask: true },
+          ],
+        }),
+      },
+    } as any;
+
+    const types = await discovery.getIssueTypes(client, 'PROJ');
+    expect(types).toHaveLength(3);
+    expect(types[0].name).toBe('Story');
+    expect(types[2].subtask).toBe(true);
+  });
+
+  it('caches results per project', async () => {
+    let callCount = 0;
+    const client = {
+      issues: {
+        getCreateIssueMetaIssueTypes: async () => {
+          callCount++;
+          return { issueTypes: [{ id: '1', name: 'Story', subtask: false }] };
+        },
+      },
+    } as any;
+
+    await discovery.getIssueTypes(client, 'PROJ');
+    await discovery.getIssueTypes(client, 'PROJ');
+    expect(callCount).toBe(1);
+  });
+
+  it('returns empty on API failure', async () => {
+    const client = {
+      issues: {
+        getCreateIssueMetaIssueTypes: async () => { throw new Error('fail'); },
+      },
+    } as any;
+
+    const types = await discovery.getIssueTypes(client, 'PROJ');
+    expect(types).toEqual([]);
+  });
+});
+
+describe('getRequiredFields', () => {
+  let discovery: FieldDiscovery;
+
+  beforeEach(() => {
+    discovery = new FieldDiscovery();
+  });
+
+  it('returns required fields without defaults', async () => {
+    const client = {
+      issues: {
+        getCreateIssueMetaIssueTypes: async () => ({
+          issueTypes: [{ id: '10001', name: 'Story', subtask: false }],
+        }),
+        getCreateIssueMetaIssueTypeId: async () => ({
+          fields: [
+            { fieldId: 'summary', name: 'Summary', required: true, hasDefaultValue: false, schema: { type: 'string' } },
+            { fieldId: 'priority', name: 'Priority', required: true, hasDefaultValue: true, schema: { type: 'priority' } },
+            { fieldId: 'cf_10141', name: 'Gaming Sector', required: true, hasDefaultValue: false, schema: { type: 'array' }, allowedValues: [{ name: 'Land Based' }, { name: 'Online' }] },
+            { fieldId: 'description', name: 'Description', required: false, hasDefaultValue: false, schema: { type: 'string' } },
+          ],
+        }),
+      },
+    } as any;
+
+    const required = await discovery.getRequiredFields(client, 'PROJ', 'Story');
+    expect(required).toHaveLength(2); // summary + Gaming Sector (priority has default)
+    expect(required[0].fieldId).toBe('summary');
+    expect(required[1].fieldId).toBe('cf_10141');
+    expect(required[1].allowedValues).toEqual(['Land Based', 'Online']);
+  });
+
+  it('caches results', async () => {
+    let callCount = 0;
+    const client = {
+      issues: {
+        getCreateIssueMetaIssueTypes: async () => ({
+          issueTypes: [{ id: '1', name: 'Bug', subtask: false }],
+        }),
+        getCreateIssueMetaIssueTypeId: async () => {
+          callCount++;
+          return { fields: [{ fieldId: 'summary', name: 'Summary', required: true, hasDefaultValue: false, schema: { type: 'string' } }] };
+        },
+      },
+    } as any;
+
+    await discovery.getRequiredFields(client, 'PROJ', 'Bug');
+    await discovery.getRequiredFields(client, 'PROJ', 'Bug');
+    expect(callCount).toBe(1);
+  });
+
+  it('returns empty for unknown issue type', async () => {
+    const client = {
+      issues: {
+        getCreateIssueMetaIssueTypes: async () => ({
+          issueTypes: [{ id: '1', name: 'Story', subtask: false }],
+        }),
+      },
+    } as any;
+
+    const required = await discovery.getRequiredFields(client, 'PROJ', 'NonExistent');
+    expect(required).toEqual([]);
+  });
+
+  it('invalidateRequiredFields clears cache for project', async () => {
+    let callCount = 0;
+    const client = {
+      issues: {
+        getCreateIssueMetaIssueTypes: async () => ({
+          issueTypes: [{ id: '1', name: 'Story', subtask: false }],
+        }),
+        getCreateIssueMetaIssueTypeId: async () => {
+          callCount++;
+          return { fields: [] };
+        },
+      },
+    } as any;
+
+    await discovery.getRequiredFields(client, 'PROJ', 'Story');
+    discovery.invalidateRequiredFields('PROJ');
+    await discovery.getRequiredFields(client, 'PROJ', 'Story');
+    expect(callCount).toBe(2); // Called twice — cache was cleared
+  });
+});

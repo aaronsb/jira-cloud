@@ -275,10 +275,11 @@ class JiraServer {
             }
           }
 
-          // On create failures, append required fields guidance
+          // On create failures, invalidate cache and append required fields guidance
           const reqArgs = request.params.arguments as Record<string, unknown> | undefined;
           if (reqArgs?.operation === 'create' && reqArgs?.projectKey) {
             const pKey = reqArgs.projectKey as string;
+            fieldDiscovery.invalidateRequiredFields(pKey);
             const iType = reqArgs.issueType as string | undefined;
             try {
               // Show valid issue types

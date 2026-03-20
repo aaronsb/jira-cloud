@@ -131,12 +131,9 @@ export class FieldDiscovery {
     }
 
     try {
-      // Step 1: Get issue types for this project
-      const issueTypes = await client.issues.getCreateIssueMetaIssueTypes({
-        projectIdOrKey: projectKey,
-      });
-      const matchingType = (issueTypes.issueTypes || issueTypes.createMetaIssueType || [])
-        .find(t => t.name?.toLowerCase() === issueTypeName.toLowerCase());
+      // Step 1: Get issue types (uses shared cache)
+      const issueTypes = await this.getIssueTypes(client, projectKey);
+      const matchingType = issueTypes.find(t => t.name.toLowerCase() === issueTypeName.toLowerCase());
 
       if (!matchingType?.id) {
         console.error(`[field-discovery] Issue type "${issueTypeName}" not found in project ${projectKey}`);
