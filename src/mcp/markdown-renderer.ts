@@ -279,6 +279,7 @@ export interface ProjectData {
   description?: string;
   lead?: string;
   projectTypeKey?: string;
+  issueTypes?: Array<{ name: string; subtask: boolean }>;
   statusCounts?: Record<string, number>;
   boards?: Array<{ id: number; name: string; type: string }>;
   components?: Array<{ id: string; name: string }>;
@@ -302,6 +303,18 @@ export function renderProject(project: ProjectData): string {
   if (project.description) {
     lines.push('');
     lines.push(truncate(stripHtml(project.description), 200));
+  }
+
+  // Issue types
+  if (project.issueTypes && project.issueTypes.length > 0) {
+    const regular = project.issueTypes.filter(t => !t.subtask).map(t => t.name);
+    const subtasks = project.issueTypes.filter(t => t.subtask).map(t => t.name);
+    const parts = [...regular];
+    if (subtasks.length > 0) {
+      parts.push(...subtasks.map(n => `${n} (subtask)`));
+    }
+    lines.push('');
+    lines.push(`**Issue Types:** ${parts.join(', ')}`);
   }
 
   // Status counts

@@ -99,7 +99,7 @@ describe('projectNextSteps', () => {
   it('returns suggestions for get with project key', () => {
     const result = projectNextSteps('get', 'PROJ');
     expect(result).toContain('project = PROJ');
-    expect(result).toContain('jira://projects/PROJ/overview');
+    expect(result).toContain('Create an issue');
   });
 
   it('returns empty for unknown operation', () => {

@@ -24,6 +24,19 @@ export interface CatalogField {
   score: number;
 }
 
+export interface IssueTypeInfo {
+  id: string;
+  name: string;
+  subtask: boolean;
+}
+
+export interface RequiredFieldInfo {
+  fieldId: string;
+  name: string;
+  schemaType: string;
+  allowedValues?: string[];
+}
+
 export interface DiscoveryStats {
   totalCustomFields: number;
   excludedNoDescription: number;
@@ -160,6 +173,100 @@ export class FieldDiscovery {
       console.error(`[field-discovery] Context field fetch failed for ${projectKey}/${issueTypeName}: ${msg}`);
       // Fall back to all writable catalog fields
       return this.catalog.filter(f => f.writable);
+    }
+  }
+
+  // ── Required Fields Cache ────────────────────────────────────────────
+
+  private requiredFieldsCache = new Map<string, RequiredFieldInfo[]>();
+  private issueTypesCache = new Map<string, IssueTypeInfo[]>();
+
+  /** Get issue types available for a project (lazy cached). */
+  async getIssueTypes(client: Version3Client, projectKey: string): Promise<IssueTypeInfo[]> {
+    const cacheKey = projectKey.toUpperCase();
+    const cached = this.issueTypesCache.get(cacheKey);
+    if (cached) return cached;
+
+    try {
+      const result = await client.issues.getCreateIssueMetaIssueTypes({
+        projectIdOrKey: projectKey,
+      });
+      const types = (result.issueTypes || result.createMetaIssueType || [])
+        .filter((t: any) => t.id && t.name)
+        .map((t: any) => ({
+          id: t.id as string,
+          name: t.name as string,
+          subtask: t.subtask ?? false,
+        }));
+      this.issueTypesCache.set(cacheKey, types);
+      return types;
+    } catch (err) {
+      console.error(`[field-discovery] Issue type fetch failed for ${projectKey}: ${err instanceof Error ? err.message : err}`);
+      return [];
+    }
+  }
+
+  /** Get required fields for a project + issue type combination (lazy cached). */
+  async getRequiredFields(
+    client: Version3Client,
+    projectKey: string,
+    issueTypeName: string,
+  ): Promise<RequiredFieldInfo[]> {
+    const cacheKey = `${projectKey}:${issueTypeName}`.toLowerCase();
+    const cached = this.requiredFieldsCache.get(cacheKey);
+    if (cached) return cached;
+
+    try {
+      const issueTypes = await this.getIssueTypes(client, projectKey);
+      const matchingType = issueTypes.find(t => t.name.toLowerCase() === issueTypeName.toLowerCase());
+      if (!matchingType) return [];
+
+      const required: RequiredFieldInfo[] = [];
+      let startAt = 0;
+      const maxResults = 50;
+      let hasMore = true;
+
+      while (hasMore) {
+        const fieldMeta = await client.issues.getCreateIssueMetaIssueTypeId({
+          projectIdOrKey: projectKey,
+          issueTypeId: matchingType.id,
+          startAt,
+          maxResults,
+        });
+        const fields = (fieldMeta.fields || fieldMeta.results || []) as any[];
+        for (const f of fields) {
+          if (f.required && !f.hasDefaultValue) {
+            const info: RequiredFieldInfo = {
+              fieldId: f.fieldId,
+              name: f.name,
+              schemaType: f.schema?.type ?? 'unknown',
+            };
+            if (f.allowedValues && Array.isArray(f.allowedValues)) {
+              info.allowedValues = f.allowedValues
+                .slice(0, 20)
+                .map((v: any) => v.name ?? v.value ?? String(v));
+            }
+            required.push(info);
+          }
+        }
+        if (fields.length < maxResults) hasMore = false;
+        startAt += fields.length;
+      }
+
+      this.requiredFieldsCache.set(cacheKey, required);
+      return required;
+    } catch (err) {
+      console.error(`[field-discovery] Required fields fetch failed for ${projectKey}/${issueTypeName}: ${err instanceof Error ? err.message : err}`);
+      return [];
+    }
+  }
+
+  /** Clear required fields cache for a project (on 400 errors, cache may be stale). */
+  invalidateRequiredFields(projectKey: string): void {
+    for (const key of this.requiredFieldsCache.keys()) {
+      if (key.startsWith(projectKey.toLowerCase() + ':')) {
+        this.requiredFieldsCache.delete(key);
+      }
     }
   }
 

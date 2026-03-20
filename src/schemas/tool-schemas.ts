@@ -171,7 +171,7 @@ export const toolSchemas = {
         },
         issueType: {
           type: 'string',
-          description: 'Issue type (e.g., Story, Bug, Task). Required for create.',
+          description: 'Issue type name — must match project configuration (e.g., Story, Bug, Task, Feature). Use manage_jira_project get to discover valid types. Required for create.',
         },
         priority: {
           type: 'string',

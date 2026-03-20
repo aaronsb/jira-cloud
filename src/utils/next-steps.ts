@@ -177,9 +177,9 @@ export function projectNextSteps(operation: string, projectKey?: string): string
       break;
     case 'get':
       steps.push(
+        { description: 'Create an issue in this project (use issue types shown above)', tool: 'manage_jira_issue', example: { operation: 'create', projectKey, summary: '<title>', issueType: '<type from list above>' } },
         { description: 'Search issues in this project', tool: 'manage_jira_filter', example: { operation: 'execute_jql', jql: `project = ${projectKey}` } },
         { description: 'View project boards', tool: 'manage_jira_board', example: { operation: 'list' } },
-        { description: `Read jira://projects/${projectKey}/overview for additional context` },
       );
       break;
   }
