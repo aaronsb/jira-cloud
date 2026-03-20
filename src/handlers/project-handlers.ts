@@ -134,23 +134,17 @@ async function handleGetProject(jiraClient: JiraClient, args: ManageJiraProjectA
     // Non-fatal — continue without issue types
   }
 
-  // If status counts are requested, get them
+  // If status counts are requested, use the count API for exact totals
   if (includeStatusCounts) {
     try {
-      // Get issue counts by status for this project
-      const searchResult = await jiraClient.searchIssues(`project = ${projectKey}`, 0, 100);
-
-      // Count issues by status
-      const statusCounts: Record<string, number> = {};
-      for (const issue of searchResult.issues) {
-        const status = issue.status;
-        statusCounts[status] = (statusCounts[status] || 0) + 1;
-      }
-
-      projectData.statusCounts = statusCounts;
+      const [total, open, done] = await Promise.all([
+        jiraClient.countIssues(`project = ${projectKey}`),
+        jiraClient.countIssues(`project = ${projectKey} AND resolution = Unresolved`),
+        jiraClient.countIssues(`project = ${projectKey} AND resolution != Unresolved`),
+      ]);
+      projectData.statusCounts = { Total: total, Open: open, Done: done };
     } catch (error) {
       console.error(`Error getting status counts for project ${projectKey}:`, error);
-      // Continue even if status counts fail
     }
   }
   
@@ -236,27 +230,16 @@ async function handleListProjects(jiraClient: JiraClient, args: ManageJiraProjec
     lead: project.lead || undefined,
   }));
 
-  // If status counts are requested, get them for each project
+  // If status counts are requested, use count API (fast, exact, parallel)
   if (includeStatusCounts) {
-    // This would be more efficient with a batch API call, but for now we'll do it sequentially
-    for (const project of projectDataList) {
+    await Promise.all(projectDataList.map(async (project) => {
       try {
-        // Get issue counts by status for this project
-        const searchResult = await jiraClient.searchIssues(`project = ${project.key}`, 0, 100);
-
-        // Count issues by status
-        const statusCounts: Record<string, number> = {};
-        for (const issue of searchResult.issues) {
-          const status = issue.status;
-          statusCounts[status] = (statusCounts[status] || 0) + 1;
-        }
-
-        project.statusCounts = statusCounts;
+        const total = await jiraClient.countIssues(`project = ${project.key}`);
+        project.statusCounts = { Total: total };
       } catch (error) {
-        console.error(`Error getting status counts for project ${project.key}:`, error);
-        // Continue with other projects even if one fails
+        console.error(`Error getting count for project ${project.key}:`, error);
       }
-    }
+    }));
   }
 
   // Render to markdown with pagination
