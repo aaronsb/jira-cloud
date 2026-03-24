@@ -37,7 +37,7 @@ function formatDate(dateStr: string | null): string {
 }
 
 /** Format seconds into human-readable duration (e.g. 1d 2h, 3h 30m) */
-function formatSeconds(seconds: number): string {
+export function formatDuration(seconds: number): string {
   if (seconds === 0) return '0m';
   const days = Math.floor(seconds / 28800); // 8h workday
   const hours = Math.floor((seconds % 28800) / 3600);
@@ -127,9 +127,9 @@ export function renderIssue(issue: JiraIssueDetails, transitions?: TransitionDet
 
   // Time tracking — consolidated line
   const timeParts: string[] = [];
-  if (issue.originalEstimate != null) timeParts.push(`Estimate: ${formatSeconds(issue.originalEstimate)}`);
-  if (issue.timeEstimate != null) timeParts.push(`Remaining: ${formatSeconds(issue.timeEstimate)}`);
-  if (issue.timeSpent != null) timeParts.push(`Logged: ${formatSeconds(issue.timeSpent)}`);
+  if (issue.originalEstimate != null) timeParts.push(`Estimate: ${formatDuration(issue.originalEstimate)}`);
+  if (issue.timeEstimate != null) timeParts.push(`Remaining: ${formatDuration(issue.timeEstimate)}`);
+  if (issue.timeSpent != null) timeParts.push(`Logged: ${formatDuration(issue.timeSpent)}`);
   if (timeParts.length > 0) lines.push(timeParts.join(' | '));
   if (issue.resolution) lines.push(`Resolution: ${issue.resolution}`);
 

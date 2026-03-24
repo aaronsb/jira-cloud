@@ -214,6 +214,18 @@ function validateManageJiraIssueArgs(args: unknown): args is ManageJiraIssueArgs
           'Missing or invalid timeSpent parameter. Provide time in Jira format (e.g., "3h 30m", "1d", "2w").'
         );
       }
+      if (normalizedArgs.adjustEstimate === 'new' && !normalizedArgs.newEstimate) {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          'newEstimate is required when adjustEstimate is "new" (e.g., "2d").'
+        );
+      }
+      if (normalizedArgs.adjustEstimate === 'manual' && !normalizedArgs.reduceBy) {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          'reduceBy is required when adjustEstimate is "manual" (e.g., "1h").'
+        );
+      }
       break;
 
     case 'hierarchy':

@@ -5,6 +5,7 @@ import type { GraphQLClient } from '../client/graphql-client.js';
 import { GraphQLHierarchyWalker, walkTree } from '../client/graphql-hierarchy.js';
 import { JiraClient } from '../client/jira-client.js';
 import { renderRollupTree } from '../handlers/plan-handler.js';
+import { formatDuration } from '../mcp/markdown-renderer.js';
 import { JiraIssueDetails, GraphIssue, GraphTreeNode } from '../types/index.js';
 import { ComputeColumn, evaluateRow, extractColumnRefs, parseComputeList } from '../utils/cube-dsl.js';
 import { analysisNextSteps } from '../utils/next-steps.js';
@@ -56,18 +57,6 @@ function formatDateShort(date: Date): string {
 
 function daysBetween(a: Date, b: Date): number {
   return Math.round((b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24));
-}
-
-function formatDuration(seconds: number): string {
-  const hours = Math.floor(seconds / 3600);
-  const days = Math.floor(hours / 8); // 8-hour work day
-  if (days > 0) {
-    const remainingHours = hours % 8;
-    return remainingHours > 0 ? `${days}d ${remainingHours}h` : `${days}d`;
-  }
-  const minutes = Math.floor((seconds % 3600) / 60);
-  if (hours > 0) return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
-  return `${minutes}m`;
 }
 
 function countBy<T>(items: T[], keyFn: (item: T) => string): Map<string, number> {
