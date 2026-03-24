@@ -144,13 +144,13 @@ export const toolSchemas = {
 
   manage_jira_issue: {
     name: 'manage_jira_issue',
-    description: 'Get, create, update, delete, move, transition, comment on, link, or explore hierarchy of Jira issues',
+    description: 'Get, create, update, delete, move, transition, comment on, link, log work on, or explore hierarchy of Jira issues',
     inputSchema: {
       type: 'object',
       properties: {
         operation: {
           type: 'string',
-          enum: ['create', 'get', 'update', 'delete', 'move', 'transition', 'comment', 'link', 'hierarchy'],
+          enum: ['create', 'get', 'update', 'delete', 'move', 'transition', 'comment', 'link', 'hierarchy', 'worklog'],
           description: 'Operation to perform',
         },
         issueKey: {
@@ -193,6 +193,39 @@ export const toolSchemas = {
         dueDate: {
           type: ['string', 'null'],
           description: 'Due date in ISO format (e.g., "2025-06-15") or null to clear. For create and update.',
+        },
+        originalEstimate: {
+          type: 'string',
+          description: 'Original time estimate in Jira format (e.g., "3d", "2h 30m", "1w"). For create and update.',
+        },
+        remainingEstimate: {
+          type: 'string',
+          description: 'Remaining time estimate in Jira format (e.g., "1d", "4h"). For update only.',
+        },
+        timeSpent: {
+          type: 'string',
+          description: 'Time spent in Jira format (e.g., "3h 30m", "1d", "2w"). Required for worklog.',
+        },
+        worklogComment: {
+          type: 'string',
+          description: 'Description of work performed. For worklog.',
+        },
+        started: {
+          type: 'string',
+          description: 'When the work started, ISO datetime (e.g., "2025-04-09T09:00:00.000+0000"). Defaults to now. For worklog.',
+        },
+        adjustEstimate: {
+          type: 'string',
+          enum: ['auto', 'leave', 'new', 'manual'],
+          description: 'How to adjust the remaining estimate: auto (reduce by timeSpent), leave (unchanged), new (set to newEstimate), manual (reduce by reduceBy). Default: auto. For worklog.',
+        },
+        newEstimate: {
+          type: 'string',
+          description: 'New remaining estimate when adjustEstimate is "new" (e.g., "2d"). For worklog.',
+        },
+        reduceBy: {
+          type: 'string',
+          description: 'Amount to reduce remaining estimate when adjustEstimate is "manual" (e.g., "1h"). For worklog.',
         },
         parent: {
           type: ['string', 'null'],

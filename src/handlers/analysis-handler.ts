@@ -5,6 +5,7 @@ import type { GraphQLClient } from '../client/graphql-client.js';
 import { GraphQLHierarchyWalker, walkTree } from '../client/graphql-hierarchy.js';
 import { JiraClient } from '../client/jira-client.js';
 import { renderRollupTree } from '../handlers/plan-handler.js';
+import { formatDuration } from '../mcp/markdown-renderer.js';
 import { JiraIssueDetails, GraphIssue, GraphTreeNode } from '../types/index.js';
 import { ComputeColumn, evaluateRow, extractColumnRefs, parseComputeList } from '../utils/cube-dsl.js';
 import { analysisNextSteps } from '../utils/next-steps.js';
@@ -56,18 +57,6 @@ function formatDateShort(date: Date): string {
 
 function daysBetween(a: Date, b: Date): number {
   return Math.round((b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24));
-}
-
-function formatDuration(seconds: number): string {
-  const hours = Math.floor(seconds / 3600);
-  const days = Math.floor(hours / 8); // 8-hour work day
-  if (days > 0) {
-    const remainingHours = hours % 8;
-    return remainingHours > 0 ? `${days}d ${remainingHours}h` : `${days}d`;
-  }
-  const minutes = Math.floor((seconds % 3600) / 60);
-  if (hours > 0) return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
-  return `${minutes}m`;
 }
 
 function countBy<T>(items: T[], keyFn: (item: T) => string): Map<string, number> {
@@ -143,25 +132,26 @@ export function renderPoints(issues: JiraIssueDetails[]): string {
 }
 
 export function renderTime(issues: JiraIssueDetails[]): string {
-  const estimated = issues.filter(i => i.timeEstimate != null);
-  const unestimated = issues.length - estimated.length;
-  const total = sumBy(issues, i => i.timeEstimate);
+  const hasOriginal = issues.some(i => i.originalEstimate != null);
+  const hasLogged = issues.some(i => i.timeSpent != null);
+  const hasRemaining = issues.some(i => i.timeEstimate != null);
 
-  const byBucket = new Map<StatusBucket, number>();
-  for (const issue of issues) {
-    const bucket = bucketStatus(issue.statusCategory);
-    byBucket.set(bucket, (byBucket.get(bucket) ?? 0) + (issue.timeEstimate ?? 0));
-  }
+  const originalTotal = sumBy(issues, i => i.originalEstimate);
+  const loggedTotal = sumBy(issues, i => i.timeSpent);
+  const remainingTotal = sumBy(issues, i => i.timeEstimate);
 
-  const done = byBucket.get('Done') ?? 0;
-  const remaining = total - done;
+  const unestimated = issues.filter(i => i.originalEstimate == null && i.timeEstimate == null).length;
 
   const lines = ['## Time (Effort)', ''];
   lines.push('| Metric | Value |');
   lines.push('|--------|-------|');
-  lines.push(`| Original Estimate | ${formatDuration(total)} |`);
-  lines.push(`| Completed | ${formatDuration(done)} |`);
-  lines.push(`| Remaining | ${formatDuration(remaining)} |`);
+  if (hasOriginal) lines.push(`| Original Estimate | ${formatDuration(originalTotal)} |`);
+  if (hasLogged) lines.push(`| Logged | ${formatDuration(loggedTotal)} |`);
+  if (hasRemaining) lines.push(`| Remaining | ${formatDuration(remainingTotal)} |`);
+  if (hasOriginal && hasLogged && originalTotal > 0) {
+    const pct = Math.round((loggedTotal / originalTotal) * 100);
+    lines.push(`| Effort Used | ${pct}% |`);
+  }
   if (unestimated > 0) {
     lines.push(`| Unestimated | ${unestimated} issue${unestimated !== 1 ? 's' : ''} |`);
   }
@@ -966,6 +956,8 @@ function graphIssueToDetails(issue: GraphIssue): JiraIssueDetails {
     storyPoints: issue.storyPoints,
     sprint: null,
     timeEstimate: null,
+    originalEstimate: null,
+    timeSpent: null,
     issueLinks: [],
   };
 }
