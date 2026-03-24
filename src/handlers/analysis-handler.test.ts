@@ -26,6 +26,8 @@ function makeIssue(overrides: Partial<JiraIssueDetails> = {}): JiraIssueDetails 
     startDate: null,
     storyPoints: null,
     timeEstimate: null,
+    originalEstimate: null,
+    timeSpent: null,
     sprint: null,
     issueLinks: [],
     ...overrides,
@@ -79,21 +81,21 @@ describe('renderPoints', () => {
 // ── Time ───────────────────────────────────────────────────────────────
 
 describe('renderTime', () => {
-  it('sums time estimates by status bucket', () => {
+  it('shows original estimate, logged, and remaining', () => {
     const issues = [
-      makeIssue({ timeEstimate: 3600, statusCategory: 'done' }),      // 1h
-      makeIssue({ timeEstimate: 7200, statusCategory: 'new' }),       // 2h
-      makeIssue({ timeEstimate: 1800, statusCategory: 'indeterminate' }), // 30m
+      makeIssue({ originalEstimate: 8 * 3600, timeSpent: 3600, timeEstimate: 7 * 3600 }),  // 1d est, 1h logged, 7h remaining
+      makeIssue({ originalEstimate: 4 * 3600, timeSpent: 2 * 3600, timeEstimate: 2 * 3600 }), // 4h est, 2h logged, 2h remaining
     ];
     const output = renderTime(issues);
-    expect(output).toContain('| Original Estimate | 3h 30m |');
-    expect(output).toContain('| Completed | 1h |');
-    expect(output).toContain('| Remaining | 2h 30m |');
+    expect(output).toContain('| Original Estimate | 1d 4h |');
+    expect(output).toContain('| Logged | 3h |');
+    expect(output).toContain('| Remaining | 1d 1h |');
+    expect(output).toContain('| Effort Used | 25% |');
   });
 
   it('counts unestimated issues', () => {
     const issues = [
-      makeIssue({ timeEstimate: 3600 }),
+      makeIssue({ originalEstimate: 3600 }),
       makeIssue(),
       makeIssue(),
     ];
@@ -107,6 +109,17 @@ describe('renderTime', () => {
     ];
     const output = renderTime(issues);
     expect(output).toContain('3d');
+  });
+
+  it('shows only available fields when data is partial', () => {
+    const issues = [
+      makeIssue({ timeEstimate: 7200 }), // only remaining, no original or logged
+    ];
+    const output = renderTime(issues);
+    expect(output).toContain('| Remaining | 2h |');
+    expect(output).not.toContain('Original Estimate');
+    expect(output).not.toContain('Logged');
+    expect(output).not.toContain('Effort Used');
   });
 });
 

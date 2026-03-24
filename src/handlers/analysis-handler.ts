@@ -143,25 +143,26 @@ export function renderPoints(issues: JiraIssueDetails[]): string {
 }
 
 export function renderTime(issues: JiraIssueDetails[]): string {
-  const estimated = issues.filter(i => i.timeEstimate != null);
-  const unestimated = issues.length - estimated.length;
-  const total = sumBy(issues, i => i.timeEstimate);
+  const hasOriginal = issues.some(i => i.originalEstimate != null);
+  const hasLogged = issues.some(i => i.timeSpent != null);
+  const hasRemaining = issues.some(i => i.timeEstimate != null);
 
-  const byBucket = new Map<StatusBucket, number>();
-  for (const issue of issues) {
-    const bucket = bucketStatus(issue.statusCategory);
-    byBucket.set(bucket, (byBucket.get(bucket) ?? 0) + (issue.timeEstimate ?? 0));
-  }
+  const originalTotal = sumBy(issues, i => i.originalEstimate);
+  const loggedTotal = sumBy(issues, i => i.timeSpent);
+  const remainingTotal = sumBy(issues, i => i.timeEstimate);
 
-  const done = byBucket.get('Done') ?? 0;
-  const remaining = total - done;
+  const unestimated = issues.filter(i => i.originalEstimate == null && i.timeEstimate == null).length;
 
   const lines = ['## Time (Effort)', ''];
   lines.push('| Metric | Value |');
   lines.push('|--------|-------|');
-  lines.push(`| Original Estimate | ${formatDuration(total)} |`);
-  lines.push(`| Completed | ${formatDuration(done)} |`);
-  lines.push(`| Remaining | ${formatDuration(remaining)} |`);
+  if (hasOriginal) lines.push(`| Original Estimate | ${formatDuration(originalTotal)} |`);
+  if (hasLogged) lines.push(`| Logged | ${formatDuration(loggedTotal)} |`);
+  if (hasRemaining) lines.push(`| Remaining | ${formatDuration(remainingTotal)} |`);
+  if (hasOriginal && hasLogged && originalTotal > 0) {
+    const pct = Math.round((loggedTotal / originalTotal) * 100);
+    lines.push(`| Effort Used | ${pct}% |`);
+  }
   if (unestimated > 0) {
     lines.push(`| Unestimated | ${unestimated} issue${unestimated !== 1 ? 's' : ''} |`);
   }
@@ -966,6 +967,8 @@ function graphIssueToDetails(issue: GraphIssue): JiraIssueDetails {
     storyPoints: issue.storyPoints,
     sprint: null,
     timeEstimate: null,
+    originalEstimate: null,
+    timeSpent: null,
     issueLinks: [],
   };
 }

@@ -69,6 +69,13 @@ export function issueNextSteps(operation: string, issueKey?: string): string {
         { description: 'Read available link types from jira://issue-link-types resource' },
       );
       break;
+    case 'worklog':
+      steps.push(
+        { description: 'View the updated issue', tool: 'manage_jira_issue', example: { operation: 'get', issueKey } },
+        { description: 'Log more time', tool: 'manage_jira_issue', example: { operation: 'worklog', issueKey, timeSpent: '<duration>' } },
+        { description: 'Adjust the remaining estimate', tool: 'manage_jira_issue', example: { operation: 'update', issueKey, remainingEstimate: '<duration>' } },
+      );
+      break;
     case 'hierarchy':
       steps.push(
         { description: 'View a specific issue from the tree', tool: 'manage_jira_issue', example: { operation: 'get', issueKey } },

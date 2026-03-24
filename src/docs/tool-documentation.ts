@@ -72,18 +72,34 @@ function generateIssueToolDocumentation(schema: any) {
       update: {
         description: "Updates an existing issue",
         required_parameters: ["issueKey"],
-        optional_parameters: ["summary", "description", "assignee", "priority", "labels", "customFields"],
+        optional_parameters: ["summary", "description", "assignee", "priority", "labels", "originalEstimate", "remainingEstimate", "customFields"],
         examples: [
           {
             description: "Update issue summary",
             code: { operation: "update", issueKey: "PROJ-123", summary: "Updated feature request" }
           },
           {
-            description: "Add worklog to issue",
-            code: {
-              operation: "update", issueKey: "PROJ-123",
-              customFields: { "worklog": { "timeSpent": "3h 30m", "comment": "Implemented feature X", "started": "2025-04-09T09:00:00.000Z" } }
-            }
+            description: "Set time estimate on an issue",
+            code: { operation: "update", issueKey: "PROJ-123", originalEstimate: "3d", remainingEstimate: "2d" }
+          }
+        ]
+      },
+      worklog: {
+        description: "Logs time spent on an issue",
+        required_parameters: ["issueKey", "timeSpent"],
+        optional_parameters: ["worklogComment", "started", "adjustEstimate", "newEstimate", "reduceBy"],
+        examples: [
+          {
+            description: "Log 3.5 hours of work",
+            code: { operation: "worklog", issueKey: "PROJ-123", timeSpent: "3h 30m", worklogComment: "Implemented feature X" }
+          },
+          {
+            description: "Log work with specific start time",
+            code: { operation: "worklog", issueKey: "PROJ-123", timeSpent: "1d", started: "2025-04-09T09:00:00.000+0000", worklogComment: "Design review" }
+          },
+          {
+            description: "Log work without adjusting estimate",
+            code: { operation: "worklog", issueKey: "PROJ-123", timeSpent: "2h", adjustEstimate: "leave" }
           }
         ]
       },
@@ -126,11 +142,13 @@ function generateIssueToolDocumentation(schema: any) {
     },
     common_use_cases: [
       {
-        title: "Tracking work logs",
-        description: "To track time spent on issues:",
+        title: "Time tracking",
+        description: "To estimate and log time on issues:",
         steps: [
-          { description: "Add a work log to an issue", code: { operation: "update", issueKey: "PROJ-123", customFields: { "worklog": { "timeSpent": "3h 30m", "comment": "Implemented feature X", "started": "2025-04-09T09:00:00.000Z" } } } },
-          { description: "View work logs for an issue", code: { operation: "get", issueKey: "PROJ-123", expand: ["worklog"] } }
+          { description: "Set an estimate when creating", code: { operation: "create", projectKey: "PROJ", summary: "New task", issueType: "Task", originalEstimate: "3d" } },
+          { description: "Update the estimate", code: { operation: "update", issueKey: "PROJ-123", originalEstimate: "5d", remainingEstimate: "3d" } },
+          { description: "Log time spent", code: { operation: "worklog", issueKey: "PROJ-123", timeSpent: "3h 30m", worklogComment: "Implemented feature X" } },
+          { description: "View time tracking on an issue", code: { operation: "get", issueKey: "PROJ-123" } }
         ]
       },
       {

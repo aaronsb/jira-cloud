@@ -126,6 +126,8 @@ export class JiraClient {
       this.customFields.startDate,
       this.customFields.storyPoints,
       'timeestimate',
+      'timeoriginalestimate',
+      'timespent',
       ...(this.customFields.sprint ? [this.customFields.sprint] : []),
       'issuelinks',
     ];
@@ -180,6 +182,8 @@ export class JiraClient {
       startDate: fields?.[this.customFields.startDate] || null,
       storyPoints: fields?.[this.customFields.storyPoints] ?? null,
       timeEstimate: fields?.timeestimate ?? null,
+      originalEstimate: fields?.timeoriginalestimate ?? null,
+      timeSpent: fields?.timespent ?? null,
       sprint: this.customFields.sprint ? this.extractSprintName(fields?.[this.customFields.sprint]) : null,
       issueLinks: (fields?.issuelinks || []).map((link: any) => ({
         type: link.type?.name || '',
@@ -576,6 +580,8 @@ export class JiraClient {
     priority?: string;
     labels?: string[];
     dueDate?: string | null;
+    originalEstimate?: string;
+    remainingEstimate?: string;
     customFields?: Record<string, any>;
   }): Promise<void> {
     const fields: any = {};
@@ -593,6 +599,12 @@ export class JiraClient {
     if (params.priority) fields.priority = { id: params.priority };
     if (params.labels) fields.labels = params.labels;
     if (params.dueDate !== undefined) fields.duedate = params.dueDate;
+    if (params.originalEstimate || params.remainingEstimate) {
+      fields.timetracking = {
+        ...(params.originalEstimate ? { originalEstimate: params.originalEstimate } : {}),
+        ...(params.remainingEstimate ? { remainingEstimate: params.remainingEstimate } : {}),
+      };
+    }
     if (params.customFields) {
       Object.assign(fields, this.convertAdfFields(params.customFields));
     }
@@ -600,6 +612,26 @@ export class JiraClient {
     await this.client.issues.editIssue({
       issueIdOrKey: params.issueKey,
       fields,
+    });
+  }
+
+  async addWorklog(params: {
+    issueKey: string;
+    timeSpent: string;
+    comment?: string;
+    started?: string;
+    adjustEstimate?: 'auto' | 'leave' | 'new' | 'manual';
+    newEstimate?: string;
+    reduceBy?: string;
+  }): Promise<void> {
+    await this.client.issueWorklogs.addWorklog({
+      issueIdOrKey: params.issueKey,
+      timeSpent: params.timeSpent,
+      comment: params.comment,
+      started: params.started,
+      adjustEstimate: params.adjustEstimate ?? 'auto',
+      newEstimate: params.newEstimate,
+      reduceBy: params.reduceBy,
     });
   }
 
@@ -631,7 +663,8 @@ export class JiraClient {
       const leanFields = [
         'summary', 'issuetype', 'priority', 'assignee', 'reporter',
         'status', 'resolution', 'labels', 'created', 'updated',
-        'resolutiondate', 'statuscategorychangedate', 'duedate', 'timeestimate',
+        'resolutiondate', 'statuscategorychangedate', 'duedate',
+        'timeestimate', 'timeoriginalestimate', 'timespent',
         this.customFields.startDate, this.customFields.storyPoints,
         ...(this.customFields.sprint ? [this.customFields.sprint] : []),
       ];
@@ -1254,6 +1287,7 @@ export class JiraClient {
     assignee?: string;
     labels?: string[];
     dueDate?: string;
+    originalEstimate?: string;
     customFields?: Record<string, any>;
   }): Promise<{ key: string }> {
     const fields: any = {
@@ -1270,6 +1304,9 @@ export class JiraClient {
     if (params.assignee) fields.assignee = { accountId: params.assignee };
     if (params.labels) fields.labels = params.labels;
     if (params.dueDate) fields.duedate = params.dueDate;
+    if (params.originalEstimate) {
+      fields.timetracking = { originalEstimate: params.originalEstimate };
+    }
     if (params.customFields) {
       Object.assign(fields, this.convertAdfFields(params.customFields));
     }

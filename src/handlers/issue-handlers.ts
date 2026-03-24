@@ -10,7 +10,7 @@ import { issueNextSteps } from '../utils/next-steps.js';
 import { normalizeArgs } from '../utils/normalize-args.js';
 
 type ManageJiraIssueArgs = {
-  operation: 'create' | 'get' | 'update' | 'delete' | 'move' | 'transition' | 'comment' | 'link' | 'hierarchy';
+  operation: 'create' | 'get' | 'update' | 'delete' | 'move' | 'transition' | 'comment' | 'link' | 'hierarchy' | 'worklog';
   issueKey?: string;
   projectKey?: string;
   summary?: string;
@@ -20,9 +20,17 @@ type ManageJiraIssueArgs = {
   assignee?: string;
   labels?: string[];
   dueDate?: string | null;
+  originalEstimate?: string;
+  remainingEstimate?: string;
   customFields?: Record<string, any>;
   transitionId?: string;
   comment?: string;
+  timeSpent?: string;
+  worklogComment?: string;
+  started?: string;
+  adjustEstimate?: 'auto' | 'leave' | 'new' | 'manual';
+  newEstimate?: string;
+  reduceBy?: string;
   linkType?: string;
   linkedIssueKey?: string;
   targetProjectKey?: string;
@@ -46,10 +54,10 @@ function validateManageJiraIssueArgs(args: unknown): args is ManageJiraIssueArgs
   
   // Validate operation parameter
   if (typeof normalizedArgs.operation !== 'string' || 
-      !['create', 'get', 'update', 'delete', 'move', 'transition', 'comment', 'link', 'hierarchy'].includes(normalizedArgs.operation as string)) {
+      !['create', 'get', 'update', 'delete', 'move', 'transition', 'comment', 'link', 'hierarchy', 'worklog'].includes(normalizedArgs.operation as string)) {
     throw new McpError(
       ErrorCode.InvalidParams,
-      'Invalid operation parameter. Valid values are: create, get, update, delete, move, transition, comment, link, hierarchy'
+      'Invalid operation parameter. Valid values are: create, get, update, delete, move, transition, comment, link, hierarchy, worklog'
     );
   }
 
@@ -131,11 +139,13 @@ function validateManageJiraIssueArgs(args: unknown): args is ManageJiraIssueArgs
         normalizedArgs.priority === undefined &&
         normalizedArgs.labels === undefined &&
         normalizedArgs.dueDate === undefined &&
+        normalizedArgs.originalEstimate === undefined &&
+        normalizedArgs.remainingEstimate === undefined &&
         normalizedArgs.customFields === undefined
       ) {
         throw new McpError(
           ErrorCode.InvalidParams,
-          'At least one update field (summary, description, parent, assignee, priority, labels, dueDate, or customFields) must be provided for the update operation.'
+          'At least one update field (summary, description, parent, assignee, priority, labels, dueDate, originalEstimate, remainingEstimate, or customFields) must be provided for the update operation.'
         );
       }
       break;
@@ -187,6 +197,21 @@ function validateManageJiraIssueArgs(args: unknown): args is ManageJiraIssueArgs
         throw new McpError(
           ErrorCode.InvalidParams,
           'Missing or invalid linkType parameter. Please provide a valid link type for the link operation.'
+        );
+      }
+      break;
+
+    case 'worklog':
+      if (typeof normalizedArgs.issueKey !== 'string' || normalizedArgs.issueKey.trim() === '') {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          'Missing or invalid issueKey parameter. Please provide a valid issue key for the worklog operation.'
+        );
+      }
+      if (typeof normalizedArgs.timeSpent !== 'string' || normalizedArgs.timeSpent.trim() === '') {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          'Missing or invalid timeSpent parameter. Provide time in Jira format (e.g., "3h 30m", "1d", "2w").'
         );
       }
       break;
@@ -392,6 +417,7 @@ async function handleCreateIssue(jiraClient: JiraClient, args: ManageJiraIssueAr
     assignee: args.assignee,
     labels: args.labels,
     dueDate: args.dueDate ?? undefined,
+    originalEstimate: args.originalEstimate,
     customFields,
   });
   
@@ -421,6 +447,8 @@ async function handleUpdateIssue(jiraClient: JiraClient, args: ManageJiraIssueAr
     priority: args.priority,
     labels: args.labels,
     dueDate: args.dueDate,
+    originalEstimate: args.originalEstimate,
+    remainingEstimate: args.remainingEstimate,
     customFields,
   });
 
@@ -496,6 +524,31 @@ async function handleLinkIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs
       {
         type: 'text',
         text: `# Issue Linked\n\n${markdown}${issueGuidance('link', args.issueKey)}`,
+      },
+    ],
+  };
+}
+
+async function handleWorklogIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs) {
+  await jiraClient.addWorklog({
+    issueKey: args.issueKey!,
+    timeSpent: args.timeSpent!,
+    comment: args.worklogComment,
+    started: args.started,
+    adjustEstimate: args.adjustEstimate,
+    newEstimate: args.newEstimate,
+    reduceBy: args.reduceBy,
+  });
+
+  // Get the updated issue and render to markdown
+  const updatedIssue = await jiraClient.getIssue(args.issueKey!, false, false);
+  const markdown = MarkdownRenderer.renderIssue(updatedIssue);
+
+  return {
+    content: [
+      {
+        type: 'text',
+        text: `# Worklog Added\n\nLogged ${args.timeSpent} on ${args.issueKey}\n\n${markdown}${issueGuidance('worklog', args.issueKey)}`,
       },
     ],
   };
@@ -610,6 +663,11 @@ export async function handleIssueRequest(
       case 'link': {
         console.error('Processing link issue operation');
         return await handleLinkIssue(jiraClient, normalizedArgs as ManageJiraIssueArgs);
+      }
+
+      case 'worklog': {
+        console.error('Processing worklog operation');
+        return await handleWorklogIssue(jiraClient, normalizedArgs as ManageJiraIssueArgs);
       }
 
       case 'hierarchy': {

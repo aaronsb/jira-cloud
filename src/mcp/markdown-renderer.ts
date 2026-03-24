@@ -36,6 +36,19 @@ function formatDate(dateStr: string | null): string {
   return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
+/** Format seconds into human-readable duration (e.g. 1d 2h, 3h 30m) */
+function formatSeconds(seconds: number): string {
+  if (seconds === 0) return '0m';
+  const days = Math.floor(seconds / 28800); // 8h workday
+  const hours = Math.floor((seconds % 28800) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0) parts.push(`${minutes}m`);
+  return parts.length > 0 ? parts.join(' ') : '0m';
+}
+
 /**
  * Format status with visual indicator
  */
@@ -111,14 +124,13 @@ export function renderIssue(issue: JiraIssueDetails, transitions?: TransitionDet
   if (dates.length > 0) lines.push(dates.join(' | '));
 
   if (issue.storyPoints) lines.push(`Points: ${issue.storyPoints}`);
-  if (issue.timeEstimate) {
-    const hours = Math.floor(issue.timeEstimate / 3600);
-    const minutes = Math.floor((issue.timeEstimate % 3600) / 60);
-    const parts: string[] = [];
-    if (hours > 0) parts.push(`${hours}h`);
-    if (minutes > 0) parts.push(`${minutes}m`);
-    lines.push(`Estimate: ${parts.length > 0 ? parts.join(' ') : '0m'}`);
-  }
+
+  // Time tracking — consolidated line
+  const timeParts: string[] = [];
+  if (issue.originalEstimate != null) timeParts.push(`Estimate: ${formatSeconds(issue.originalEstimate)}`);
+  if (issue.timeEstimate != null) timeParts.push(`Remaining: ${formatSeconds(issue.timeEstimate)}`);
+  if (issue.timeSpent != null) timeParts.push(`Logged: ${formatSeconds(issue.timeSpent)}`);
+  if (timeParts.length > 0) lines.push(timeParts.join(' | '));
   if (issue.resolution) lines.push(`Resolution: ${issue.resolution}`);
 
   // Description — already markdown from ADF conversion
