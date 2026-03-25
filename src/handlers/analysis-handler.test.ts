@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { parseComputeList } from '../utils/cube-dsl.js';
-import { renderPoints, renderTime, renderSchedule, renderCycle, renderDistribution, renderSummaryTable, extractProjectKeys, removeProjectClause, extractDimensions, renderCubeSetup, groupByJqlClause } from './analysis-handler.js';
+import { renderPoints, renderTime, renderSchedule, renderCycle, renderDistribution, renderSummaryTable, extractProjectKeys, removeProjectClause, extractDimensions, renderCubeSetup, groupByJqlClause, stripOrderBy } from './analysis-handler.js';
 import { JiraIssueDetails } from '../types/index.js';
 
 // ── Test Helpers ───────────────────────────────────────────────────────
@@ -557,5 +557,29 @@ describe('renderCubeSetup', () => {
     const output = renderCubeSetup('project = AA', 50, dims);
     expect(output).toContain('total, open, overdue');
     expect(output).toContain('bugs, unassigned, no_due_date, no_estimate, no_start_date, no_labels, blocked, stale, stale_status, backlog_rot');
+  });
+});
+
+// ── stripOrderBy ────────────────────────────────────────────────────────
+
+describe('stripOrderBy', () => {
+  it('should remove ORDER BY clause from end of JQL', () => {
+    expect(stripOrderBy('project = PROJ ORDER BY created DESC')).toBe('project = PROJ');
+  });
+
+  it('should handle case-insensitive ORDER BY', () => {
+    expect(stripOrderBy('project = PROJ order by updated asc')).toBe('project = PROJ');
+  });
+
+  it('should leave JQL without ORDER BY unchanged', () => {
+    expect(stripOrderBy('assignee = currentUser() AND resolution = Unresolved')).toBe('assignee = currentUser() AND resolution = Unresolved');
+  });
+
+  it('should handle complex JQL with ORDER BY', () => {
+    expect(stripOrderBy('assignee = currentUser() AND text ~ "migration" ORDER BY updated DESC')).toBe('assignee = currentUser() AND text ~ "migration"');
+  });
+
+  it('should handle multiple fields in ORDER BY', () => {
+    expect(stripOrderBy('project = PROJ ORDER BY priority DESC, created ASC')).toBe('project = PROJ');
   });
 });
