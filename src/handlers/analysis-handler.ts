@@ -503,6 +503,11 @@ async function batchParallel<T>(tasks: (() => Promise<T>)[], batchSize: number):
 
 const ROW_BATCH_SIZE = 3; // ~18-33 concurrent count queries per batch
 
+/** Strip ORDER BY clause from JQL — ordering is meaningless for counts and analysis */
+function stripOrderBy(jql: string): string {
+  return jql.replace(/\s+ORDER\s+BY\s+.+$/i, '');
+}
+
 /** Build a scoped JQL by adding a condition to the base query */
 function scopeJql(baseJql: string, condition: string): string {
   return `(${baseJql}) AND ${condition}`;
@@ -1098,6 +1103,10 @@ export async function handleAnalysisRequest(jiraClient: JiraClient, request: any
       throw new McpError(ErrorCode.InvalidParams, 'Either jql, filterId, or dataRef parameter is required.');
     }
   }
+
+  // Strip ORDER BY — analysis uses counts and full-page fetches, ordering is meaningless
+  // and breaks scopeJql() which wraps JQL in parens (ORDER BY inside parens is invalid)
+  jql = stripOrderBy(jql);
 
   // Parse requested metrics
   const requested = (args.metrics && Array.isArray(args.metrics))
