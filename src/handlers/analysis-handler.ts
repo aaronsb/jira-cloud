@@ -504,7 +504,7 @@ async function batchParallel<T>(tasks: (() => Promise<T>)[], batchSize: number):
 const ROW_BATCH_SIZE = 3; // ~18-33 concurrent count queries per batch
 
 /** Strip ORDER BY clause from JQL — ordering is meaningless for counts and analysis */
-function stripOrderBy(jql: string): string {
+export function stripOrderBy(jql: string): string {
   return jql.replace(/\s+ORDER\s+BY\s+.+$/i, '');
 }
 
