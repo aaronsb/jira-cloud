@@ -57,7 +57,13 @@ _release-commit:
 	git tag -a "v$(NEW_VERSION)" -m "v$(NEW_VERSION)"
 	git push && git push --tags
 	@echo ""
-	@echo "Released v$(NEW_VERSION). Run 'make publish-all' to publish everywhere."
+	@echo "── Building MCPB ──"
+	$(MAKE) mcpb
+	@echo ""
+	@echo "── GitHub Release ──"
+	gh release create "v$(NEW_VERSION)" --title "v$(NEW_VERSION)" --generate-notes jira-cloud-mcp.mcpb
+	@echo ""
+	@echo "v$(NEW_VERSION) released. npm auto-publishes via CI on tag push."
 
 # ── Publishing ──────────────────────────────────────────────────────────
 
@@ -72,30 +78,22 @@ mcpb: build     ## Build .mcpb desktop extension bundle
 	@echo ""
 	@echo "Built: jira-cloud-mcp.mcpb ($$(du -h jira-cloud-mcp.mcpb | cut -f1))"
 
-publish-all: mcpb  ## Publish to npm, MCP Registry, GitHub Release, and build MCPB
+publish-all: mcpb  ## Manual publish: MCP Registry + upload MCPB to existing GitHub Release
 	@echo ""
-	@echo "Publishing v$(VERSION) to all channels."
-	@echo "  1. npm (requires OTP)"
-	@echo "  2. MCP Registry (requires GitHub auth)"
-	@echo "  3. GitHub Release"
-	@echo "  4. MCPB bundle (already built)"
+	@echo "Publishing v$(VERSION) — npm is handled by CI on tag push."
+	@echo "  1. MCP Registry (requires GitHub auth)"
+	@echo "  2. Upload MCPB to GitHub Release"
 	@echo ""
 	@read -p "Continue? [y/N] " confirm && [ "$$confirm" = "y" ] || (echo "Aborted." && exit 1)
-	@echo ""
-	@echo "── npm ──"
-	@read -p "npm OTP: " otp && npm publish --access public --otp "$$otp"
 	@echo ""
 	@echo "── MCP Registry ──"
 	mcp-publisher login github
 	mcp-publisher publish server.json
 	@echo ""
 	@echo "── GitHub Release ──"
-	@read -p "Release notes (one line, or empty for default): " notes; \
-	if [ -z "$$notes" ]; then notes="Release v$(VERSION)"; fi; \
-	gh release create "v$(VERSION)" --title "v$(VERSION)" --notes "$$notes" jira-cloud-mcp.mcpb
+	gh release upload "v$(VERSION)" jira-cloud-mcp.mcpb --clobber
 	@echo ""
-	@echo "v$(VERSION) published to all channels."
-	@echo "MCPB bundle: jira-cloud-mcp.mcpb"
+	@echo "v$(VERSION) published."
 
 help:           ## Show this help
 	@grep -E '^[a-z_-]+:.*##' $(MAKEFILE_LIST) | awk -F ':.*## ' '{printf "  %-16s %s\n", $$1, $$2}'
