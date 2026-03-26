@@ -3,14 +3,17 @@ import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { setupToolResourceHandlers } from './tool-resource-handlers.js';
 import { fieldDiscovery } from '../client/field-discovery.js';
 import { categoryLabel } from '../client/field-type-map.js';
+import type { GraphQLClient } from '../client/graphql-client.js';
+import { searchGoals } from '../client/graphql-goals.js';
 import { JiraClient } from '../client/jira-client.js';
 
 /**
  * Sets up resource handlers for the Jira MCP server
  * @param jiraClient The Jira client instance
+ * @param graphqlClient Optional GraphQL client for Townsquare goals
  * @returns Object containing resource handlers
  */
-export function setupResourceHandlers(jiraClient: JiraClient) {
+export function setupResourceHandlers(jiraClient: JiraClient, graphqlClient?: GraphQLClient | null) {
   const toolResourceHandler = setupToolResourceHandlers();
 
   return {
@@ -95,7 +98,7 @@ export function setupResourceHandlers(jiraClient: JiraClient) {
       try {
         // Handle static resources
         if (uri === 'jira://instance/summary') {
-          return await getInstanceSummary(jiraClient);
+          return await getInstanceSummary(jiraClient, graphqlClient);
         }
         
         if (uri === 'jira://projects/distribution') {
@@ -159,23 +162,23 @@ export function setupResourceHandlers(jiraClient: JiraClient) {
 /**
  * Gets a summary of the Jira instance
  */
-async function getInstanceSummary(jiraClient: JiraClient) {
+async function getInstanceSummary(jiraClient: JiraClient, graphqlClient?: GraphQLClient | null) {
   try {
     // Get projects
     const projects = await jiraClient.listProjects();
-    
+
     // Get boards
     const boards = await jiraClient.listBoards();
-    
+
     // Get active sprints for each board (limited to first 5 boards for performance)
     const sprints = (await Promise.all(
-      boards.slice(0, 5).map(board => 
+      boards.slice(0, 5).map(board =>
         jiraClient.listBoardSprints(board.id)
           .catch(() => []) // Ignore errors for individual boards
       )
     )).flat();
-    
-    const summary = {
+
+    const summary: Record<string, unknown> = {
       totalProjects: projects.length,
       totalBoards: boards.length,
       activeSprintsCount: sprints.filter(s => s.state === 'active').length,
@@ -183,7 +186,30 @@ async function getInstanceSummary(jiraClient: JiraClient) {
         timestamp: new Date().toISOString()
       }
     };
-    
+
+    // Fetch goal summary counts if GraphQL client is available
+    if (graphqlClient) {
+      try {
+        const result = await searchGoals(graphqlClient, '', 'HIERARCHY_ASC', 200);
+        if (result.success && result.goals && result.goals.length > 0) {
+          const goals = result.goals;
+          const stateCounts: Record<string, number> = {};
+          for (const g of goals) {
+            stateCounts[g.state.value] = (stateCounts[g.state.value] ?? 0) + 1;
+          }
+          const themes = goals.filter(g => !g.parentGoal).length;
+          summary.goals = {
+            total: goals.length,
+            themes,
+            ...stateCounts,
+            hint: 'Use analyze_jira_plan with operation list_goals to explore the goal tree',
+          };
+        }
+      } catch {
+        // Goals not available on this instance — skip silently
+      }
+    }
+
     return {
       contents: [
         {

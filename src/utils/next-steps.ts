@@ -270,6 +270,37 @@ export function conflictFixSteps(conflicts: import('../types/index.js').RollupCo
   return lines.join('\n');
 }
 
+export function goalNextSteps(operation: string, goalKey?: string, workItemCount?: number): string {
+  const steps: NextStep[] = [];
+  switch (operation) {
+    case 'list_goals':
+      steps.push(
+        { description: 'Get detail on a specific goal', tool: 'analyze_jira_plan', example: { operation: 'get_goal', goalKey: 'GOAL-KEY' } },
+        { description: 'Analyze a goal\'s linked issues', tool: 'analyze_jira_plan', example: { operation: 'analyze', goalKey: 'GOAL-KEY' } },
+      );
+      break;
+    case 'get_goal':
+      if (goalKey && workItemCount && workItemCount > 0) {
+        steps.push(
+          { description: 'Analyze this goal\'s linked issues', tool: 'analyze_jira_plan', example: { operation: 'analyze', goalKey } },
+        );
+      }
+      steps.push(
+        { description: 'Search for more goals', tool: 'analyze_jira_plan', example: { operation: 'list_goals', searchString: '' } },
+      );
+      break;
+    case 'analyze':
+      if (goalKey) {
+        steps.push(
+          { description: 'View goal detail', tool: 'analyze_jira_plan', example: { operation: 'get_goal', goalKey } },
+          { description: 'Check for data gaps', tool: 'analyze_jira_plan', example: { operation: 'analyze', goalKey, mode: 'gaps' } },
+        );
+      }
+      break;
+  }
+  return steps.length > 0 ? formatSteps(steps) : '';
+}
+
 export function analysisNextSteps(jql: string, issueKeys: string[], truncated = false, groupBy?: string, filterSource?: string): string {
   const steps: NextStep[] = [];
   if (issueKeys.length > 0) {

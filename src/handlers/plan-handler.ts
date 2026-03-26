@@ -2,10 +2,11 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import type { GraphObjectCache } from '../client/graph-object-cache.js';
 import type { GraphQLClient } from '../client/graphql-client.js';
+import { searchGoals, getGoalByKey, resolveGoalWorkItems } from '../client/graphql-goals.js';
 import { GraphQLHierarchyWalker, collectLeaves, computeDepth, walkTree } from '../client/graphql-hierarchy.js';
 import type { JiraClient } from '../client/jira-client.js';
 import type { GraphTreeNode, RollupResult } from '../types/index.js';
-import { planNextSteps } from '../utils/next-steps.js';
+import { planNextSteps, goalNextSteps } from '../utils/next-steps.js';
 import { normalizeArgs } from '../utils/normalize-args.js';
 
 const ALL_ROLLUPS = ['dates', 'points', 'progress', 'assignees'];
@@ -18,13 +19,26 @@ export async function handlePlanRequest(
   cache?: GraphObjectCache,
 ) {
   const args = normalizeArgs(request.params?.arguments ?? {});
-  const issueKey = args.issueKey as string | undefined;
+  const operation = (args.operation as string) ?? 'analyze';
+  const goalKey = args.goalKey as string | undefined;
 
-  if (!issueKey) {
-    throw new McpError(ErrorCode.InvalidParams, 'issueKey is required for analyze_jira_plan');
+  // Goal operations
+  if (operation === 'list_goals') {
+    return handleListGoals(graphqlClient, args);
+  }
+  if (operation === 'get_goal') {
+    if (!goalKey) throw new McpError(ErrorCode.InvalidParams, 'goalKey is required for get_goal');
+    return handleGetGoal(graphqlClient, goalKey);
+  }
+  if (goalKey && operation === 'analyze') {
+    return handleAnalyzeGoal(graphqlClient, goalKey, args, cache);
   }
 
-  const operation = (args.operation as string) ?? 'analyze';
+  // Issue operations require issueKey
+  const issueKey = args.issueKey as string | undefined;
+  if (!issueKey) {
+    throw new McpError(ErrorCode.InvalidParams, 'issueKey or goalKey is required for analyze_jira_plan');
+  }
 
   // Handle release operation
   if (operation === 'release') {
@@ -438,4 +452,217 @@ export function renderRollupTree(
   node.children.forEach((child, i) => {
     renderRollupTree(child, lines, rollups, childPrefix, i === node.children.length - 1);
   });
+}
+
+// --- Goal operations ---
+
+async function handleListGoals(
+  graphqlClient: GraphQLClient,
+  args: Record<string, unknown>,
+) {
+  const searchString = (args.searchString as string) ?? '';
+  const sort = (args.sort as string) ?? 'HIERARCHY_ASC';
+
+  const result = await searchGoals(graphqlClient, searchString, sort);
+  if (!result.success || !result.goals) {
+    const error = result.error ?? 'Unknown error';
+    if (error.includes('not found') || error.includes('Cannot route')) {
+      return { content: [{ type: 'text', text: 'No goals found. Goals may not be enabled on this instance.' }] };
+    }
+    return { content: [{ type: 'text', text: `Goal search failed: ${error}` }], isError: true };
+  }
+
+  if (result.goals.length === 0) {
+    const hint = searchString.includes('status =')
+      ? '\n\n*Note: TQL status filtering may be incomplete for some values. Try without the status filter to see all goals.*'
+      : '';
+    return { content: [{ type: 'text', text: `No goals found for search: "${searchString}"${hint}` }] };
+  }
+
+  const lines: string[] = [];
+  lines.push(`# Goals (${result.goals.length})`);
+  lines.push('');
+
+  for (const goal of result.goals) {
+    const workCount = result.workItemCounts?.get(goal.key) ?? 0;
+    const indent = goal.parentGoal ? '  ' : '';
+    const stateIcon = goalStateIcon(goal.state.value);
+    const owner = goal.owner ? ` — ${goal.owner.name}` : '';
+    const workLabel = workCount > 0 ? ` | ${workCount} linked issues` : '';
+
+    lines.push(`${indent}${stateIcon} **${goal.key}**: ${goal.name} [${goal.state.label}]${owner}${workLabel}`);
+  }
+
+  lines.push('');
+  lines.push(goalNextSteps('list_goals'));
+
+  return { content: [{ type: 'text', text: lines.join('\n') }] };
+}
+
+async function handleGetGoal(
+  graphqlClient: GraphQLClient,
+  goalKey: string,
+) {
+  const result = await getGoalByKey(graphqlClient, goalKey);
+  if (!result.success || !result.goal) {
+    return { content: [{ type: 'text', text: `Goal ${goalKey} not found: ${result.error ?? 'unknown error'}` }], isError: true };
+  }
+
+  const goal = result.goal;
+  const lines: string[] = [];
+
+  lines.push(`# Goal: ${goal.key} — ${goal.name}`);
+  lines.push(`**State:** ${goal.state.label} | **Owner:** ${goal.owner?.name ?? 'Unassigned'}`);
+  if (goal.parentGoal) {
+    lines.push(`**Parent:** ${goal.parentGoal.key} — ${goal.parentGoal.name}`);
+  }
+  if (goal.description) {
+    lines.push(`**Description:** ${goal.description}`);
+  }
+  lines.push('');
+
+  if (goal.subGoals.length > 0) {
+    lines.push(`## Sub-Goals (${goal.subGoals.length})`);
+    lines.push('');
+    for (const sg of goal.subGoals) {
+      const stateIcon = goalStateIcon(sg.state.value);
+      lines.push(`${stateIcon} **${sg.key}**: ${sg.name} [${sg.state.label}]`);
+    }
+    lines.push('');
+  }
+
+  if (goal.projects.length > 0) {
+    lines.push(`## Projects (${goal.projects.length})`);
+    lines.push('');
+    for (const p of goal.projects) {
+      lines.push(`- ${p.name} [${p.state.value}]`);
+    }
+    lines.push('');
+  }
+
+  if (goal.workItems.length > 0) {
+    lines.push(`## Linked Issues (${goal.workItems.length})`);
+    lines.push('');
+    for (const w of goal.workItems) {
+      lines.push(`- **${w.key}** [${w.issueType.name}] ${w.summary} — ${w.status.name}`);
+    }
+    lines.push('');
+  } else {
+    lines.push('*No linked Jira issues.*');
+    lines.push('');
+  }
+
+  lines.push(goalNextSteps('get_goal', goalKey, goal.workItems.length));
+
+  return { content: [{ type: 'text', text: lines.join('\n') }] };
+}
+
+async function handleAnalyzeGoal(
+  graphqlClient: GraphQLClient,
+  goalKey: string,
+  args: Record<string, unknown>,
+  cache?: GraphObjectCache,
+) {
+  const result = await resolveGoalWorkItems(graphqlClient, goalKey);
+  if (!result.success || !result.goal) {
+    return { content: [{ type: 'text', text: `Failed to resolve goal ${goalKey}: ${result.error ?? 'unknown error'}` }], isError: true };
+  }
+
+  const goal = result.goal;
+  const issueKeys = result.issueKeys!;
+
+  if (issueKeys.length === 0) {
+    const lines: string[] = [];
+    lines.push(`# Goal: ${goal.key} — ${goal.name} [${goal.state.label}]`);
+    lines.push('');
+    lines.push('No linked Jira issues to analyze. Cannot resolve linked Jira issues — the workItems API may have changed, or no issues are linked to this goal.');
+    lines.push('');
+    lines.push(goalNextSteps('analyze', goalKey, 0));
+    return { content: [{ type: 'text', text: lines.join('\n') }] };
+  }
+
+  // Goal context header
+  const header: string[] = [];
+  header.push(`# Goal: ${goal.key} — ${goal.name} [${goal.state.label}]`);
+  header.push(`**Owner:** ${goal.owner?.name ?? 'Unassigned'} | **Linked issues:** ${issueKeys.length}`);
+  if (goal.subGoals.length > 0) {
+    header.push(`**Sub-goals:** ${goal.subGoals.map(sg => `${sg.key} [${sg.state.value}]`).join(', ')}`);
+  }
+  header.push('');
+
+  // Walk each issue's hierarchy and compute rollups
+  const rollups = (Array.isArray(args.rollups) ? args.rollups : ALL_ROLLUPS) as string[];
+
+  // For goal analysis, walk each linked issue and merge results
+  const walker = new GraphQLHierarchyWalker(graphqlClient);
+  const allTrees: GraphTreeNode[] = [];
+  const errors: string[] = [];
+
+  for (const key of issueKeys) {
+    // Check cache first
+    if (cache) {
+      const status = cache.getStatus(key);
+      if (status.state === 'complete' || status.state === 'stale') {
+        allTrees.push(cache.get(key)!.tree);
+        continue;
+      }
+    }
+    try {
+      const { tree } = await walker.walkDown(key);
+      allTrees.push(tree);
+    } catch {
+      errors.push(key);
+    }
+  }
+
+  if (allTrees.length === 0) {
+    header.push('All issue hierarchy walks failed. The linked issues may not be accessible.');
+    if (errors.length > 0) header.push(`Failed keys: ${errors.join(', ')}`);
+    return { content: [{ type: 'text', text: header.join('\n') }] };
+  }
+
+  // Render each tree's rollup as a summary line
+  header.push(`## Issue Rollups (${allTrees.length} of ${issueKeys.length} resolved)`);
+  if (errors.length > 0) {
+    header.push(`*${errors.length} issues could not be walked: ${errors.join(', ')}*`);
+  }
+  header.push('');
+
+  let totalResolved = 0;
+  let totalItems = 0;
+  let totalPoints = 0;
+  let earnedPoints = 0;
+
+  for (const tree of allTrees) {
+    const rollup = GraphQLHierarchyWalker.computeRollups(tree);
+    totalResolved += rollup.resolvedItems;
+    totalItems += rollup.totalItems;
+    totalPoints += rollup.totalPoints;
+    earnedPoints += rollup.earnedPoints;
+    renderNodeLine(tree, header, rollups);
+  }
+
+  header.push('');
+  header.push('## Aggregate');
+  if (rollups.includes('progress')) {
+    const pct = totalItems > 0 ? Math.round(totalResolved / totalItems * 100) : 0;
+    header.push(`**Progress:** ${totalResolved}/${totalItems} resolved (${pct}%)`);
+  }
+  if (rollups.includes('points') && totalPoints > 0) {
+    header.push(`**Points:** ${earnedPoints}/${totalPoints} earned`);
+  }
+  header.push('');
+  header.push(goalNextSteps('analyze', goalKey, issueKeys.length));
+
+  return { content: [{ type: 'text', text: header.join('\n') }] };
+}
+
+function goalStateIcon(state: string): string {
+  switch (state) {
+    case 'done': return '✓';
+    case 'on_track': return '●';
+    case 'at_risk': return '⚠';
+    case 'off_track': return '✗';
+    default: return '○';
+  }
 }

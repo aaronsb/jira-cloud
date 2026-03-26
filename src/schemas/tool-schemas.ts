@@ -417,18 +417,31 @@ export const toolSchemas = {
 
   analyze_jira_plan: {
     name: 'analyze_jira_plan',
-    description: 'Analyze hierarchy rollups for any parent issue. Walks the issue tree via GraphQL, computes rolled-up dates, points, progress, assignees, and detects date conflicts. Results are cached server-side for fast re-analysis. Works on any Jira instance (no Plans/Premium required). For flat-set metrics use analyze_jira_issues (with dataRef to analyze cached plan data); for structure without rollups use manage_jira_issue hierarchy.',
+    description: 'Analyze hierarchy rollups for issues or Atlassian Goals. Walks issue trees via GraphQL, computes rolled-up dates, points, progress, assignees, and detects conflicts. Also discovers and analyzes Goals (Townsquare) — use list_goals to find goals, get_goal for detail, or analyze with goalKey to run metrics on a goal\'s linked issues. Results cached server-side. For flat-set metrics use analyze_jira_issues; for structure without rollups use manage_jira_issue hierarchy.',
     inputSchema: {
       type: 'object',
       properties: {
         operation: {
           type: 'string',
-          enum: ['analyze', 'release'],
-          description: 'Operation to perform. analyze (default): walk hierarchy and compute rollups. release: free cached walk data for this issueKey.',
+          enum: ['analyze', 'release', 'list_goals', 'get_goal'],
+          description: 'Operation to perform. analyze (default): walk hierarchy and compute rollups — accepts issueKey or goalKey. release: free cached walk data. list_goals: search Atlassian Goals. get_goal: get goal detail with linked issues.',
         },
         issueKey: {
           type: 'string',
-          description: 'Issue key at the root of the plan tree (e.g., PROJ-100). Required.',
+          description: 'Issue key at the root of the plan tree (e.g., PROJ-100). Required for analyze/release unless goalKey is provided.',
+        },
+        goalKey: {
+          type: 'string',
+          description: 'Atlassian Goal key (e.g., PRAEC-25). Use with analyze to run rollup metrics on the goal\'s linked Jira issues, or with get_goal to see goal detail.',
+        },
+        searchString: {
+          type: 'string',
+          description: 'TQL search string for list_goals. Examples: \'name LIKE "Health"\', \'status = on_track\', \'status = on_track AND name LIKE "velocity"\'. Empty string returns all goals.',
+        },
+        sort: {
+          type: 'string',
+          enum: ['HIERARCHY_ASC', 'HIERARCHY_DESC', 'NAME_ASC', 'NAME_DESC', 'TARGET_DATE_ASC', 'TARGET_DATE_DESC', 'LATEST_UPDATE_DATE_ASC', 'LATEST_UPDATE_DATE_DESC'],
+          description: 'Sort order for list_goals. Default: HIERARCHY_ASC (groups parents with children).',
         },
         rollups: {
           type: 'array',
@@ -448,7 +461,7 @@ export const toolSchemas = {
           description: 'Output mode. rollup (default): summary + entry points. gaps: conflicts and missing data only.',
         },
       },
-      required: ['issueKey'],
+      required: [],
     },
   },
 
