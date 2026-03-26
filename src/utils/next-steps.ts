@@ -293,7 +293,7 @@ export function goalNextSteps(operation: string, goalKey?: string, workItemCount
       if (goalKey) {
         steps.push(
           { description: 'View goal detail', tool: 'analyze_jira_plan', example: { operation: 'get_goal', goalKey } },
-          { description: 'Check for data gaps', tool: 'analyze_jira_plan', example: { operation: 'analyze', goalKey, mode: 'gaps' } },
+          { description: 'Drill into a specific linked issue', tool: 'analyze_jira_plan', example: { issueKey: 'ISSUE-KEY' } },
         );
       }
       break;

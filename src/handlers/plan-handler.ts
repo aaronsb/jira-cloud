@@ -569,7 +569,7 @@ async function handleAnalyzeGoal(
   }
 
   const goal = result.goal;
-  const issueKeys = result.issueKeys!;
+  const issueKeys = result.issueKeys ?? [];
 
   if (issueKeys.length === 0) {
     const lines: string[] = [];
@@ -598,8 +598,9 @@ async function handleAnalyzeGoal(
   const allTrees: GraphTreeNode[] = [];
   const errors: string[] = [];
 
+  // Separate cached from uncached keys
+  const uncachedKeys: string[] = [];
   for (const key of issueKeys) {
-    // Check cache first
     if (cache) {
       const status = cache.getStatus(key);
       if (status.state === 'complete' || status.state === 'stale') {
@@ -607,11 +608,19 @@ async function handleAnalyzeGoal(
         continue;
       }
     }
-    try {
-      const { tree } = await walker.walkDown(key);
-      allTrees.push(tree);
-    } catch {
-      errors.push(key);
+    uncachedKeys.push(key);
+  }
+
+  // Walk uncached keys in parallel
+  const walkResults = await Promise.allSettled(
+    uncachedKeys.map(key => walker.walkDown(key)),
+  );
+  for (let i = 0; i < walkResults.length; i++) {
+    const result = walkResults[i];
+    if (result.status === 'fulfilled') {
+      allTrees.push(result.value.tree);
+    } else {
+      errors.push(uncachedKeys[i]);
     }
   }
 
