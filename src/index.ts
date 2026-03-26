@@ -146,7 +146,7 @@ class JiraServer {
     }));
 
     // Set up resource handlers
-    const resourceHandlers = setupResourceHandlers(this.jiraClient);
+    const resourceHandlers = setupResourceHandlers(this.jiraClient, this.graphqlClient);
     this.server.setRequestHandler(ListResourcesRequestSchema, resourceHandlers.listResources);
     this.server.setRequestHandler(ListResourceTemplatesRequestSchema, resourceHandlers.listResourceTemplates);
     this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
@@ -332,7 +332,7 @@ class JiraServer {
     try {
       const cloudId = await discoverCloudId(JIRA_HOST!, JIRA_EMAIL!, JIRA_API_TOKEN!);
       if (cloudId) {
-        this.graphqlClient = new GraphQLClient(JIRA_EMAIL!, JIRA_API_TOKEN!, cloudId);
+        this.graphqlClient = new GraphQLClient(JIRA_EMAIL!, JIRA_API_TOKEN!, cloudId, JIRA_HOST!);
         console.error(`[jira-cloud] GraphQL client ready (cloudId: ${cloudId.slice(0, 8)}...)`);
       } else {
         console.error('[jira-cloud] GraphQL/Plans unavailable — analyze_jira_plan disabled');

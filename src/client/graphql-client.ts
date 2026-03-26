@@ -73,28 +73,59 @@ export async function discoverCloudId(
 export class GraphQLClient {
   private authHeader: string;
   private cloudId: string;
+  private tenantedEndpoint: string | null;
 
-  constructor(email: string, apiToken: string, cloudId: string) {
+  constructor(email: string, apiToken: string, cloudId: string, host?: string) {
     this.authHeader = buildAuthHeader(email, apiToken);
     this.cloudId = cloudId;
+    this.tenantedEndpoint = host
+      ? `https://${extractHostname(host)}/gateway/api/graphql`
+      : null;
   }
 
   getCloudId(): string {
     return this.cloudId;
   }
 
+  /** Site container ARI for Townsquare queries */
+  getSiteAri(): string {
+    return `ari:cloud:townsquare::site/${this.cloudId}`;
+  }
+
   async query<T>(
     query: string,
     variables: Record<string, unknown> = {},
   ): Promise<{ success: boolean; data?: T; error?: string }> {
+    return this._fetch<T>(AGG_ENDPOINT, query, variables, {
+      'X-ExperimentalApi': 'JiraPlan,JiraPlansSupport',
+    });
+  }
+
+  /** Query the tenanted endpoint ({host}/gateway/api/graphql) for site-scoped APIs like Townsquare */
+  async queryTenanted<T>(
+    query: string,
+    variables: Record<string, unknown> = {},
+  ): Promise<{ success: boolean; data?: T; error?: string }> {
+    if (!this.tenantedEndpoint) {
+      return { success: false, error: 'Tenanted endpoint not available (no host configured)' };
+    }
+    return this._fetch<T>(this.tenantedEndpoint, query, variables);
+  }
+
+  private async _fetch<T>(
+    endpoint: string,
+    query: string,
+    variables: Record<string, unknown>,
+    extraHeaders?: Record<string, string>,
+  ): Promise<{ success: boolean; data?: T; error?: string }> {
     try {
-      const response = await fetch(AGG_ENDPOINT, {
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Authorization': this.authHeader,
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'X-ExperimentalApi': 'JiraPlan,JiraPlansSupport',
+          ...extraHeaders,
         },
         body: JSON.stringify({
           query,
