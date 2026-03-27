@@ -924,7 +924,7 @@ async function renderHierarchy(issues: JiraIssueDetails[], graphqlClient: GraphQ
   }
 
   if (parentKeys.size > MAX_HIERARCHY_ROOTS) {
-    lines.push('', `*Showing ${MAX_HIERARCHY_ROOTS} of ${parentKeys.size} root issues. Use analyze_jira_plan for a focused subtree.*`);
+    lines.push('', `*Showing ${MAX_HIERARCHY_ROOTS} of ${parentKeys.size} root issues. Use manage_jira_plan for a focused subtree.*`);
   }
 
   return lines.join('\n');
@@ -1064,11 +1064,11 @@ export async function handleAnalysisRequest(jiraClient: JiraClient, request: any
   const dataRef = args.dataRef as string | undefined;
   if (dataRef && typeof dataRef === 'string' && dataRef.trim() !== '') {
     if (!cache) {
-      throw new McpError(ErrorCode.InvalidParams, 'dataRef requires the graph object cache (start a walk with analyze_jira_plan first).');
+      throw new McpError(ErrorCode.InvalidParams, 'dataRef requires the graph object cache (start a walk with manage_jira_plan first).');
     }
     const cached = cache.get(dataRef);
     if (!cached) {
-      throw new McpError(ErrorCode.InvalidParams, `No cached walk for "${dataRef}". Start one with analyze_jira_plan first.`);
+      throw new McpError(ErrorCode.InvalidParams, `No cached walk for "${dataRef}". Start one with manage_jira_plan first.`);
     }
     if (cached.state === 'walking') {
       return {

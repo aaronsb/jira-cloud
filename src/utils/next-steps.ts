@@ -79,7 +79,7 @@ export function issueNextSteps(operation: string, issueKey?: string): string {
     case 'hierarchy':
       steps.push(
         { description: 'View a specific issue from the tree', tool: 'manage_jira_issue', example: { operation: 'get', issueKey } },
-        { description: 'Analyze plan rollups (requires Jira Plans)', tool: 'analyze_jira_plan', example: { issueKey } },
+        { description: 'Analyze plan rollups (requires Jira Plans)', tool: 'manage_jira_plan', example: { issueKey } },
         { description: 'Search for issues in this project', tool: 'manage_jira_filter', example: { operation: 'execute_jql', jql: `project = "${issueKey?.split('-')[0]}"` } },
       );
       break;
@@ -218,10 +218,10 @@ export function planNextSteps(issueKey: string, mode?: string, conflicts?: impor
     { description: 'Explore the hierarchy tree', tool: 'manage_jira_issue', example: { operation: 'hierarchy', issueKey } },
   );
   if (mode !== 'gaps') {
-    steps.push({ description: 'Check for data gaps and conflicts', tool: 'analyze_jira_plan', example: { issueKey, mode: 'gaps' } });
+    steps.push({ description: 'Check for data gaps and conflicts', tool: 'manage_jira_plan', example: { issueKey, mode: 'gaps' } });
   }
   if (mode !== 'timeline') {
-    steps.push({ description: 'View the timeline', tool: 'analyze_jira_plan', example: { issueKey, mode: 'timeline' } });
+    steps.push({ description: 'View the timeline', tool: 'manage_jira_plan', example: { issueKey, mode: 'timeline' } });
   }
   steps.push(
     { description: 'Run flat metrics on children', tool: 'analyze_jira_issues', example: { jql: `parent = ${issueKey}`, metrics: ['summary'], groupBy: 'assignee' } },
@@ -275,25 +275,43 @@ export function goalNextSteps(operation: string, goalKey?: string, workItemCount
   switch (operation) {
     case 'list_goals':
       steps.push(
-        { description: 'Get detail on a specific goal', tool: 'analyze_jira_plan', example: { operation: 'get_goal', goalKey: 'GOAL-KEY' } },
-        { description: 'Analyze a goal\'s linked issues', tool: 'analyze_jira_plan', example: { operation: 'analyze', goalKey: 'GOAL-KEY' } },
+        { description: 'Get detail on a specific goal', tool: 'manage_jira_plan', example: { operation: 'get_goal', goalKey: 'GOAL-KEY' } },
+        { description: 'Analyze a goal\'s linked issues', tool: 'manage_jira_plan', example: { operation: 'analyze', goalKey: 'GOAL-KEY' } },
       );
       break;
     case 'get_goal':
       if (goalKey && workItemCount && workItemCount > 0) {
         steps.push(
-          { description: 'Analyze this goal\'s linked issues', tool: 'analyze_jira_plan', example: { operation: 'analyze', goalKey } },
+          { description: 'Analyze this goal\'s linked issues', tool: 'manage_jira_plan', example: { operation: 'analyze', goalKey } },
         );
       }
       steps.push(
-        { description: 'Search for more goals', tool: 'analyze_jira_plan', example: { operation: 'list_goals', searchString: '' } },
+        { description: 'Search for more goals', tool: 'manage_jira_plan', example: { operation: 'list_goals', searchString: '' } },
       );
       break;
     case 'analyze':
       if (goalKey) {
         steps.push(
-          { description: 'View goal detail', tool: 'analyze_jira_plan', example: { operation: 'get_goal', goalKey } },
-          { description: 'Drill into a specific linked issue', tool: 'analyze_jira_plan', example: { issueKey: 'ISSUE-KEY' } },
+          { description: 'View goal detail', tool: 'manage_jira_plan', example: { operation: 'get_goal', goalKey } },
+          { description: 'Update goal status', tool: 'manage_jira_plan', example: { operation: 'update_goal_status', goalKey, status: 'on_track', summary: 'Progress update' } },
+        );
+      }
+      break;
+    case 'create_goal':
+    case 'update_goal':
+    case 'update_goal_status':
+      if (goalKey) {
+        steps.push(
+          { description: 'View updated goal', tool: 'manage_jira_plan', example: { operation: 'get_goal', goalKey } },
+        );
+      }
+      break;
+    case 'link_work_item':
+    case 'unlink_work_item':
+      if (goalKey) {
+        steps.push(
+          { description: 'View goal with updated links', tool: 'manage_jira_plan', example: { operation: 'get_goal', goalKey } },
+          { description: 'Analyze goal progress', tool: 'manage_jira_plan', example: { operation: 'analyze', goalKey } },
         );
       }
       break;
@@ -340,7 +358,7 @@ export function analysisNextSteps(jql: string, issueKeys: string[], truncated = 
   // Suggest plan analysis when issue keys suggest hierarchical structure
   if (issueKeys.length > 0) {
     steps.push(
-      { description: 'Analyze plan rollups for a parent issue (requires Jira Plans)', tool: 'analyze_jira_plan', example: { issueKey: issueKeys[0] } },
+      { description: 'Analyze plan rollups for a parent issue (requires Jira Plans)', tool: 'manage_jira_plan', example: { issueKey: issueKeys[0] } },
     );
   }
   // Suggest saving as filter if not already using one

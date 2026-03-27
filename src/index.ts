@@ -120,7 +120,7 @@ class JiraServer {
     }).catch(() => {});
 
     // CloudId discovery happens in run() before server connects — must complete
-    // before ListTools so analyze_jira_plan is registered if available.
+    // before ListTools so manage_jira_plan is registered if available.
 
     this.server.onerror = (error) => console.error('[MCP Error]', error);
     process.on('SIGINT', async () => {
@@ -133,7 +133,7 @@ class JiraServer {
     // Set up required MCP protocol handlers
     this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
       tools: Object.entries(toolSchemas)
-        .filter(([key]) => key !== 'analyze_jira_plan' || this.graphqlClient !== null)
+        .filter(([key]) => key !== 'manage_jira_plan' || this.graphqlClient !== null)
         .map(([key, schema]) => ({
           name: key,
           description: schema.description,
@@ -193,7 +193,7 @@ class JiraServer {
           ...toolHandlers,
           queue_jira_operations: createQueueHandler(toolHandlers, JIRA_HOST),
           ...(this.graphqlClient ? {
-            analyze_jira_plan: (_client, req) => handlePlanRequest(this.jiraClient, this.graphqlClient!, req, this.cache),
+            manage_jira_plan: (_client, req) => handlePlanRequest(this.jiraClient, this.graphqlClient!, req, this.cache),
           } : {}),
         };
 
@@ -335,10 +335,10 @@ class JiraServer {
         this.graphqlClient = new GraphQLClient(JIRA_EMAIL!, JIRA_API_TOKEN!, cloudId, JIRA_HOST!);
         console.error(`[jira-cloud] GraphQL client ready (cloudId: ${cloudId.slice(0, 8)}...)`);
       } else {
-        console.error('[jira-cloud] GraphQL/Plans unavailable — analyze_jira_plan disabled');
+        console.error('[jira-cloud] GraphQL/Plans unavailable — manage_jira_plan disabled');
       }
     } catch {
-      console.error('[jira-cloud] GraphQL discovery failed — analyze_jira_plan disabled');
+      console.error('[jira-cloud] GraphQL discovery failed — manage_jira_plan disabled');
     }
 
     const transport = new StdioServerTransport();

@@ -379,7 +379,7 @@ export const toolSchemas = {
         },
         dataRef: {
           type: 'string',
-          description: 'Root issue key of a cached hierarchy walk. Analyzes cached plan data without re-fetching from Jira. Start a walk with analyze_jira_plan first. Supports all metrics except flow. Takes precedence over jql/filterId.',
+          description: 'Root issue key of a cached hierarchy walk. Analyzes cached plan data without re-fetching from Jira. Start a walk with manage_jira_plan first. Supports all metrics except flow. Takes precedence over jql/filterId.',
         },
         metrics: {
           type: 'array',
@@ -415,28 +415,61 @@ export const toolSchemas = {
     },
   },
 
-  analyze_jira_plan: {
-    name: 'analyze_jira_plan',
-    description: 'Analyze hierarchy rollups for issues or Atlassian Goals. Walks issue trees via GraphQL, computes rolled-up dates, points, progress, assignees, and detects conflicts. Also discovers and analyzes Goals (Townsquare) — use list_goals to find goals, get_goal for detail, or analyze with goalKey to run metrics on a goal\'s linked issues. Results cached server-side. For flat-set metrics use analyze_jira_issues; for structure without rollups use manage_jira_issue hierarchy.',
+  manage_jira_plan: {
+    name: 'manage_jira_plan',
+    description: 'Navigate and manage the strategic-to-execution hierarchy. Walks issue trees and Atlassian Goals via GraphQL. Read: analyze rollups (dates, points, progress, conflicts), discover goals (list_goals), get goal detail (get_goal). Write: create/update goals, post status updates, link/unlink Jira issues to goals. Results cached server-side. For flat-set metrics use analyze_jira_issues; for structure without rollups use manage_jira_issue hierarchy.',
     inputSchema: {
       type: 'object',
       properties: {
         operation: {
           type: 'string',
-          enum: ['analyze', 'release', 'list_goals', 'get_goal'],
-          description: 'Operation to perform. analyze (default): walk hierarchy and compute rollups — accepts issueKey or goalKey. release: free cached walk data. list_goals: search Atlassian Goals. get_goal: get goal detail with linked issues.',
+          enum: ['analyze', 'release', 'list_goals', 'get_goal', 'create_goal', 'update_goal', 'update_goal_status', 'link_work_item', 'unlink_work_item'],
+          description: 'Operation to perform. analyze: walk hierarchy and compute rollups. release: free cached walk. list_goals: search goals. get_goal: goal detail. create_goal: create a goal. update_goal: edit goal name/description/dates/archive. update_goal_status: post a status update (on_track/off_track/done). link_work_item: link a Jira issue to a goal. unlink_work_item: unlink a Jira issue from a goal.',
         },
         issueKey: {
           type: 'string',
-          description: 'Issue key at the root of the plan tree (e.g., PROJ-100). Required for analyze/release unless goalKey is provided.',
+          description: 'Issue key at the root of the plan tree (e.g., PROJ-100). Required for analyze/release unless goalKey is provided. Also used with link_work_item/unlink_work_item to specify the Jira issue.',
         },
         goalKey: {
           type: 'string',
-          description: 'Atlassian Goal key (e.g., PRAEC-25). Use with analyze to run rollup metrics on the goal\'s linked Jira issues, or with get_goal to see goal detail.',
+          description: 'Atlassian Goal key (e.g., PRAEC-25). Used for get_goal, analyze, update_goal, update_goal_status, link_work_item, unlink_work_item.',
+        },
+        name: {
+          type: 'string',
+          description: 'Goal name. Required for create_goal. Optional for update_goal (renames the goal).',
+        },
+        description: {
+          type: 'string',
+          description: 'Goal description text. For create_goal and update_goal.',
+        },
+        status: {
+          type: 'string',
+          enum: ['on_track', 'off_track', 'at_risk', 'done', 'pending', 'paused'],
+          description: 'Goal status for update_goal_status.',
+        },
+        summary: {
+          type: 'string',
+          description: 'Status update summary text for update_goal_status. Describes what changed and why.',
+        },
+        parentGoalKey: {
+          type: 'string',
+          description: 'Parent goal key for create_goal. Makes the new goal a sub-goal of this parent.',
+        },
+        targetDate: {
+          type: 'string',
+          description: 'Target date in ISO format (YYYY-MM-DD) for create_goal and update_goal.',
+        },
+        startDate: {
+          type: 'string',
+          description: 'Start date in ISO format (YYYY-MM-DD) for update_goal.',
+        },
+        archived: {
+          type: 'boolean',
+          description: 'Set to true to archive a goal, false to unarchive. For update_goal.',
         },
         searchString: {
           type: 'string',
-          description: 'TQL search string for list_goals. Examples: \'name LIKE "Health"\', \'status = on_track\', \'status = on_track AND name LIKE "velocity"\'. Empty string returns all goals.',
+          description: 'TQL search string for list_goals. Examples: \'name LIKE "Health"\', \'status = on_track\'. Empty string returns all goals.',
         },
         sort: {
           type: 'string',
@@ -453,7 +486,7 @@ export const toolSchemas = {
         },
         focus: {
           type: 'string',
-          description: 'Issue key to focus on within the cached plan. Shows the node, its parent, siblings, and children — a windowed view for navigating large plans. Requires a completed walk.',
+          description: 'Issue key to focus on within the cached plan. Windowed view for navigating large plans.',
         },
         mode: {
           type: 'string',
