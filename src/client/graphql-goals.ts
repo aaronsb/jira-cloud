@@ -482,8 +482,9 @@ export async function createGoalStatusUpdate(
   }
 
   const mutation = result.data.goals_createUpdate;
-  if (!mutation.success && mutation.errors?.length) {
-    return { success: false, error: mutation.errors.map(e => e.message).join('; ') };
+  if (!mutation.success) {
+    const msg = mutation.errors?.map(e => e.message).join('; ') ?? 'Status update failed (no error details)';
+    return { success: false, error: msg };
   }
 
   return { success: true };
