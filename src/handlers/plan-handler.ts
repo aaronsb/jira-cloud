@@ -2,7 +2,7 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import type { GraphObjectCache } from '../client/graph-object-cache.js';
 import type { GraphQLClient } from '../client/graphql-client.js';
-import { searchGoals, getGoalByKey, resolveGoalWorkItems } from '../client/graphql-goals.js';
+import { searchGoals, getGoalByKey, resolveGoalWorkItems, createGoal, editGoal, createGoalStatusUpdate, linkWorkItem, unlinkWorkItem } from '../client/graphql-goals.js';
 import { GraphQLHierarchyWalker, collectLeaves, computeDepth, walkTree } from '../client/graphql-hierarchy.js';
 import type { JiraClient } from '../client/jira-client.js';
 import type { GraphTreeNode, RollupResult } from '../types/index.js';
@@ -33,11 +33,34 @@ export async function handlePlanRequest(
   if (goalKey && operation === 'analyze') {
     return handleAnalyzeGoal(graphqlClient, goalKey, args, cache);
   }
+  if (operation === 'create_goal') {
+    return handleCreateGoal(graphqlClient, args);
+  }
+  if (operation === 'update_goal') {
+    if (!goalKey) throw new McpError(ErrorCode.InvalidParams, 'goalKey is required for update_goal');
+    return handleUpdateGoal(graphqlClient, goalKey, args);
+  }
+  if (operation === 'update_goal_status') {
+    if (!goalKey) throw new McpError(ErrorCode.InvalidParams, 'goalKey is required for update_goal_status');
+    return handleUpdateGoalStatus(graphqlClient, goalKey, args);
+  }
+  if (operation === 'link_work_item') {
+    if (!goalKey) throw new McpError(ErrorCode.InvalidParams, 'goalKey is required for link_work_item');
+    const issueKeyArg = args.issueKey as string | undefined;
+    if (!issueKeyArg) throw new McpError(ErrorCode.InvalidParams, 'issueKey is required for link_work_item');
+    return handleLinkWorkItem(graphqlClient, goalKey, issueKeyArg);
+  }
+  if (operation === 'unlink_work_item') {
+    if (!goalKey) throw new McpError(ErrorCode.InvalidParams, 'goalKey is required for unlink_work_item');
+    const issueKeyArg = args.issueKey as string | undefined;
+    if (!issueKeyArg) throw new McpError(ErrorCode.InvalidParams, 'issueKey is required for unlink_work_item');
+    return handleUnlinkWorkItem(graphqlClient, goalKey, issueKeyArg);
+  }
 
   // Issue operations require issueKey
   const issueKey = args.issueKey as string | undefined;
   if (!issueKey) {
-    throw new McpError(ErrorCode.InvalidParams, 'issueKey or goalKey is required for analyze_jira_plan');
+    throw new McpError(ErrorCode.InvalidParams, 'issueKey or goalKey is required for manage_jira_plan');
   }
 
   // Handle release operation
@@ -674,4 +697,123 @@ function goalStateIcon(state: string): string {
     case 'off_track': return '✗';
     default: return '○';
   }
+}
+
+// --- Goal mutations ---
+
+async function handleCreateGoal(
+  graphqlClient: GraphQLClient,
+  args: Record<string, unknown>,
+) {
+  const name = args.name as string | undefined;
+  if (!name) throw new McpError(ErrorCode.InvalidParams, 'name is required for create_goal');
+
+  const result = await createGoal(graphqlClient, {
+    name,
+    description: args.description as string | undefined,
+    parentGoalKey: args.parentGoalKey as string | undefined,
+    targetDate: args.targetDate as string | undefined,
+  });
+
+  if (!result.success || !result.goal) {
+    return { content: [{ type: 'text', text: `Failed to create goal: ${result.error}` }], isError: true };
+  }
+
+  const goal = result.goal;
+  const lines = [
+    `Goal created: **${goal.key}** — ${goal.name}`,
+    `URL: ${goal.url}`,
+    '',
+    goalNextSteps('create_goal', goal.key),
+  ];
+  return { content: [{ type: 'text', text: lines.join('\n') }] };
+}
+
+async function handleUpdateGoal(
+  graphqlClient: GraphQLClient,
+  goalKey: string,
+  args: Record<string, unknown>,
+) {
+  const result = await editGoal(graphqlClient, goalKey, {
+    name: args.name as string | undefined,
+    description: args.description as string | undefined,
+    targetDate: args.targetDate as string | undefined,
+    startDate: args.startDate as string | undefined,
+    archived: args.archived as boolean | undefined,
+  });
+
+  if (!result.success) {
+    return { content: [{ type: 'text', text: `Failed to update goal ${goalKey}: ${result.error}` }], isError: true };
+  }
+
+  const lines = [
+    `Goal ${goalKey} updated.`,
+    '',
+    goalNextSteps('update_goal', goalKey),
+  ];
+  return { content: [{ type: 'text', text: lines.join('\n') }] };
+}
+
+async function handleUpdateGoalStatus(
+  graphqlClient: GraphQLClient,
+  goalKey: string,
+  args: Record<string, unknown>,
+) {
+  const status = args.status as string | undefined;
+  if (!status) throw new McpError(ErrorCode.InvalidParams, 'status is required for update_goal_status');
+
+  const result = await createGoalStatusUpdate(
+    graphqlClient,
+    goalKey,
+    status,
+    args.summary as string | undefined,
+  );
+
+  if (!result.success) {
+    return { content: [{ type: 'text', text: `Failed to update status for ${goalKey}: ${result.error}` }], isError: true };
+  }
+
+  const lines = [
+    `Goal ${goalKey} status updated to **${status}**.`,
+    args.summary ? `Summary: ${args.summary}` : '',
+    '',
+    goalNextSteps('update_goal_status', goalKey),
+  ].filter(Boolean);
+  return { content: [{ type: 'text', text: lines.join('\n') }] };
+}
+
+async function handleLinkWorkItem(
+  graphqlClient: GraphQLClient,
+  goalKey: string,
+  issueKey: string,
+) {
+  const result = await linkWorkItem(graphqlClient, goalKey, issueKey);
+  if (!result.success) {
+    return { content: [{ type: 'text', text: `Failed to link ${issueKey} to goal ${goalKey}: ${result.error}` }], isError: true };
+  }
+
+  const lines = [
+    `Linked **${issueKey}** to goal **${goalKey}**.`,
+    '',
+    goalNextSteps('link_work_item', goalKey),
+  ];
+  return { content: [{ type: 'text', text: lines.join('\n') }] };
+}
+
+async function handleUnlinkWorkItem(
+  graphqlClient: GraphQLClient,
+  goalKey: string,
+  issueKey: string,
+) {
+  const result = await unlinkWorkItem(graphqlClient, goalKey, issueKey);
+  if (!result.success) {
+    return { content: [{ type: 'text', text: `Failed to unlink ${issueKey} from goal ${goalKey}: ${result.error}` }], isError: true };
+  }
+
+  const lines = [
+    `Unlinked **${issueKey}** from goal **${goalKey}**.`,
+    '',
+    goalNextSteps('unlink_work_item', goalKey),
+  ];
+  return { content: [{ type: 'text', text: lines.join('\n') }] };
 }

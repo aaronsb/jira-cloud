@@ -158,6 +158,14 @@ function extractTextFromNodes(nodes: Array<{ type: string; text?: string; conten
   return text;
 }
 
+/** Wrap plain text in ADF document format (required for Townsquare description/summary fields) */
+function toAdf(text: string): string {
+  return JSON.stringify({
+    version: 1, type: 'doc',
+    content: [{ type: 'paragraph', content: [{ type: 'text', text }] }],
+  });
+}
+
 // --- Functions ---
 
 export async function searchGoals(
@@ -281,4 +289,260 @@ export async function resolveGoalWorkItems(
   }
 
   return { success: true, issueKeys: [...issueKeys], goal };
+}
+
+// --- Mutations ---
+
+const GOAL_TYPES_QUERY = `
+  query GoalTypes($containerId: ID!) {
+    goals_goalTypes(containerId: $containerId) {
+      edges { node { id } }
+    }
+  }
+`;
+
+// Session-level cache for goal type ARIs
+let cachedGoalTypeIds: string[] | null = null;
+
+async function resolveGoalTypes(client: GraphQLClient): Promise<string[]> {
+  if (cachedGoalTypeIds) return cachedGoalTypeIds;
+
+  const result = await client.queryTenanted<{ goals_goalTypes: { edges: Array<{ node: { id: string } }> } }>(
+    GOAL_TYPES_QUERY, { containerId: client.getSiteAri() },
+  );
+
+  if (!result.success || !result.data) return [];
+
+  cachedGoalTypeIds = result.data.goals_goalTypes.edges.map(e => e.node.id);
+  return cachedGoalTypeIds;
+}
+
+/** Resolve goal type: first type for top-level goals, last type for sub-goals */
+async function resolveGoalType(client: GraphQLClient, hasParent: boolean): Promise<string | null> {
+  const types = await resolveGoalTypes(client);
+  if (types.length === 0) return null;
+  return hasParent ? types[types.length - 1] : types[0];
+}
+
+const GOAL_CREATE_MUTATION = `
+  mutation CreateGoal($input: TownsquareGoalsCreateInput!) {
+    goals_create(input: $input) {
+      success
+      errors { message }
+      goal { id name key url state { value label } }
+    }
+  }
+`;
+
+const GOAL_EDIT_MUTATION = `
+  mutation EditGoal($input: TownsquareGoalsEditInput!) {
+    goals_edit(input: $input) {
+      goal { id name key url state { value label } isArchived }
+    }
+  }
+`;
+
+const GOAL_CREATE_UPDATE_MUTATION = `
+  mutation CreateGoalUpdate($input: TownsquareGoalsCreateUpdateInput!) {
+    goals_createUpdate(input: $input) {
+      success
+      errors { message }
+      update { id url creationDate }
+    }
+  }
+`;
+
+const GOAL_LINK_WORK_ITEM_MUTATION = `
+  mutation LinkWorkItem($input: TownsquareGoalsLinkWorkItemInput!) {
+    goals_linkWorkItem(input: $input) {
+      goal { id name key }
+    }
+  }
+`;
+
+const GOAL_UNLINK_WORK_ITEM_MUTATION = `
+  mutation UnlinkWorkItem($input: TownsquareGoalsUnlinkWorkItemInput!) {
+    goals_unlinkWorkItem(input: $input) {
+      goal { id name key }
+    }
+  }
+`;
+
+/** Resolve a goal key to its ARI (needed for mutations) */
+async function resolveGoalId(
+  client: GraphQLClient,
+  goalKey: string,
+): Promise<{ success: boolean; goalId?: string; error?: string }> {
+  const result = await getGoalByKey(client, goalKey);
+  if (!result.success || !result.goal) {
+    return { success: false, error: result.error ?? `Goal ${goalKey} not found` };
+  }
+  return { success: true, goalId: result.goal.id };
+}
+
+export async function createGoal(
+  client: GraphQLClient,
+  opts: { name: string; description?: string; parentGoalKey?: string; targetDate?: string },
+): Promise<{ success: boolean; goal?: { name: string; key: string; url: string }; error?: string }> {
+  const hasParent = !!opts.parentGoalKey;
+  const goalTypeId = await resolveGoalType(client, hasParent);
+  if (!goalTypeId) {
+    return { success: false, error: 'Could not discover goal types for this instance. Goals may not be enabled.' };
+  }
+
+  const input: Record<string, unknown> = {
+    containerId: client.getSiteAri(),
+    name: opts.name,
+    goalTypeId,
+  };
+
+  if (opts.parentGoalKey) {
+    const parent = await resolveGoalId(client, opts.parentGoalKey);
+    if (!parent.success) return { success: false, error: `Parent goal: ${parent.error}` };
+    input.parentGoalId = parent.goalId;
+  }
+
+  if (opts.targetDate) {
+    input.targetDate = { date: opts.targetDate, confidence: 'QUARTER' };
+  }
+
+  if (opts.description) {
+    input.description = toAdf(opts.description);
+  }
+
+  const result = await client.queryTenanted<{ goals_create: { success: boolean; errors?: Array<{ message: string }>; goal: { id: string; name: string; key: string; url: string } | null } }>(
+    GOAL_CREATE_MUTATION, { input },
+  );
+
+  if (!result.success || !result.data) {
+    return { success: false, error: result.error ?? 'Create failed' };
+  }
+
+  const mutation = result.data.goals_create;
+  if (!mutation.success || !mutation.goal) {
+    const msg = mutation.errors?.map(e => e.message).join('; ') ?? 'Unknown error';
+    return { success: false, error: msg };
+  }
+
+  return { success: true, goal: { name: mutation.goal.name, key: mutation.goal.key, url: mutation.goal.url } };
+}
+
+export async function editGoal(
+  client: GraphQLClient,
+  goalKey: string,
+  opts: { name?: string; description?: string; targetDate?: string; startDate?: string; archived?: boolean },
+): Promise<{ success: boolean; error?: string }> {
+  const resolved = await resolveGoalId(client, goalKey);
+  if (!resolved.success) return { success: false, error: resolved.error };
+
+  const input: Record<string, unknown> = { goalId: resolved.goalId };
+
+  if (opts.name !== undefined) input.name = opts.name;
+  if (opts.description !== undefined) {
+    input.description = toAdf(opts.description);
+  }
+  if (opts.targetDate !== undefined) {
+    input.targetDate = { date: opts.targetDate, confidence: 'QUARTER' };
+  }
+  if (opts.startDate !== undefined) input.startDate = opts.startDate;
+  if (opts.archived !== undefined) input.archived = opts.archived;
+
+  const result = await client.queryTenanted(GOAL_EDIT_MUTATION, { input });
+  if (!result.success) return { success: false, error: result.error };
+  return { success: true };
+}
+
+export async function createGoalStatusUpdate(
+  client: GraphQLClient,
+  goalKey: string,
+  status: string,
+  summary?: string,
+): Promise<{ success: boolean; error?: string }> {
+  const resolved = await resolveGoalId(client, goalKey);
+  if (!resolved.success) return { success: false, error: resolved.error };
+
+  const input: Record<string, unknown> = {
+    goalId: resolved.goalId,
+    status,
+  };
+
+  if (summary) {
+    input.summary = toAdf(summary);
+  }
+
+  const result = await client.queryTenanted<{ goals_createUpdate: { success: boolean; errors?: Array<{ message: string }> } }>(
+    GOAL_CREATE_UPDATE_MUTATION, { input },
+  );
+
+  if (!result.success || !result.data) {
+    return { success: false, error: result.error ?? 'Status update failed' };
+  }
+
+  const mutation = result.data.goals_createUpdate;
+  if (!mutation.success) {
+    const msg = mutation.errors?.map(e => e.message).join('; ') ?? 'Status update failed (no error details)';
+    return { success: false, error: msg };
+  }
+
+  return { success: true };
+}
+
+const ISSUE_BY_KEY_QUERY = `
+  query IssueByKey($cloudId: ID!, $key: String!) {
+    jira { issueByKey(key: $key, cloudId: $cloudId) { id } }
+  }
+`;
+
+/** Resolve a Jira issue key to its ARI (needed for goal work item linking) */
+async function resolveIssueAri(
+  client: GraphQLClient,
+  issueKey: string,
+): Promise<{ success: boolean; issueAri?: string; error?: string }> {
+  const result = await client.queryTenanted<{ jira: { issueByKey: { id: string } | null } }>(
+    ISSUE_BY_KEY_QUERY, { key: issueKey },
+  );
+  if (!result.success || !result.data?.jira?.issueByKey) {
+    return { success: false, error: `Issue ${issueKey} not found` };
+  }
+  return { success: true, issueAri: result.data.jira.issueByKey.id };
+}
+
+export async function linkWorkItem(
+  client: GraphQLClient,
+  goalKey: string,
+  issueKey: string,
+): Promise<{ success: boolean; error?: string }> {
+  const [resolved, issue] = await Promise.all([
+    resolveGoalId(client, goalKey),
+    resolveIssueAri(client, issueKey),
+  ]);
+  if (!resolved.success) return { success: false, error: resolved.error };
+  if (!issue.success) return { success: false, error: issue.error };
+
+  const result = await client.queryTenanted(GOAL_LINK_WORK_ITEM_MUTATION, {
+    input: { goalId: resolved.goalId, workItemId: issue.issueAri },
+  });
+
+  if (!result.success) return { success: false, error: result.error };
+  return { success: true };
+}
+
+export async function unlinkWorkItem(
+  client: GraphQLClient,
+  goalKey: string,
+  issueKey: string,
+): Promise<{ success: boolean; error?: string }> {
+  const [resolved, issue] = await Promise.all([
+    resolveGoalId(client, goalKey),
+    resolveIssueAri(client, issueKey),
+  ]);
+  if (!resolved.success) return { success: false, error: resolved.error };
+  if (!issue.success) return { success: false, error: issue.error };
+
+  const result = await client.queryTenanted(GOAL_UNLINK_WORK_ITEM_MUTATION, {
+    input: { goalId: resolved.goalId, workItemId: issue.issueAri },
+  });
+
+  if (!result.success) return { success: false, error: result.error };
+  return { success: true };
 }

@@ -202,7 +202,7 @@ async function getInstanceSummary(jiraClient: JiraClient, graphqlClient?: GraphQ
             total: goals.length,
             themes,
             ...stateCounts,
-            hint: 'Use analyze_jira_plan with operation list_goals to explore the goal tree',
+            hint: 'Use manage_jira_plan with operation list_goals to explore the goal tree',
           };
         }
       } catch {
