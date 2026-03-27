@@ -63,6 +63,10 @@
       "description": "Compute project metrics over a set of issues selected by JQL"
     },
     {
+      "name": "manage_jira_plan",
+      "description": "Navigate and manage the strategic-to-execution hierarchy — issue rollups and Atlassian Goals"
+    },
+    {
       "name": "queue_jira_operations",
       "description": "Execute multiple Jira operations in a single call"
     }

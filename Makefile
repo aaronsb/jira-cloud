@@ -57,13 +57,7 @@ _release-commit:
 	git tag -a "v$(NEW_VERSION)" -m "v$(NEW_VERSION)"
 	git push && git push --tags
 	@echo ""
-	@echo "── Building MCPB ──"
-	$(MAKE) mcpb
-	@echo ""
-	@echo "── GitHub Release ──"
-	gh release create "v$(NEW_VERSION)" --title "v$(NEW_VERSION)" --generate-notes jira-cloud-mcp.mcpb
-	@echo ""
-	@echo "v$(NEW_VERSION) released. npm auto-publishes via CI on tag push."
+	@echo "v$(NEW_VERSION) released. CI handles npm publish, .mcpb build, and GitHub Release."
 
 # ── Publishing ──────────────────────────────────────────────────────────
 
