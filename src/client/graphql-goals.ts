@@ -158,6 +158,14 @@ function extractTextFromNodes(nodes: Array<{ type: string; text?: string; conten
   return text;
 }
 
+/** Wrap plain text in ADF document format (required for Townsquare description/summary fields) */
+function toAdf(text: string): string {
+  return JSON.stringify({
+    version: 1, type: 'doc',
+    content: [{ type: 'paragraph', content: [{ type: 'text', text }] }],
+  });
+}
+
 // --- Functions ---
 
 export async function searchGoals(
@@ -399,10 +407,7 @@ export async function createGoal(
   }
 
   if (opts.description) {
-    input.description = JSON.stringify({
-      version: 1, type: 'doc',
-      content: [{ type: 'paragraph', content: [{ type: 'text', text: opts.description }] }],
-    });
+    input.description = toAdf(opts.description);
   }
 
   const result = await client.queryTenanted<{ goals_create: { success: boolean; errors?: Array<{ message: string }>; goal: { id: string; name: string; key: string; url: string } | null } }>(
@@ -434,11 +439,7 @@ export async function editGoal(
 
   if (opts.name !== undefined) input.name = opts.name;
   if (opts.description !== undefined) {
-    // Wrap plain text in ADF format
-    input.description = JSON.stringify({
-      version: 1, type: 'doc',
-      content: [{ type: 'paragraph', content: [{ type: 'text', text: opts.description }] }],
-    });
+    input.description = toAdf(opts.description);
   }
   if (opts.targetDate !== undefined) {
     input.targetDate = { date: opts.targetDate, confidence: 'QUARTER' };
@@ -466,11 +467,7 @@ export async function createGoalStatusUpdate(
   };
 
   if (summary) {
-    // Summary must be ADF format
-    input.summary = JSON.stringify({
-      version: 1, type: 'doc',
-      content: [{ type: 'paragraph', content: [{ type: 'text', text: summary }] }],
-    });
+    input.summary = toAdf(summary);
   }
 
   const result = await client.queryTenanted<{ goals_createUpdate: { success: boolean; errors?: Array<{ message: string }> } }>(
