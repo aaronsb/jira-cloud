@@ -3,6 +3,7 @@ export {
   dataDir,
   ensureParentDir,
   ensureWorkspaceDir,
+  formatSize,
   getWorkspaceDir,
   resolveWorkspacePath,
   sanitizeFilename,

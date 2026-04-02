@@ -6,6 +6,11 @@ import { handleWorkspaceRequest } from './workspace-handler.js';
 // Mock workspace module
 vi.mock('../workspace/index.js', () => ({
   ensureWorkspaceDir: vi.fn().mockResolvedValue({ path: '/mock/workspace', valid: true }),
+  formatSize: (bytes: number) => {
+    if (bytes < 1024) return `${bytes}B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+  },
   resolveWorkspacePath: vi.fn((f: string) => `/mock/workspace/${f}`),
   ensureParentDir: vi.fn().mockResolvedValue(undefined),
   verifyPathSafety: vi.fn().mockResolvedValue(undefined),
@@ -64,6 +69,13 @@ describe('workspace-handler', () => {
       expect(result.content).toHaveLength(2);
       expect(result.content[1].type).toBe('image');
       expect(result.content[1].mimeType).toBe('image/png');
+    });
+
+    it('returns path reference for large text files', async () => {
+      vi.mocked(fs.stat).mockResolvedValue({ size: 200 * 1024 } as any); // 200KB
+      const result = await handleWorkspaceRequest({ operation: 'read', filename: 'huge.txt' });
+      expect(result.content[0].text).toContain('text');
+      expect(result.content[0].text).toContain('manage_jira_media upload');
     });
 
     it('returns path reference for binary files', async () => {

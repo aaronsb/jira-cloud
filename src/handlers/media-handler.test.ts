@@ -4,6 +4,11 @@ import { handleMediaRequest } from './media-handler.js';
 // Mock workspace module to avoid filesystem side effects
 vi.mock('../workspace/index.js', () => ({
   ensureWorkspaceDir: vi.fn().mockResolvedValue({ path: '/mock/workspace', valid: true }),
+  formatSize: (bytes: number) => {
+    if (bytes < 1024) return `${bytes}B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+  },
   resolveWorkspacePath: vi.fn((f: string) => `/mock/workspace/${f}`),
   ensureParentDir: vi.fn().mockResolvedValue(undefined),
   verifyPathSafety: vi.fn().mockResolvedValue(undefined),

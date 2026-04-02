@@ -9,6 +9,7 @@ import type { JiraClient } from '../client/jira-client.js';
 import { mediaNextSteps } from '../utils/next-steps.js';
 import {
   ensureWorkspaceDir,
+  formatSize,
   resolveWorkspacePath,
   ensureParentDir,
   verifyPathSafety,
@@ -74,7 +75,8 @@ export async function handleMediaRequest(
         };
       }
 
-      const attachment = await client.uploadAttachment(args.issueKey, args.filename, buffer, args.mediaType);
+      const safeFilename = sanitizeFilename(args.filename);
+      const attachment = await client.uploadAttachment(args.issueKey, safeFilename, buffer, args.mediaType);
       let text = `Uploaded: ${attachment.filename} | ${attachment.mimeType} | ${formatSize(attachment.size)} | id:${attachment.id}`;
       text += mediaNextSteps('upload', { issueKey: args.issueKey });
       return { content: [{ type: 'text', text }] };
@@ -127,7 +129,7 @@ export async function handleMediaRequest(
       return {
         content: [{
           type: 'text',
-          text: `${attachInfo.filename} | ${attachInfo.mimeType} | ${formatSize(attachInfo.size)} | id:${attachInfo.id} | v${attachInfo.author} | ${attachInfo.created}`,
+          text: `${attachInfo.filename} | ${attachInfo.mimeType} | ${formatSize(attachInfo.size)} | id:${attachInfo.id} | ${attachInfo.author} | ${attachInfo.created}`,
         }],
       };
     }
@@ -161,8 +163,3 @@ export async function handleMediaRequest(
   }
 }
 
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes}B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
-}

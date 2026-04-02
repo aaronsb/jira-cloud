@@ -8,6 +8,7 @@ import * as path from 'node:path';
 
 import {
   ensureWorkspaceDir,
+  formatSize,
   resolveWorkspacePath,
   ensureParentDir,
   verifyPathSafety,
@@ -257,10 +258,4 @@ async function handleMove(args: WorkspaceArgs): Promise<{ content: Array<{ type:
       text: `Moved: ${args.filename} -> ${args.destination}\nPath: ${destPath}`,
     }],
   };
-}
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes}B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
 }

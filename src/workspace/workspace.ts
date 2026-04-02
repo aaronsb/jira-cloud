@@ -192,6 +192,17 @@ export async function ensureParentDir(filePath: string): Promise<void> {
   await fs.mkdir(dir, { recursive: true, mode: 0o755 });
 }
 
+// ── Formatting ─────────────────────────────────────────────
+
+/** Format byte count as human-readable size. */
+export function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes}B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+}
+
+// ── Path Safety ────────────────────────────────────────────
+
 /**
  * Verify a file path is safe after symlink resolution.
  * Must be called before any fs operation on a workspace path.
