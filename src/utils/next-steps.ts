@@ -31,6 +31,7 @@ export function issueNextSteps(operation: string, issueKey?: string): string {
         { description: 'Update fields', tool: 'manage_jira_issue', example: { operation: 'update', issueKey } },
         { description: 'Add a comment', tool: 'manage_jira_issue', example: { operation: 'comment', issueKey, comment: '<text>' } },
         { description: 'View available transitions', tool: 'manage_jira_issue', example: { operation: 'get', issueKey, expand: ['transitions'] } },
+        { description: 'Manage attachments (upload, download, view)', tool: 'manage_jira_media', example: { operation: 'list', issueKey } },
       );
       break;
     case 'update':
@@ -314,6 +315,33 @@ export function goalNextSteps(operation: string, goalKey?: string, workItemCount
           { description: 'Analyze goal progress', tool: 'manage_jira_plan', example: { operation: 'analyze', goalKey } },
         );
       }
+      break;
+  }
+  return steps.length > 0 ? formatSteps(steps) : '';
+}
+
+export function mediaNextSteps(operation: string, context: { issueKey?: string }): string {
+  const steps: NextStep[] = [];
+  switch (operation) {
+    case 'list':
+      steps.push(
+        { description: 'Download an attachment to workspace', tool: 'manage_jira_media', example: { operation: 'download', attachmentId: '<id>' } },
+        { description: 'View an image attachment inline', tool: 'manage_jira_media', example: { operation: 'view', attachmentId: '<id>' } },
+        { description: 'Upload a file to this issue', tool: 'manage_jira_media', example: { operation: 'upload', issueKey: context.issueKey, filename: '<name>', mediaType: '<mime>', workspaceFile: '<staged file>' } },
+      );
+      break;
+    case 'upload':
+      steps.push(
+        { description: 'List attachments on this issue', tool: 'manage_jira_media', example: { operation: 'list', issueKey: context.issueKey } },
+        { description: 'View the issue', tool: 'manage_jira_issue', example: { operation: 'get', issueKey: context.issueKey } },
+      );
+      break;
+    case 'download':
+      steps.push(
+        { description: 'View staged files in workspace', tool: 'manage_workspace', example: { operation: 'list' } },
+        { description: 'Upload to another issue', tool: 'manage_jira_media', example: { operation: 'upload', issueKey: '<target issue>', workspaceFile: '<filename>', mediaType: '<mime>', filename: '<filename>' } },
+        { description: 'Read the downloaded file', tool: 'manage_workspace', example: { operation: 'read', filename: '<filename>' } },
+      );
       break;
   }
   return steps.length > 0 ? formatSteps(steps) : '';
