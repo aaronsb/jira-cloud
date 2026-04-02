@@ -1360,6 +1360,58 @@ export class JiraClient {
     };
   }
 
+  // ── Attachment Operations ────────────────────────────────
+
+  async getAttachmentInfo(attachmentId: string): Promise<JiraAttachment> {
+    const meta = await this.client.issueAttachments.getAttachment(attachmentId);
+    return {
+      id: meta.id?.toString() ?? attachmentId,
+      filename: meta.filename ?? 'unnamed',
+      mimeType: meta.mimeType ?? 'application/octet-stream',
+      size: meta.size ?? 0,
+      created: meta.created ?? '',
+      author: meta.author?.displayName ?? 'Unknown',
+      url: meta.content ?? '',
+    };
+  }
+
+  async downloadAttachment(attachmentId: string): Promise<Buffer> {
+    const content = await this.client.issueAttachments.getAttachmentContent(attachmentId);
+    // jira.js generic defaults to Buffer; ensure we return Buffer even if runtime type differs
+    return Buffer.isBuffer(content) ? content : Buffer.from(content as any);
+  }
+
+  async uploadAttachment(
+    issueKey: string,
+    filename: string,
+    content: Buffer,
+    mimeType: string,
+  ): Promise<JiraAttachment> {
+    const result = await this.client.issueAttachments.addAttachment({
+      issueIdOrKey: issueKey,
+      attachment: {
+        filename,
+        file: content,
+        mimeType,
+      },
+    });
+
+    const att = Array.isArray(result) ? result[0] : result;
+    return {
+      id: att.id?.toString() ?? '',
+      filename: att.filename ?? filename,
+      mimeType: att.mimeType ?? mimeType,
+      size: att.size ?? content.length,
+      created: att.created ?? new Date().toISOString(),
+      author: att.author?.displayName ?? 'Unknown',
+      url: att.content ?? '',
+    };
+  }
+
+  async deleteAttachment(attachmentId: string): Promise<void> {
+    await this.client.issueAttachments.removeAttachment(attachmentId);
+  }
+
   async deleteFilter(filterId: string): Promise<void> {
     await this.client.filters.deleteFilter(filterId);
   }

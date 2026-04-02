@@ -23,15 +23,18 @@ import { handleAnalysisRequest } from './handlers/analysis-handler.js';
 import { handleBoardRequest } from './handlers/board-handlers.js';
 import { handleFilterRequest } from './handlers/filter-handlers.js';
 import { handleIssueRequest } from './handlers/issue-handlers.js';
+import { handleMediaRequest } from './handlers/media-handler.js';
 import { handlePlanRequest } from './handlers/plan-handler.js';
 import { handleProjectRequest } from './handlers/project-handlers.js';
 import { createQueueHandler } from './handlers/queue-handler.js';
 import { setupResourceHandlers } from './handlers/resource-handlers.js';
 import { handleSprintRequest } from './handlers/sprint-handlers.js';
+import { handleWorkspaceRequest } from './handlers/workspace-handler.js';
 import { promptDefinitions } from './prompts/prompt-definitions.js';
 import { getPrompt } from './prompts/prompt-messages.js';
 import { toolSchemas } from './schemas/tool-schemas.js';
 import type { GraphIssue } from './types/index.js';
+import { normalizeArgs } from './utils/normalize-args.js';
 
 // Jira credentials from environment variables
 const JIRA_EMAIL = process.env.JIRA_EMAIL;
@@ -187,6 +190,8 @@ class JiraServer {
           manage_jira_sprint: handleSprintRequest,
           manage_jira_filter: handleFilterRequest,
           analyze_jira_issues: (client, req) => handleAnalysisRequest(client, req, this.graphqlClient, this.cache),
+          manage_jira_media: (client, req) => handleMediaRequest(client, normalizeArgs(req.params.arguments ?? {}) as any),
+          manage_workspace: (_client, req) => handleWorkspaceRequest(normalizeArgs(req.params.arguments ?? {}) as any),
         };
 
         const handlers: Record<string, (client: JiraClient, req: typeof request) => Promise<any>> = {

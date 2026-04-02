@@ -498,6 +498,74 @@ export const toolSchemas = {
     },
   },
 
+  manage_jira_media: {
+    name: 'manage_jira_media',
+    description: 'Manage file attachments on Jira issues (remote). Operations here affect Jira — delete permanently removes an attachment from the issue for all users. Use manage_workspace for local file staging. Downloads copy from Jira to workspace; uploads copy from workspace to Jira.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        operation: {
+          type: 'string',
+          enum: ['list', 'upload', 'download', 'view', 'get_info', 'delete'],
+          description: 'Operation to perform. list: attachments on an issue. upload: copy file from workspace to Jira issue. download: copy attachment from Jira to local workspace. view: display image inline. get_info: attachment metadata. delete: permanently remove attachment from Jira (affects all users).',
+        },
+        issueKey: {
+          type: 'string',
+          description: 'Issue key (e.g., PROJ-123). Required for list and upload.',
+        },
+        attachmentId: {
+          type: 'string',
+          description: 'Attachment ID. Required for download, view, get_info, delete.',
+        },
+        filename: {
+          type: 'string',
+          description: 'Filename for upload (required) or download (optional override).',
+        },
+        content: {
+          type: 'string',
+          description: 'Base64-encoded file content for upload. Alternative to workspaceFile.',
+        },
+        mediaType: {
+          type: 'string',
+          description: 'MIME type (e.g., "image/png", "application/pdf"). Required for upload.',
+        },
+        workspaceFile: {
+          type: 'string',
+          description: 'Filename in workspace to upload. Alternative to content. Use manage_workspace list to see staged files.',
+        },
+      },
+      required: ['operation'],
+    },
+  },
+
+  manage_workspace: {
+    name: 'manage_workspace',
+    description: 'Manage files in the local workspace staging area (local only — no Jira impact). Files downloaded via manage_jira_media land here. Delete only removes the local copy. Use manage_jira_media to affect attachments on Jira issues.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        operation: {
+          type: 'string',
+          enum: ['list', 'read', 'write', 'delete', 'mkdir', 'move'],
+          description: 'Operation to perform. list: show staged files. read: display file content. write: stage base64 content. delete: remove local file only (does not affect Jira). mkdir: create directory. move: rename/relocate file.',
+        },
+        filename: {
+          type: 'string',
+          description: 'Filename or path within workspace. Supports nesting with / separators.',
+        },
+        destination: {
+          type: 'string',
+          description: 'Destination path for move operation.',
+        },
+        content: {
+          type: 'string',
+          description: 'Base64-encoded content for write operation.',
+        },
+      },
+      required: ['operation'],
+    },
+  },
+
   queue_jira_operations: {
     name: 'queue_jira_operations',
     description: 'Execute multiple Jira operations in a single call. Operations run sequentially with result references ($0.key) and per-operation error strategies (bail/continue). Powerful for analysis pipelines: create a filter, then run multiple analyze_jira_issues calls against $0.filterId with different groupBy/compute — all in one call.',
@@ -511,7 +579,7 @@ export const toolSchemas = {
             properties: {
               tool: {
                 type: 'string',
-                enum: ['manage_jira_issue', 'manage_jira_filter', 'manage_jira_sprint', 'manage_jira_project', 'manage_jira_board', 'analyze_jira_issues'],
+                enum: ['manage_jira_issue', 'manage_jira_filter', 'manage_jira_sprint', 'manage_jira_project', 'manage_jira_board', 'analyze_jira_issues', 'manage_jira_media', 'manage_workspace'],
                 description: 'Which tool to call.',
               },
               args: {
