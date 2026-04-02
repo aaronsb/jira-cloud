@@ -1,6 +1,6 @@
 {
   "name": "@aaronsb/jira-cloud-mcp",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "mcpName": "io.github.aaronsb/jira-cloud",
   "description": "Model Context Protocol (MCP) server for Jira Cloud - enables AI assistants to interact with Jira",
   "type": "module",
