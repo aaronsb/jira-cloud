@@ -12,7 +12,6 @@ export function formatToolName(toolName: string): string {
 
 const documentationGenerators: Record<string, (schema: any) => any> = {
   manage_jira_issue: generateIssueToolDocumentation,
-  manage_jira_board: generateBoardToolDocumentation,
   manage_jira_sprint: generateSprintToolDocumentation,
   manage_jira_filter: generateFilterToolDocumentation,
   manage_jira_project: generateProjectToolDocumentation,
@@ -177,45 +176,6 @@ function generateIssueToolDocumentation(schema: any) {
       { name: "Issue Link Types", uri: "jira://issue-link-types", description: "List of all available issue link types" },
       { name: "Custom Fields Catalog", uri: "jira://custom-fields", description: "Discovered custom fields with types, descriptions, and usage scores" },
       { name: "Context Custom Fields", uri: "jira://custom-fields/{projectKey}/{issueType}", description: "Custom fields available for a specific project and issue type" }
-    ]
-  };
-}
-
-function generateBoardToolDocumentation(schema: any) {
-  return {
-    name: "Board Management (Read-Only)",
-    description: schema.description,
-    operations: {
-      get: {
-        description: "Retrieves board details",
-        required_parameters: ["boardId"], optional_parameters: ["expand"],
-        expand_options: ["sprints", "issues", "configuration"],
-        examples: [
-          { description: "Get basic board details", code: { operation: "get", boardId: 123 } },
-          { description: "Get board with sprints", code: { operation: "get", boardId: 123, expand: ["sprints"] } }
-        ]
-      },
-      list: {
-        description: "Lists all available boards",
-        required_parameters: [], optional_parameters: ["maxResults", "startAt"],
-        examples: [
-          { description: "List all boards", code: { operation: "list" } },
-          { description: "List boards with pagination", code: { operation: "list", startAt: 10, maxResults: 20 } }
-        ]
-      }
-    },
-    common_use_cases: [
-      {
-        title: "Working with board sprints",
-        description: "To manage sprints on a board:",
-        steps: [
-          { description: "Get board with sprints", code: { operation: "get", boardId: 123, expand: ["sprints"] } },
-          { description: "Create a new sprint", tool: "manage_jira_sprint", code: { operation: "create", boardId: 123, name: "Sprint 1", goal: "Complete core features" } }
-        ]
-      }
-    ],
-    related_resources: [
-      { name: "Board Overview", uri: "jira://boards/{boardId}/overview", description: "Get detailed information about a board" }
     ]
   };
 }

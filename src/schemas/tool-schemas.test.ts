@@ -5,11 +5,10 @@ const DOMAIN_TOOLS = [
   'manage_jira_issue',
   'manage_jira_filter',
   'manage_jira_project',
-  'manage_jira_board',
   'manage_jira_sprint',
 ];
 
-const ALL_TOOLS = [...DOMAIN_TOOLS, 'analyze_jira_issues', 'manage_jira_media', 'manage_jira_plan', 'manage_workspace', 'queue_jira_operations'];
+const ALL_TOOLS = [...DOMAIN_TOOLS, 'analyze_jira_issues', 'manage_jira_media', 'manage_jira_plan', 'manage_jira_request', 'manage_local_workspace', 'queue_jira_operations'];
 
 describe('toolSchemas', () => {
   it('exports all 10 tools', () => {
@@ -89,10 +88,11 @@ describe('toolSchemas', () => {
     expect(ops).toEqual(['get', 'list']);
   });
 
-  it('board schema is read-only (get and list only)', () => {
-    const boardSchema = toolSchemas.manage_jira_board;
-    const ops = boardSchema.inputSchema.properties.operation.enum;
-    expect(ops).toEqual(['get', 'list']);
+  it('sprint schema includes board operations', () => {
+    const sprintSchema = toolSchemas.manage_jira_sprint;
+    const ops = sprintSchema.inputSchema.properties.operation.enum;
+    expect(ops).toContain('get_board');
+    expect(ops).toContain('list_boards');
   });
 
   it('jql description references tool documentation resource', () => {

@@ -20,13 +20,13 @@ import { GraphObjectCache } from './client/graph-object-cache.js';
 import { discoverCloudId, GraphQLClient } from './client/graphql-client.js';
 import { JiraClient } from './client/jira-client.js';
 import { handleAnalysisRequest } from './handlers/analysis-handler.js';
-import { handleBoardRequest } from './handlers/board-handlers.js';
 import { handleFilterRequest } from './handlers/filter-handlers.js';
 import { handleIssueRequest } from './handlers/issue-handlers.js';
 import { handleMediaRequest } from './handlers/media-handler.js';
 import { handlePlanRequest } from './handlers/plan-handler.js';
 import { handleProjectRequest } from './handlers/project-handlers.js';
 import { createQueueHandler } from './handlers/queue-handler.js';
+import { handleRequestRequest } from './handlers/request-handlers.js';
 import { setupResourceHandlers } from './handlers/resource-handlers.js';
 import { handleSprintRequest } from './handlers/sprint-handlers.js';
 import { handleWorkspaceRequest } from './handlers/workspace-handler.js';
@@ -82,6 +82,7 @@ class JiraServer {
   private server: Server;
   private jiraClient: JiraClient;
   private graphqlClient: GraphQLClient | null = null;
+  private serviceDeskAvailable = false;
   private cache = new GraphObjectCache();
 
   constructor() {
@@ -136,7 +137,11 @@ class JiraServer {
     // Set up required MCP protocol handlers
     this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
       tools: Object.entries(toolSchemas)
-        .filter(([key]) => key !== 'manage_jira_plan' || this.graphqlClient !== null)
+        .filter(([key]) => {
+          if (key === 'manage_jira_plan') return this.graphqlClient !== null;
+          if (key === 'manage_jira_request') return this.serviceDeskAvailable;
+          return true;
+        })
         .map(([key, schema]) => ({
           name: key,
           description: schema.description,
@@ -186,12 +191,14 @@ class JiraServer {
         const toolHandlers: Record<string, (client: JiraClient, req: typeof request) => Promise<any>> = {
           manage_jira_issue: handleIssueRequest,
           manage_jira_project: handleProjectRequest,
-          manage_jira_board: handleBoardRequest,
           manage_jira_sprint: handleSprintRequest,
           manage_jira_filter: handleFilterRequest,
           analyze_jira_issues: (client, req) => handleAnalysisRequest(client, req, this.graphqlClient, this.cache),
           manage_jira_media: (client, req) => handleMediaRequest(client, normalizeArgs(req.params.arguments ?? {}) as any),
-          manage_workspace: (_client, req) => handleWorkspaceRequest(normalizeArgs(req.params.arguments ?? {}) as any),
+          manage_local_workspace: (_client, req) => handleWorkspaceRequest(normalizeArgs(req.params.arguments ?? {}) as any),
+          ...(this.serviceDeskAvailable ? {
+            manage_jira_request: handleRequestRequest,
+          } : {}),
         };
 
         const handlers: Record<string, (client: JiraClient, req: typeof request) => Promise<any>> = {
@@ -246,10 +253,13 @@ class JiraServer {
           throw error;
         }
 
-        // Surface Jira permission errors with actionable guidance
+        // Surface Jira permission errors with actionable guidance.
+        // Jira REST error shapes vary: v3 uses `errorMessages[]`+`errors{}`, JSM servicedeskapi
+        // uses `errorMessage` (singular), some endpoints use `message`.
         const status = (error as any)?.response?.status
           ?? (error as any)?.status;
         const jiraMessage = (error as any)?.response?.data?.errorMessages?.[0]
+          ?? (error as any)?.response?.data?.errorMessage
           ?? (error as any)?.response?.data?.message
           ?? (error as any)?.message
           ?? '';
@@ -271,18 +281,26 @@ class JiraServer {
         }
 
         if (status === 400) {
-          const fieldErrors = (error as any)?.response?.data?.errors;
-          const errorMessages = (error as any)?.response?.data?.errorMessages;
+          const data = (error as any)?.response?.data;
+          const fieldErrors = data?.errors;
+          const errorMessages = data?.errorMessages;
+          const singular = data?.errorMessage ?? data?.message;
 
           const lines = ['**Jira rejected this request:**'];
           if (errorMessages?.length > 0) {
             lines.push(...errorMessages.map((m: string) => `- ${m}`));
+          } else if (singular) {
+            lines.push(`- ${singular}`);
           }
           if (fieldErrors && Object.keys(fieldErrors).length > 0) {
             lines.push('', '**Field errors:**');
             for (const [field, msg] of Object.entries(fieldErrors)) {
               lines.push(`- \`${field}\`: ${msg}`);
             }
+          }
+          // Last-resort: include raw body so the agent isn't blind to the rejection
+          if (lines.length === 1 && data) {
+            lines.push(`- ${typeof data === 'string' ? data : JSON.stringify(data).slice(0, 500)}`);
           }
 
           // On create failures, invalidate cache and append required fields guidance
@@ -344,6 +362,15 @@ class JiraServer {
       }
     } catch {
       console.error('[jira-cloud] GraphQL discovery failed — manage_jira_plan disabled');
+    }
+
+    // Probe service desk reachability before connecting — gates manage_jira_request
+    try {
+      await this.jiraClient.serviceDeskClient.serviceDesk.getServiceDesks({ limit: 1 });
+      this.serviceDeskAvailable = true;
+      console.error('[jira-cloud] Service desk API reachable — manage_jira_request enabled');
+    } catch {
+      console.error('[jira-cloud] Service desk API unavailable — manage_jira_request disabled');
     }
 
     const transport = new StdioServerTransport();

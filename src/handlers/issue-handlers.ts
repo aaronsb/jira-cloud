@@ -275,7 +275,7 @@ function getCatalogFieldMeta() {
 }
 
 /** Resolve field names to IDs in customFields, returns resolved object */
-function resolveCustomFieldNames(customFields: Record<string, any>): Record<string, any> {
+export function resolveCustomFieldNames(customFields: Record<string, any>): Record<string, any> {
   if (!fieldDiscovery.isReady()) return customFields;
 
   const resolved: Record<string, any> = {};
