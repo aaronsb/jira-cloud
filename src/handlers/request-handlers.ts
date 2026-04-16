@@ -223,7 +223,7 @@ async function getRequestType(client: JiraClient, args: RequestArgs): Promise<Ha
  * The JSM fields endpoint returns `{fieldId, name}` for both system and custom fields, which
  * covers customer-scoped auth where the global customFields catalog is forbidden (issue #43).
  */
-async function resolveViaRequestTypeFields(
+export async function resolveViaRequestTypeFields(
   client: JiraClient,
   serviceDeskId: string,
   requestTypeId: string,
@@ -259,7 +259,7 @@ async function resolveViaRequestTypeFields(
   return resolved;
 }
 
-const SYSTEM_FIELDS = new Set([
+export const SYSTEM_FIELDS = new Set([
   'summary', 'description', 'priority', 'duedate', 'labels',
   'reporter', 'assignee', 'attachment', 'issuetype',
 ]);
@@ -404,7 +404,9 @@ async function getRequest(client: JiraClient, args: RequestArgs): Promise<Handle
     if ((req.comments?.size ?? cmts.length) > 10) lines.push(`_…${(req.comments?.size ?? cmts.length) - 10} more comment(s)_`);
   }
 
-  // Customer transitions
+  // Customer transitions. Empty list is common — whether a customer sees transitions here
+  // depends on the project's permission scheme and workflow config. Many JSM workflows expose
+  // none, which is normal, not a bug.
   if (transitions.length > 0) {
     lines.push('', '## Available transitions');
     for (const t of transitions) {
@@ -422,15 +424,28 @@ async function commentRequest(client: JiraClient, args: RequestArgs): Promise<Ha
   if (!args.issueKey || !args.comment) {
     throw new McpError(ErrorCode.InvalidParams, 'issueKey and comment are required');
   }
+  // Atlassian's JSM customer API rejects non-public comments — only agents can post internal
+  // comments via the agent-side endpoint. Fail fast with a clear message instead of a silent 400.
+  if (args.isPublic === false) {
+    throw new McpError(
+      ErrorCode.InvalidParams,
+      'Customers cannot post internal comments via manage_jira_request. Omit isPublic or set it to true. Internal comments require agent-side tooling.',
+    );
+  }
+
+  // JSM /request/{key}/comment expects body as a plain string (not ADF like v3 issue comments).
+  // Round-trip through markdownToAdf → extractTextFromAdf to strip markdown syntax, preventing
+  // literal "**bold**" rendering on the portal. Keeps behavior predictable across tools even
+  // though JSM can't render rich text from the customer API.
+  const plain = TextProcessor.extractTextFromAdf(TextProcessor.markdownToAdf(args.comment)).trim();
 
   await client.serviceDeskClient.request.createRequestComment({
     issueIdOrKey: args.issueKey,
-    body: args.comment,
-    public: args.isPublic ?? true,
+    body: plain || args.comment,
+    public: true,
   });
 
-  const visibility = args.isPublic === false ? 'internal' : 'public';
-  const text = `Added ${visibility} comment to ${args.issueKey}.${requestNextSteps('comment', { issueKey: args.issueKey })}`;
+  const text = `Added public comment to ${args.issueKey}.${requestNextSteps('comment', { issueKey: args.issueKey })}`;
   return { content: [{ type: 'text', text }] };
 }
 

@@ -69,7 +69,7 @@ Key design points:
 
 - **Customer persona only.** No queue management, SLA configuration, or agent workflows. Those belong in a separate service-management server.
 - **Progressive disclosure.** List ops stay lean; `expand: ["fields"]` and `get_request_type` opt in to the dynamic field schema when needed. `get` is rich-by-default because customer-service flows want the whole picture in one call.
-- **Customer-side transitions.** `transition` uses `/rest/servicedeskapi/request/{key}/transition` (customer endpoint), not the agent-side workflow. IDs are discovered via `get` — no separate list operation needed.
+- **Self-service transitions.** `transition` uses `/rest/servicedeskapi/request/{key}/transition`. Whether any transitions are exposed to the caller depends on the project's workflow and permission scheme — jira.js's own docs note the endpoint also requires the "Transition Issues" permission in the scheme. Many JSM projects expose zero transitions to customers, which is normal. IDs come from `get` — no separate list operation needed.
 - **Requests are issues underneath.** Once a request exists, `manage_jira_issue` can update arbitrary fields. The request tool handles the customer-facing API surface.
 - **Attachments via `manage_jira_media`.** JSM requests support attachments through the same Jira attachment API. No duplication needed.
 - **SLA visibility.** The `get` operation surfaces SLA status (time to first response, time to resolution) since that's the primary customer concern.

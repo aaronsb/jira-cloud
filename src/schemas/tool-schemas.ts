@@ -470,7 +470,7 @@ export const toolSchemas = {
         operation: {
           type: 'string',
           enum: ['list_portals', 'list_request_types', 'get_request_type', 'create', 'get', 'comment', 'transition', 'list'],
-          description: 'Operation to perform. list_portals: service desks. list_request_types: request types on a portal (use expand:["fields"] to also fetch field schemas). get_request_type: detail + field schema for one type — shows what to fill out. create: raise request. get: rich view (status, SLA, comments, transitions, attachments) in one call. comment: customer-visible comment. transition: customer-side transition (reopen, mark resolved, etc.) — discover IDs via get. list: my requests.',
+          description: 'Operation to perform. list_portals: service desks. list_request_types: request types on a portal (use expand:["fields"] to also fetch field schemas). get_request_type: detail + field schema for one type — shows what to fill out. create: raise request. get: rich view (status, SLA, comments, transitions, attachments) in one call. comment: public-only customer comment. transition: self-service transition on a request (discover IDs via get — often empty because the workflow/permissions don\'t expose any to the customer). list: my requests.',
         },
         serviceDeskId: {
           type: 'string',
@@ -498,11 +498,11 @@ export const toolSchemas = {
         },
         transitionId: {
           type: 'string',
-          description: 'Customer transition ID (from get output). Required for transition.',
+          description: 'Transition ID (from the "Available transitions" section of `get`). Required for transition. Customer-facing transitions depend on the project workflow/permission scheme — many JSM projects expose none, which is normal.',
         },
         isPublic: {
           type: 'boolean',
-          description: 'Whether the comment is public (visible to the customer) or internal. Default: true.',
+          description: 'Must be true (or omitted). Atlassian only permits customers to post public comments; isPublic:false is rejected with a clear error. Internal comments require agent-side tooling.',
           default: true,
         },
         requestFieldValues: {
