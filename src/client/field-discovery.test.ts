@@ -211,18 +211,53 @@ describe('FieldDiscovery', () => {
     expect(catalog[0].name).toBe('Top 1');
   });
 
-  it('handles discovery failure gracefully', async () => {
+  it('handles total discovery failure gracefully', async () => {
+    // Both the admin field-search API and the basic field list fail.
     const client = {
       issueFields: {
         getFieldsPaginated: async () => { throw new Error('API down'); },
+        getFields: async () => { throw new Error('also down'); },
       },
     } as any;
 
     await discovery.discover(client);
 
     expect(discovery.isReady()).toBe(false);
-    expect(discovery.getError()).toBe('API down');
+    expect(discovery.getState()).toBe('unavailable');
+    expect(discovery.getError()).toContain('API down');
+    expect(discovery.getError()).toContain('also down');
     expect(discovery.getCatalog()).toEqual([]);
+  });
+
+  it('falls back to the basic field list (unscored) when the admin field-search API 403s', async () => {
+    const client = {
+      issueFields: {
+        getFieldsPaginated: async () => { throw new Error('Request failed with status code 403'); },
+        getFields: async () => [
+          { id: 'customfield_10035', name: 'Story Points', custom: true, schema: { type: 'number', custom: 'com.atlassian.jira.plugin.system.customfieldtypes:float' } },
+          { id: 'customfield_10100', name: 'Account', custom: true, schema: { type: 'string', custom: 'some.tempo:account' } },
+          // A cascading-select — kept in unscored mode even though it's "unsupported" for scoring.
+          { id: 'customfield_10200', name: 'Region', custom: true, schema: { type: 'option', custom: 'com.atlassian.jira.plugin.system.customfieldtypes:cascadingselect' } },
+          // System fields are filtered out.
+          { id: 'summary', name: 'Summary', custom: false, schema: { type: 'string', system: 'summary' } },
+        ],
+      },
+    } as any;
+
+    await discovery.discover(client);
+
+    expect(discovery.getState()).toBe('unscored');
+    expect(discovery.isReady()).toBe(true);
+    expect(discovery.getError()).toContain('403');
+    // All three custom fields kept; the system field dropped. Sorted by name.
+    const catalog = discovery.getCatalog();
+    expect(catalog.map(f => f.name)).toEqual(['Account', 'Region', 'Story Points']);
+    // Name → ID resolution (the write-path dependency) works.
+    expect(discovery.resolveNameToId('story points')).toBe('customfield_10035');
+    expect(discovery.resolveNameToId('Account')).toBe('customfield_10100');
+    // No screen/recency metadata in this mode.
+    expect(catalog[0].score).toBe(0);
+    expect(catalog[0].screensCount).toBe(0);
   });
 
   it('handles empty field list', async () => {
