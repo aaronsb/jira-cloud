@@ -421,6 +421,12 @@ function issueGuidance(operation: string, issueKey?: string): string {
   return issueNextSteps(operation, issueKey) + getUndescribedFieldNag();
 }
 
+/** Extract the project key prefix from a Jira issue key (e.g. `PROJ-123` → `PROJ`).
+ *  Uppercases the result so handlers don't drift from each other on casing. */
+function projectKeyFromIssueKey(issueKey: string): string {
+  return issueKey.split('-')[0].toUpperCase();
+}
+
 // Handler functions for each operation
 async function handleGetIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs) {
   // Parse expansion options
@@ -456,7 +462,7 @@ async function handleGetIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs)
   // pointing at the opt-in and the scoped `jira://custom-fields/{proj}/{type}` resource.
   const markdown = MarkdownRenderer.renderIssue(issue, transitions, {
     customFields: includeAllCustomFields ? 'dump' : 'breadcrumb',
-    projectKey: args.issueKey!.split('-')[0],
+    projectKey: projectKeyFromIssueKey(args.issueKey!),
     issueTypeName: issue.issueType,
   });
 
@@ -569,7 +575,7 @@ async function handleUpdateIssue(jiraClient: JiraClient, args: ManageJiraIssueAr
   if (customFields && customFieldsNeedRouting(customFields)) {
     // createmeta-based resolution needs the issue's type; the project key is the key prefix.
     const probe = await jiraClient.getIssue(args.issueKey!, false, false);
-    const projectKey = args.issueKey!.split('-')[0].toUpperCase();
+    const projectKey = projectKeyFromIssueKey(args.issueKey!);
     try {
       customFields = await applyRouteResolutions(jiraClient, customFields, projectKey, probe.issueType);
     } catch (e) {

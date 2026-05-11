@@ -187,11 +187,12 @@ export function renderIssue(
   // opt-in expand and the scoped resource; the full dump is gated behind `customFields: 'dump'`.
   // Zero populated → silent in every mode.
   const customFieldsMode = opts.customFields ?? 'breadcrumb';
-  const populatedCount = issue.customFieldValues?.length ?? 0;
+  const cfs = issue.customFieldValues ?? [];
+  const populatedCount = cfs.length;
   if (customFieldsMode === 'dump' && populatedCount > 0) {
     lines.push('');
     lines.push('Custom Fields:');
-    for (const cf of issue.customFieldValues!) {
+    for (const cf of cfs) {
       const displayValue = Array.isArray(cf.value)
         ? (cf.value as unknown[]).join(', ')
         : String(cf.value);
