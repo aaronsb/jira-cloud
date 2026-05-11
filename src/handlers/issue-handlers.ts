@@ -3,8 +3,9 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { fieldDiscovery } from '../client/field-discovery.js';
 import { categoryLabel } from '../client/field-type-map.js';
 import { JiraClient } from '../client/jira-client.js';
+import { routeForField } from '../extensions/index.js';
 import { MarkdownRenderer } from '../mcp/markdown-renderer.js';
-import type { HierarchyNode, HierarchyResult } from '../types/index.js';
+import type { HierarchyNode, HierarchyResult, JiraIssueDetails } from '../types/index.js';
 import { bulkOperationGuard } from '../utils/bulk-operation-guard.js';
 import { issueNextSteps } from '../utils/next-steps.js';
 import { normalizeArgs } from '../utils/normalize-args.js';
@@ -247,7 +248,7 @@ function validateManageJiraIssueArgs(args: unknown): args is ManageJiraIssueArgs
       );
     }
     
-    const validExpansions = ['comments', 'transitions', 'attachments', 'related_issues', 'history'];
+    const validExpansions = ['comments', 'transitions', 'attachments', 'related_issues', 'history', 'custom_fields'];
     for (const expansion of normalizedArgs.expand) {
       if (typeof expansion !== 'string' || !validExpansions.includes(expansion)) {
         throw new McpError(
@@ -272,6 +273,102 @@ function getCatalogFieldMeta() {
     type: categoryLabel(f.category),
     description: f.description,
   }));
+}
+
+/** Compact rendering of a field value for the "Applied" section. */
+function formatAppliedValue(v: unknown): string {
+  if (v === null || v === undefined) return '(none)';
+  if (Array.isArray(v)) return v.map(formatAppliedValue).join(', ') || '(none)';
+  if (typeof v === 'object') {
+    const o = v as Record<string, unknown>;
+    if (typeof o.name === 'string') return o.name;
+    if (typeof o.value === 'string') return o.value;
+    if (typeof o.displayName === 'string') return o.displayName;
+    const s = JSON.stringify(v);
+    return s.length > 80 ? s.slice(0, 77) + '…' : s;
+  }
+  const s = String(v);
+  return s.length > 80 ? s.slice(0, 77) + '…' : s;
+}
+
+/**
+ * Render an "Applied" section confirming what a create/update wrote (ADR-213 §A4, #48).
+ * For custom fields it cross-checks the re-fetched issue and flags silent drops — a write
+ * Jira accepts but discards (field off the Edit screen, hidden by a config, etc.).
+ */
+function renderAppliedFields(args: ManageJiraIssueArgs, issue: JiraIssueDetails): string {
+  const lines: string[] = [];
+
+  if (args.summary !== undefined) lines.push(`- **Summary**: ${formatAppliedValue(issue.summary ?? args.summary)}`);
+  if (args.description !== undefined) lines.push(`- **Description**: ${issue.description ? `updated (${issue.description.length} chars)` : '(cleared)'}`);
+  if (args.priority !== undefined) lines.push(`- **Priority**: ${formatAppliedValue(issue.priority)}`);
+  if (args.assignee !== undefined) lines.push(`- **Assignee**: ${issue.assignee ?? '(unassigned)'}`);
+  if (args.labels !== undefined) lines.push(`- **Labels**: ${(issue.labels && issue.labels.length) ? issue.labels.join(', ') : '(none)'}`);
+  if (args.dueDate !== undefined) lines.push(`- **Due date**: ${issue.dueDate ?? '(cleared)'}`);
+  if (args.parent !== undefined) lines.push(`- **Parent**: ${issue.parent ?? '(removed)'}`);
+  if (args.originalEstimate !== undefined) lines.push(`- **Original estimate**: ${issue.originalEstimate ?? '(cleared)'}`);
+  if (args.remainingEstimate !== undefined) lines.push(`- **Remaining estimate**: ${issue.timeEstimate ?? '(cleared)'}`);
+
+  if (args.customFields) {
+    const storedByName = new Map((issue.customFieldValues ?? []).map(v => [v.name, v.value]));
+    for (const [requestedName, requestedValue] of Object.entries(args.customFields)) {
+      const fieldId = requestedName.startsWith('customfield_') ? requestedName : fieldDiscovery.resolveNameToId(requestedName);
+      const catalogName = fieldId ? (fieldDiscovery.getFieldById(fieldId)?.name ?? requestedName) : requestedName;
+      const stored = storedByName.has(catalogName) ? storedByName.get(catalogName)
+        : storedByName.has(requestedName) ? storedByName.get(requestedName)
+        : undefined;
+      const requestedNonEmpty = requestedValue !== undefined && requestedValue !== null && requestedValue !== ''
+        && !(Array.isArray(requestedValue) && requestedValue.length === 0);
+
+      if (stored !== undefined) {
+        lines.push(`- **${requestedName}**: ${formatAppliedValue(stored)}`);
+      } else if (requestedNonEmpty && fieldId && fieldDiscovery.getFieldById(fieldId)) {
+        lines.push(`- **${requestedName}**: ⚠️ requested \`${formatAppliedValue(requestedValue)}\` but Jira stored no value — the field may be off the Edit screen for this issue type, hidden by a field configuration, or require a dedicated API. It may still be editable inline in the Jira UI.`);
+      } else {
+        lines.push(`- **${requestedName}**: ${formatAppliedValue(requestedValue)} (sent — could not verify)`);
+      }
+    }
+  }
+
+  return lines.length > 0 ? `\n\n**Applied:**\n${lines.join('\n')}` : '';
+}
+
+/** The extension route claiming a customFields payload key — checks the key directly (covers a raw
+ *  field name or a Connect field key) and, for a `customfield_*` id, the resolved catalog name. */
+function routeForPayloadKey(key: string) {
+  const direct = routeForField(key);
+  if (direct) return direct;
+  if (key.startsWith('customfield_')) {
+    const name = fieldDiscovery.getFieldById(key)?.name;
+    if (name) return routeForField(name);
+  }
+  return undefined;
+}
+
+/** True if any customFields key maps to an extension route with a value-resolving write handler. */
+function customFieldsNeedRouting(customFields: Record<string, unknown>): boolean {
+  return Object.keys(customFields).some(k => routeForPayloadKey(k)?.resolveWrite != null);
+}
+
+/**
+ * Apply extension routes' `resolveWrite` hooks to a resolved customFields map (ADR-213 §B) — e.g.
+ * turn a Tempo account name into the numeric id Jira expects. Throws if a value can't be resolved;
+ * callers re-throw as InvalidParams.
+ */
+async function applyRouteResolutions(
+  jiraClient: JiraClient,
+  customFields: Record<string, any>,
+  projectKey: string,
+  issueTypeName: string,
+): Promise<Record<string, any>> {
+  const out: Record<string, any> = {};
+  for (const [key, value] of Object.entries(customFields)) {
+    const route = routeForPayloadKey(key);
+    out[key] = route?.resolveWrite
+      ? await route.resolveWrite({ client: jiraClient.v3Client, projectKey, issueTypeName }, key, value)
+      : value;
+  }
+  return out;
 }
 
 /** Resolve field names to IDs in customFields, returns resolved object */
@@ -338,12 +435,14 @@ async function handleGetIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs)
   const includeComments = expansionOptions.comments || false;
   const includeAttachments = expansionOptions.attachments || false;
   const includeHistory = expansionOptions.history || false;
+  const includeAllCustomFields = expansionOptions.custom_fields || false;
   const issue = await jiraClient.getIssue(
     args.issueKey!,
     includeComments,
     includeAttachments,
     getCatalogFieldMeta(),
     includeHistory,
+    includeAllCustomFields,
   );
   
   // Get transitions if requested
@@ -378,7 +477,7 @@ async function handleMoveIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs
   bulkOperationGuard.record('move', issueKey);
 
   // Get the moved issue (it now has a new key in the target project)
-  const movedIssue = await jiraClient.getIssue(issueKey, false, false);
+  const movedIssue = await jiraClient.getIssue(issueKey, false, false, getCatalogFieldMeta());
   const markdown = MarkdownRenderer.renderIssue(movedIssue);
 
   return {
@@ -418,7 +517,14 @@ async function handleDeleteIssue(jiraClient: JiraClient, args: ManageJiraIssueAr
 }
 
 async function handleCreateIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs) {
-  const customFields = args.customFields ? resolveCustomFieldNames(args.customFields) : undefined;
+  let customFields = args.customFields ? resolveCustomFieldNames(args.customFields) : undefined;
+  if (customFields && customFieldsNeedRouting(customFields)) {
+    try {
+      customFields = await applyRouteResolutions(jiraClient, customFields, args.projectKey!, args.issueType!);
+    } catch (e) {
+      throw new McpError(ErrorCode.InvalidParams, e instanceof Error ? e.message : String(e));
+    }
+  }
 
   const result = await jiraClient.createIssue({
     projectKey: args.projectKey!,
@@ -434,21 +540,32 @@ async function handleCreateIssue(jiraClient: JiraClient, args: ManageJiraIssueAr
   });
   
   // Get the created issue and render to markdown
-  const createdIssue = await jiraClient.getIssue(result.key, false, false);
+  const createdIssue = await jiraClient.getIssue(result.key, false, false, getCatalogFieldMeta(), false, !!args.customFields);
   const markdown = MarkdownRenderer.renderIssue(createdIssue);
+  const applied = renderAppliedFields(args, createdIssue);
 
   return {
     content: [
       {
         type: 'text',
-        text: `# Issue Created\n\n${markdown}${issueGuidance('create', result.key)}`,
+        text: `# Issue Created\n\n${markdown}${applied}${issueGuidance('create', result.key)}`,
       },
     ],
   };
 }
 
 async function handleUpdateIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs) {
-  const customFields = args.customFields ? resolveCustomFieldNames(args.customFields) : undefined;
+  let customFields = args.customFields ? resolveCustomFieldNames(args.customFields) : undefined;
+  if (customFields && customFieldsNeedRouting(customFields)) {
+    // createmeta-based resolution needs the issue's type; the project key is the key prefix.
+    const probe = await jiraClient.getIssue(args.issueKey!, false, false);
+    const projectKey = args.issueKey!.split('-')[0].toUpperCase();
+    try {
+      customFields = await applyRouteResolutions(jiraClient, customFields, projectKey, probe.issueType);
+    } catch (e) {
+      throw new McpError(ErrorCode.InvalidParams, e instanceof Error ? e.message : String(e));
+    }
+  }
 
   await jiraClient.updateIssue({
     issueKey: args.issueKey!,
@@ -465,14 +582,15 @@ async function handleUpdateIssue(jiraClient: JiraClient, args: ManageJiraIssueAr
   });
 
   // Get the updated issue and render to markdown
-  const updatedIssue = await jiraClient.getIssue(args.issueKey!, false, false);
+  const updatedIssue = await jiraClient.getIssue(args.issueKey!, false, false, getCatalogFieldMeta(), false, !!args.customFields);
   const markdown = MarkdownRenderer.renderIssue(updatedIssue);
+  const applied = renderAppliedFields(args, updatedIssue);
 
   return {
     content: [
       {
         type: 'text',
-        text: `# Issue Updated\n\n${markdown}${issueGuidance('update', args.issueKey)}`,
+        text: `# Issue Updated\n\n${markdown}${applied}${issueGuidance('update', args.issueKey)}`,
       },
     ],
   };
@@ -486,7 +604,7 @@ async function handleTransitionIssue(jiraClient: JiraClient, args: ManageJiraIss
   );
 
   // Get the updated issue and render to markdown
-  const updatedIssue = await jiraClient.getIssue(args.issueKey!, false, false);
+  const updatedIssue = await jiraClient.getIssue(args.issueKey!, false, false, getCatalogFieldMeta());
   const markdown = MarkdownRenderer.renderIssue(updatedIssue);
 
   return {

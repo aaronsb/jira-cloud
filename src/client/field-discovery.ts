@@ -19,6 +19,9 @@ export interface CatalogField {
   category: FieldCategory;
   writable: boolean;
   jsonSchema: Record<string, unknown>;
+  /** Schema "custom" type, e.g. "com.pyxis.greenhopper.jira:gh-sprint" or a Connect app key —
+   *  used by extension modules to recognise app-managed fields. May be "" when unknown. */
+  schemaCustom: string;
   screensCount: number;
   lastUsed: string | null;  // ISO date or null
   score: number;
@@ -37,6 +40,12 @@ export interface RequiredFieldInfo {
   allowedValues?: string[];
 }
 
+/** An enumerable option for a field, as returned by createmeta — `{id, value}`. */
+export interface FieldAllowedValue {
+  id: string | number;
+  value: string;
+}
+
 export interface DiscoveryStats {
   totalCustomFields: number;
   excludedNoDescription: number;
@@ -46,6 +55,18 @@ export interface DiscoveryStats {
   catalogSize: number;
   undescribedRatio: number;  // 0..1 — ratio of on-screen custom fields without descriptions
 }
+
+/**
+ * Catalog readiness state (ADR-213 §A1).
+ *
+ * - `loading` — discovery hasn't finished yet
+ * - `scored` — built from the admin field-search API; ranked by screen usage + recency, cut to the curated top-N
+ * - `unscored` — admin field-search API returned 403; built from the basic field list (any authenticated user).
+ *   No screen/recency metadata, so no ranking and no cutoff — every custom field is kept. Name→ID resolution
+ *   (the write-path dependency) works the same; the `jira://custom-fields` resource is larger and unranked.
+ * - `unavailable` — even the basic field list failed; no catalog at all
+ */
+export type CatalogMode = 'loading' | 'scored' | 'unscored' | 'unavailable';
 
 // ── Constants ──────────────────────────────────────────────────────────
 
@@ -73,15 +94,20 @@ export class FieldDiscovery {
   private idToField: Map<string, CatalogField> = new Map();
   private wellKnown: Map<string, string> = new Map(); // logical name → field ID
   private stats: DiscoveryStats | null = null;
-  private ready = false;
+  private mode: CatalogMode = 'loading';
   private error: string | null = null;
 
-  /** Whether the catalog has been built */
+  /** Whether a usable catalog exists (scored or unscored). */
   isReady(): boolean {
-    return this.ready;
+    return this.mode === 'scored' || this.mode === 'unscored';
   }
 
-  /** Error message if startup discovery failed */
+  /** Granular catalog state — see {@link CatalogMode}. */
+  getState(): CatalogMode {
+    return this.mode;
+  }
+
+  /** Error message if discovery failed (or degraded). */
   getError(): string | null {
     return this.error;
   }
@@ -126,7 +152,7 @@ export class FieldDiscovery {
     projectKey: string,
     issueTypeName: string,
   ): Promise<CatalogField[]> {
-    if (!this.ready || this.catalog.length === 0) {
+    if (!this.isReady() || this.catalog.length === 0) {
       return [];
     }
 
@@ -260,11 +286,71 @@ export class FieldDiscovery {
 
   /** Clear required fields cache for a project (on 400 errors, cache may be stale). */
   invalidateRequiredFields(projectKey: string): void {
+    const prefix = projectKey.toLowerCase() + ':';
     for (const key of this.requiredFieldsCache.keys()) {
-      if (key.startsWith(projectKey.toLowerCase() + ':')) {
-        this.requiredFieldsCache.delete(key);
-      }
+      if (key.startsWith(prefix)) this.requiredFieldsCache.delete(key);
     }
+    for (const key of this.fieldOptionsCache.keys()) {
+      if (key.startsWith(prefix)) this.fieldOptionsCache.delete(key);
+    }
+  }
+
+  // ── Field Options (createmeta allowedValues) ─────────────────────────
+
+  private fieldOptionsCache = new Map<string, Map<string, FieldAllowedValue[]>>();
+
+  /**
+   * Enumerable allowed values (`{id, value}`) for a field on a project + issue type, read from
+   * createmeta. Returns `[]` if the field isn't on that issue type's create screen or has no
+   * enumerable options. Cached per project/issue-type — one createmeta walk covers every field.
+   * Used to resolve a human-friendly option name to the id the issue-edit endpoint expects
+   * (e.g. the Tempo Account field — see ADR-213 §B / field-routing.ts).
+   */
+  async getFieldAllowedValues(
+    client: Version3Client,
+    projectKey: string,
+    issueTypeName: string,
+    fieldId: string,
+  ): Promise<FieldAllowedValue[]> {
+    const cacheKey = `${projectKey}:${issueTypeName}`.toLowerCase();
+    let perField = this.fieldOptionsCache.get(cacheKey);
+    if (!perField) {
+      perField = new Map<string, FieldAllowedValue[]>();
+      try {
+        const issueTypes = await this.getIssueTypes(client, projectKey);
+        const matchingType = issueTypes.find(t => t.name.toLowerCase() === issueTypeName.toLowerCase());
+        if (matchingType) {
+          let startAt = 0;
+          const maxResults = 50;
+          let hasMore = true;
+          while (hasMore) {
+            const fieldMeta = await client.issues.getCreateIssueMetaIssueTypeId({
+              projectIdOrKey: projectKey,
+              issueTypeId: matchingType.id,
+              startAt,
+              maxResults,
+            });
+            const fields = (fieldMeta.fields || fieldMeta.results || []) as any[];
+            for (const f of fields) {
+              if (!f.fieldId || !Array.isArray(f.allowedValues) || f.allowedValues.length === 0) continue;
+              const opts: FieldAllowedValue[] = [];
+              for (const v of f.allowedValues) {
+                const id = v?.id ?? v?.value;
+                const value = v?.value ?? v?.name ?? (typeof v === 'string' ? v : undefined);
+                if (id !== undefined && value !== undefined) opts.push({ id, value: String(value) });
+              }
+              if (opts.length > 0) perField.set(f.fieldId, opts);
+            }
+            if (fields.length < maxResults) hasMore = false;
+            startAt += fields.length;
+          }
+        }
+      } catch (err) {
+        console.error(`[field-discovery] Field options fetch failed for ${projectKey}/${issueTypeName}: ${err instanceof Error ? err.message : err}`);
+      }
+      this.fieldOptionsCache.set(cacheKey, perField);
+    }
+    return perField.get(fieldId) ?? [];
   }
 
   /**
@@ -280,15 +366,41 @@ export class FieldDiscovery {
 
   /**
    * Build the master catalog from Jira's field metadata.
+   *
+   * Tries the admin-only paginated field-search API first (full metadata → `scored` mode).
+   * On any failure (typically a 403 for non-admin users — see issue #43) falls back to the
+   * basic field list, which any authenticated user can read, and builds an `unscored` catalog.
+   * If even that fails, the catalog stays empty (`unavailable`) and custom fields pass through
+   * unfiltered, as before.
    */
   async discover(client: Version3Client): Promise<void> {
+    console.error('[field-discovery] Starting custom field discovery...');
+
+    let rawFields: RawField[];
+    let degraded = false;
     try {
-      console.error('[field-discovery] Starting custom field discovery...');
+      rawFields = await this.fetchAllCustomFields(client);
+      console.error(`[field-discovery] Fetched ${rawFields.length} custom fields (full metadata)`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // Keep the underlying cause around — it explains the degraded mode in the resource.
+      this.error = `The admin field-search API is unavailable (${msg}) — likely because this user lacks the Administer Jira global permission. Running custom-field discovery in unscored mode.`;
+      console.error(`[field-discovery] Admin field-search API unavailable (${msg}); falling back to the basic field list`);
+      try {
+        rawFields = await this.fetchCustomFieldsBasic(client);
+        degraded = true;
+        console.error(`[field-discovery] Fetched ${rawFields.length} custom fields (basic list — no screen/recency metadata)`);
+      } catch (err2) {
+        const msg2 = err2 instanceof Error ? err2.message : String(err2);
+        this.error = `Custom field discovery failed. Admin field-search API: ${msg}. Basic field list: ${msg2}.`;
+        this.mode = 'unavailable';
+        console.error(`[field-discovery] ${this.error}`);
+        return;
+      }
+    }
 
-      const rawFields = await this.fetchAllCustomFields(client);
-      console.error(`[field-discovery] Fetched ${rawFields.length} custom fields`);
-
-      // Detect well-known locked fields by schema type (before filtering)
+    try {
+      // Detect well-known locked fields by schema custom type (works in both modes)
       for (const field of rawFields) {
         const logicalName = WELL_KNOWN_FIELDS[field.schemaCustom];
         if (logicalName) {
@@ -297,37 +409,52 @@ export class FieldDiscovery {
         }
       }
 
-      const { qualified, stats } = this.filterAndClassify(rawFields);
-      console.error(`[field-discovery] ${qualified.length} fields passed filters`);
+      if (degraded) {
+        this.catalog = this.buildUnscoredCatalog(rawFields);
+        this.stats = {
+          totalCustomFields: rawFields.length,
+          excludedNoDescription: 0,
+          excludedNoScreens: 0,
+          excludedUnsupportedType: 0,
+          excludedLocked: 0,
+          catalogSize: this.catalog.length,
+          undescribedRatio: 0,
+        };
+        this.buildIndexes();
+        this.mode = 'unscored';
+        console.error(`[field-discovery] Catalog ready (unscored): ${this.catalog.length} fields`);
+      } else {
+        const { qualified, stats } = this.filterAndClassify(rawFields);
+        console.error(`[field-discovery] ${qualified.length} fields passed filters`);
 
-      const scored = this.scoreFields(qualified);
-      const finalCatalog = this.applyCutoff(scored);
+        const scored = this.scoreFields(qualified);
+        const finalCatalog = this.applyCutoff(scored);
 
-      this.catalog = finalCatalog;
-      this.stats = { ...stats, catalogSize: finalCatalog.length };
-      this.buildIndexes();
-      this.ready = true;
+        this.catalog = finalCatalog;
+        this.stats = { ...stats, catalogSize: finalCatalog.length };
+        this.buildIndexes();
+        this.mode = 'scored';
 
-      console.error(`[field-discovery] Catalog ready: ${finalCatalog.length} fields`);
-      if (stats.undescribedRatio > 0.5) {
-        console.error(
-          `[field-discovery] WARNING: ${Math.round(stats.undescribedRatio * 100)}% of on-screen custom fields lack descriptions. ` +
-          `Encourage your Jira admin to add descriptions for better AI support.`
-        );
+        console.error(`[field-discovery] Catalog ready (scored): ${finalCatalog.length} fields`);
+        if (stats.undescribedRatio > 0.5) {
+          console.error(
+            `[field-discovery] WARNING: ${Math.round(stats.undescribedRatio * 100)}% of on-screen custom fields lack descriptions. ` +
+            `Encourage your Jira admin to add descriptions for better AI support.`
+          );
+        }
+        this.logExclusions(rawFields, finalCatalog);
       }
-
-      // Log excluded fields at debug level
-      this.logExclusions(rawFields, finalCatalog);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       this.error = msg;
-      console.error(`[field-discovery] Discovery failed: ${msg}`);
-      // Don't re-throw — catalog stays empty, fields pass through unfiltered
+      this.mode = 'unavailable';
+      console.error(`[field-discovery] Catalog build failed: ${msg}`);
     }
   }
 
   /**
-   * Fetch all custom fields with metadata via paginated API.
+   * Fetch all custom fields with full metadata via the admin paginated field-search API.
+   * Requires the Administer Jira global permission — throws (typically 403) otherwise.
    */
   private async fetchAllCustomFields(client: Version3Client): Promise<RawField[]> {
     const allFields: RawField[] = [];
@@ -366,6 +493,55 @@ export class FieldDiscovery {
     }
 
     return allFields;
+  }
+
+  /**
+   * Fetch custom fields via the basic field list (`GET /rest/api/3/field`), which any
+   * authenticated user can read. Carries id / name / schema / `custom` flag but **not**
+   * `description`, `screensCount`, `lastUsed`, or `isLocked` — so the resulting catalog is
+   * `unscored` (no ranking, no cutoff). Used as the non-admin fallback for issue #43.
+   */
+  private async fetchCustomFieldsBasic(client: Version3Client): Promise<RawField[]> {
+    const all = await client.issueFields.getFields();
+    return (all || [])
+      .filter(f => f?.id && (f.custom === true || f.id.startsWith('customfield_')))
+      .map(f => ({
+        id: f.id!,
+        name: f.name || f.id!,
+        description: '',
+        isLocked: false,
+        screensCount: 0,
+        lastUsed: null,
+        lastUsedType: 'NO_INFORMATION',
+        schemaType: f.schema?.type || '',
+        schemaCustom: f.schema?.custom || '',
+        schemaItems: (f.schema?.items as string) || '',
+      }));
+  }
+
+  /**
+   * Build an unscored catalog: every custom field, no exclusions, no ranking, sorted by name.
+   * Type classification still runs (drives the `writable` flag and `category`), but unsupported
+   * types are kept rather than dropped — name→ID resolution should cover every field.
+   */
+  private buildUnscoredCatalog(rawFields: RawField[]): CatalogField[] {
+    return rawFields
+      .map(f => {
+        const typeInfo = classifyFieldType(f.schemaType, f.schemaCustom || undefined, f.schemaItems || undefined);
+        return {
+          id: f.id,
+          name: f.name,
+          description: f.description,
+          category: typeInfo.category,
+          writable: typeInfo.writable,
+          jsonSchema: typeInfo.jsonSchema,
+          schemaCustom: f.schemaCustom,
+          screensCount: 0,
+          lastUsed: null,
+          score: 0,
+        };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
   }
 
   /**
@@ -492,6 +668,7 @@ export class FieldDiscovery {
       category: f.typeInfo.category,
       writable: f.typeInfo.writable,
       jsonSchema: f.typeInfo.jsonSchema,
+      schemaCustom: f.schemaCustom,
       screensCount: f.screensCount,
       lastUsed: f.lastUsed,
       score: Math.round(f.score * 100) / 100,

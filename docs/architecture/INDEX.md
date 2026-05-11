@@ -30,3 +30,6 @@ _MCP tool API surface, LLM interaction patterns, schema design_
 | [ADR-207](./tools/ADR-207-plan-analysis-with-hierarchy-rollups.md) | Plan analysis via GraphQL hierarchy traversal | Draft |
 | [ADR-208](./tools/ADR-208-sprint-aware-analysis-and-navigation.md) | Sprint-aware analysis and navigation | Proposed |
 | [ADR-209](./tools/ADR-209-required-field-discovery-per-project-and-issue-type.md) | Required field discovery per project and issue type | Proposed |
+| [ADR-210](./tools/ADR-210-townsquare-goals-and-projects-integration.md) | Townsquare Goals and Projects Integration | Draft |
+| [ADR-211](./tools/ADR-211-attachment-and-workspace-management.md) | Attachment and Workspace Management | Draft |
+| [ADR-213](./tools/ADR-213-custom-field-robustness-and-capability-aware-field-routing.md) | Custom field robustness and capability-aware field routing | Accepted |

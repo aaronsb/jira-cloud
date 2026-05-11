@@ -37,7 +37,7 @@ function generateIssueToolDocumentation(schema: any) {
         description: "Retrieves issue details",
         required_parameters: ["issueKey"],
         optional_parameters: ["expand"],
-        expand_options: ["comments", "transitions", "attachments", "related_issues", "history"],
+        expand_options: ["comments", "transitions", "attachments", "related_issues", "history", "custom_fields"],
         examples: [
           {
             description: "Get basic issue details",

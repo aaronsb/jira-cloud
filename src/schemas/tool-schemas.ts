@@ -267,9 +267,9 @@ export const toolSchemas = {
           type: 'array',
           items: {
             type: 'string',
-            enum: ['comments', 'transitions', 'attachments', 'related_issues', 'history'],
+            enum: ['comments', 'transitions', 'attachments', 'related_issues', 'history', 'custom_fields'],
           },
-          description: 'Additional fields to include in the response.',
+          description: 'Additional fields to include in the response. Populated custom fields are returned by default once the field catalog is ready; pass "custom_fields" to also surface populated custom fields that fall outside the curated catalog (the full set of fields on the issue).',
         },
       },
       required: ['operation'],

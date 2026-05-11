@@ -6,6 +6,7 @@ import { categoryLabel } from '../client/field-type-map.js';
 import type { GraphQLClient } from '../client/graphql-client.js';
 import { searchGoals } from '../client/graphql-goals.js';
 import { JiraClient } from '../client/jira-client.js';
+import { allFieldRoutes, moduleStatuses } from '../extensions/index.js';
 
 /**
  * Sets up resource handlers for the Jira MCP server
@@ -54,6 +55,12 @@ export function setupResourceHandlers(jiraClient: JiraClient, graphqlClient?: Gr
             name: 'Analysis Query Recipes',
             mimeType: 'text/markdown',
             description: 'Composition patterns for analyze_jira_issues — how to combine summary counts, groupBy, and JQL for PM dashboards'
+          },
+          {
+            uri: 'jira://capabilities',
+            name: 'Connection Capabilities',
+            mimeType: 'application/json',
+            description: 'What this connection can do — custom-field catalog mode, Plans availability, and fields that need special handling (Sprint, Epic Link, Tempo Account, …)'
           },
           // Add tool resources
           ...toolResources.resources
@@ -116,7 +123,11 @@ export function setupResourceHandlers(jiraClient: JiraClient, graphqlClient?: Gr
         if (uri === 'jira://analysis/recipes') {
           return getAnalysisRecipes();
         }
-        
+
+        if (uri === 'jira://capabilities') {
+          return await getCapabilities(graphqlClient);
+        }
+
         // Handle resource templates
         const projectMatch = uri.match(/^jira:\/\/projects\/([^/]+)\/overview$/);
         if (projectMatch) {
@@ -361,13 +372,62 @@ async function getBoardOverview(jiraClient: JiraClient, boardId: number) {
   }
 }
 
+/** In unscored mode the catalog can be large; the resource truncates past this many fields. */
+const MAX_UNSCORED_RESOURCE_FIELDS = 200;
+
 /**
- * Gets the master custom fields catalog
+ * Gets the master custom fields catalog (ADR-201, ADR-213 §A1).
+ *
+ * Three states (see {@link CatalogMode}):
+ * - `scored` — curated, ranked catalog with descriptions, screen counts, and recency
+ * - `unscored` — admin field API returned 403; flat id/name/type list of every custom field
+ *   (no descriptions — the basic field API doesn't carry them), truncated for size with a
+ *   pointer to the project-scoped resource for richer per-field detail
+ * - `unavailable` / `loading` — no catalog yet
  */
 function getCustomFieldsCatalog() {
+  const state = fieldDiscovery.getState();
   const catalog = fieldDiscovery.getCatalog();
   const stats = fieldDiscovery.getStats();
+  const error = fieldDiscovery.getError();
 
+  if (state === 'loading') {
+    return jsonResource('jira://custom-fields', { status: 'loading', fields: [], count: 0 });
+  }
+
+  if (state === 'unavailable') {
+    return jsonResource('jira://custom-fields', {
+      status: 'unavailable',
+      fields: [],
+      count: 0,
+      error: error ?? 'Custom field discovery failed.',
+    });
+  }
+
+  if (state === 'unscored') {
+    const total = catalog.length;
+    const truncated = total > MAX_UNSCORED_RESOURCE_FIELDS;
+    const fields = (truncated ? catalog.slice(0, MAX_UNSCORED_RESOURCE_FIELDS) : catalog).map(f => ({
+      id: f.id,
+      name: f.name,
+      type: categoryLabel(f.category),
+      writable: f.writable,
+    }));
+    return jsonResource('jira://custom-fields', {
+      status: 'ready',
+      mode: 'unscored',
+      fields,
+      count: total,
+      ...(truncated ? { truncated: true, shown: fields.length } : {}),
+      note:
+        (error ? error + ' ' : '') +
+        'Fields are not ranked by screen usage or recency, and descriptions are not available in this mode. ' +
+        'For descriptions and allowed values on the fields relevant to a specific project and issue type, read ' +
+        'jira://custom-fields/{projectKey}/{issueType}.',
+    });
+  }
+
+  // scored
   const fields = catalog.map(f => ({
     id: f.id,
     name: f.name,
@@ -380,7 +440,8 @@ function getCustomFieldsCatalog() {
   }));
 
   const response: Record<string, unknown> = {
-    status: fieldDiscovery.isReady() ? 'ready' : 'loading',
+    status: 'ready',
+    mode: 'scored',
     fields,
     count: fields.length,
   };
@@ -397,17 +458,56 @@ function getCustomFieldsCatalog() {
     };
   }
 
-  if (fieldDiscovery.getError()) {
-    response.error = fieldDiscovery.getError();
-  }
+  return jsonResource('jira://custom-fields', response);
+}
 
+/** Wrap an object as a single JSON resource content entry. */
+function jsonResource(uri: string, body: unknown) {
   return {
     contents: [{
-      uri: 'jira://custom-fields',
+      uri,
       mimeType: 'application/json',
-      text: JSON.stringify(response, null, 2),
+      text: JSON.stringify(body, null, 2),
     }],
   };
+}
+
+/**
+ * What this connection can actually do (ADR-213 §B): the custom-field catalog mode, whether the
+ * Plans/GraphQL surface is reachable, the loaded extension modules and their detection state, and
+ * the field routes those modules contribute (fields that need handling beyond a plain customFields
+ * write — Sprint, Epic Link, Tempo Account, …). `resolves: true` on a route means this server can
+ * transform the value for you (e.g. an account name → id); otherwise the route's guidance names the
+ * path to use.
+ */
+async function getCapabilities(graphqlClient?: GraphQLClient | null) {
+  const catalogState = fieldDiscovery.getState();
+  const catalog = fieldDiscovery.getCatalog();
+  const catalogError = fieldDiscovery.getError();
+
+  const fieldRouting = allFieldRoutes().map(r => ({
+    names: r.names,
+    resolves: !!r.resolveWrite,
+    reason: r.unhandled.reason,
+    guidance: r.unhandled.message,
+    ...(r.unhandled.suggestedTool ? { suggestedTool: r.unhandled.suggestedTool } : {}),
+  }));
+
+  return jsonResource('jira://capabilities', {
+    customFieldCatalog: {
+      mode: catalogState,
+      count: catalog.length,
+      ...(catalogState !== 'scored' && catalogError ? { note: catalogError } : {}),
+    },
+    plans: { available: graphqlClient != null },
+    extensions: await moduleStatuses(),
+    fieldRouting,
+    note:
+      'Extension modules + capability-aware field routing (ADR-213 §B). Each fieldRouting entry ' +
+      'describes a field that needs handling beyond a plain customFields write; `resolves: true` ' +
+      'means this server transforms the value for you (pass a name or an id), otherwise `guidance` ' +
+      'names the right path. Read jira://custom-fields for the field catalog.',
+  });
 }
 
 /**
@@ -437,7 +537,7 @@ async function getContextCustomFields(jiraClient: JiraClient, projectKey: string
         issueType,
         fields: result,
         count: result.length,
-        catalogReady: fieldDiscovery.isReady(),
+        catalogMode: fieldDiscovery.getState(),
       }, null, 2),
     }],
   };

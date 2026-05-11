@@ -3,6 +3,12 @@ import { Version3Client, AgileClient } from 'jira.js';
 import { JiraConfig, JiraIssueDetails, JiraPerson, FilterResponse, TransitionDetails, SearchResponse, BoardResponse, SprintResponse, JiraAttachment } from '../types/index.js';
 import { TextProcessor } from '../utils/text-processing.js';
 
+/**
+ * Above this many catalog custom fields, `getIssue` requests `*navigable` instead of
+ * enumerating every field ID — keeps the request small in unscored-catalog mode (ADR-213 §A2).
+ */
+const CUSTOM_FIELD_ID_REQUEST_LIMIT = 50;
+
 // Define additional types for sprint operations
 interface SprintIssue {
   key: string;
@@ -200,6 +206,7 @@ export class JiraClient {
     includeAttachments = false,
     customFieldMeta?: Array<{ id: string; name: string; type: string; description: string }>,
     includeHistory = false,
+    includeAllCustomFields = false,
   ): Promise<JiraIssueDetails> {
     const fields = [...this.issueFields];
 
@@ -207,11 +214,20 @@ export class JiraClient {
       fields.push('attachment');
     }
 
-    // Include discovered custom field IDs in the fetch
+    // Decide how to fetch custom fields:
+    // - small catalog (scored mode, ≤ ~30 fields) → request the catalog's IDs explicitly
+    // - large catalog (unscored mode) or explicit `custom_fields` expand → request all navigable
+    //   fields once (`*navigable`) and label whatever populated custom fields come back
+    const useNavigableWildcard =
+      !!customFieldMeta && (includeAllCustomFields || customFieldMeta.length > CUSTOM_FIELD_ID_REQUEST_LIMIT);
     if (customFieldMeta) {
-      for (const cf of customFieldMeta) {
-        if (!fields.includes(cf.id)) {
-          fields.push(cf.id);
+      if (useNavigableWildcard) {
+        fields.push('*navigable');
+      } else {
+        for (const cf of customFieldMeta) {
+          if (!fields.includes(cf.id)) {
+            fields.push(cf.id);
+          }
         }
       }
     }
@@ -249,21 +265,42 @@ export class JiraClient {
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     }
 
-    // Extract custom field values using catalog metadata
+    // Extract custom field values, labeled via the catalog metadata.
     if (customFieldMeta) {
       const rawFields = issue.fields as Record<string, any>;
+      const metaById = new Map(customFieldMeta.map(m => [m.id, m]));
       const customValues: JiraIssueDetails['customFieldValues'] = [];
-      for (const cf of customFieldMeta) {
-        const value = rawFields[cf.id];
-        if (value !== undefined && value !== null) {
+      const isPopulated = (v: unknown) =>
+        v !== undefined && v !== null
+        && !(Array.isArray(v) && v.length === 0)
+        && !(typeof v === 'object' && !Array.isArray(v) && Object.keys(v as object).length === 0);
+
+      if (useNavigableWildcard) {
+        // The response carries every navigable custom field; surface the populated ones.
+        for (const [key, value] of Object.entries(rawFields)) {
+          if (!/^customfield_\d+$/.test(key) || !isPopulated(value)) continue;
+          const meta = metaById.get(key);
           customValues.push({
-            name: cf.name,
+            name: meta?.name ?? key,
             value: this.formatCustomFieldValue(value),
-            type: cf.type,
-            description: cf.description,
+            type: meta?.type ?? 'unknown',
+            description: meta?.description ?? '',
           });
         }
+      } else {
+        for (const cf of customFieldMeta) {
+          const value = rawFields[cf.id];
+          if (isPopulated(value)) {
+            customValues.push({
+              name: cf.name,
+              value: this.formatCustomFieldValue(value),
+              type: cf.type,
+              description: cf.description,
+            });
+          }
+        }
       }
+
       if (customValues.length > 0) {
         issueDetails.customFieldValues = customValues;
       }
@@ -702,6 +739,27 @@ export class JiraClient {
     } catch (error) {
       console.error('Error executing lean JQL search:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Validate a JQL query's structure and field references via POST /rest/api/3/jql/parse
+   * (ADR-213 §A3, #44). The enhanced search endpoint silently returns zero results for an
+   * unknown field, so this is the only way to distinguish "field doesn't exist" from "field
+   * is empty across all issues". Returns the list of syntax/validation errors — empty if valid.
+   * If the parse endpoint itself fails, returns [] (don't block the search on a flaky validator).
+   */
+  async parseJqlErrors(jql: string): Promise<string[]> {
+    try {
+      const cleanJql = jql.replace(/\\"/g, '"');
+      const result = await this.client.jql.parseJqlQueries({
+        queries: [cleanJql],
+        validation: 'warn',
+      });
+      return result?.queries?.[0]?.errors ?? [];
+    } catch (err) {
+      console.error(`[jql-parse] validation skipped: ${err instanceof Error ? err.message : String(err)}`);
+      return [];
     }
   }
 
