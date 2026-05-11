@@ -9,6 +9,7 @@
 import { Version3Client } from 'jira.js';
 
 import { classifyFieldType, type FieldCategory, type FieldTypeInfo } from './field-type-map.js';
+import { routeForField } from '../extensions/index.js';
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -79,6 +80,19 @@ const RECENCY_WEIGHT = 5;
 const RECENCY_HALF_LIFE_DAYS = 30;
 
 // ── Field Discovery ────────────────────────────────────────────────────
+
+/**
+ * True if an extension route owns a value-resolving write handler for this field (ADR-213 §B).
+ * Used to mark `writable: true` on a field whose Jira type our classifier can't map — e.g. Tempo
+ * Account reports an opaque schema (→ `unsupported` category) but `resolveTempoAccountWrite` turns
+ * a name into the numeric id the standard issue-edit endpoint accepts. Matches the route by field
+ * name first, then by schema-custom key. (#45 follow-up: keeps the catalog `writable` flag in
+ * step with what the write path actually does.)
+ */
+function extensionCanWrite(fieldName: string, schemaCustom: string): boolean {
+  const route = routeForField(fieldName) ?? (schemaCustom ? routeForField(schemaCustom) : undefined);
+  return route?.resolveWrite != null;
+}
 
 /** Well-known locked fields identified by schema custom type */
 const WELL_KNOWN_FIELDS: Record<string, string> = {
@@ -533,7 +547,7 @@ export class FieldDiscovery {
           name: f.name,
           description: f.description,
           category: typeInfo.category,
-          writable: typeInfo.writable,
+          writable: typeInfo.writable || extensionCanWrite(f.name, f.schemaCustom),
           jsonSchema: typeInfo.jsonSchema,
           schemaCustom: f.schemaCustom,
           screensCount: 0,
@@ -586,6 +600,10 @@ export class FieldDiscovery {
       }
 
       // Filter: supported type
+      // NOTE: this also drops extension-handled fields whose Jira type our classifier can't map
+      // (e.g. Tempo Account on an admin tenant) — the unscored fallback keeps them and flags them
+      // writable via `extensionCanWrite`, but the scored path doesn't. Retaining them here is a
+      // larger change (it shifts what's in the curated catalog, not just a flag). See #45 / #57.
       const typeInfo = classifyFieldType(field.schemaType, field.schemaCustom || undefined, field.schemaItems || undefined);
       if (typeInfo.category === 'unsupported') {
         excludedUnsupportedType++;

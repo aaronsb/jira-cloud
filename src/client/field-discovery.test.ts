@@ -260,6 +260,52 @@ describe('FieldDiscovery', () => {
     expect(catalog[0].screensCount).toBe(0);
   });
 
+  it('marks an extension-handled field writable even when its Jira type is unsupported (Tempo Account)', async () => {
+    const client = {
+      issueFields: {
+        getFieldsPaginated: async () => { throw new Error('Request failed with status code 403'); },
+        getFields: async () => [
+          // Opaque schema → the classifier can't map it (`unsupported`). Named "Account" so the
+          // Tempo extension route claims it and `resolveTempoAccountWrite` makes it writable.
+          { id: 'customfield_11266', name: 'Account', custom: true, schema: { type: 'any', custom: 'io.tempo.jira__account' } },
+          // Same opaque shape, but no extension route owns it → stays conservatively read-only.
+          { id: 'customfield_99999', name: 'Mystery Widget', custom: true, schema: { type: 'any', custom: 'com.acme:widget' } },
+        ],
+      },
+    } as any;
+
+    await discovery.discover(client);
+    expect(discovery.getState()).toBe('unscored');
+
+    const catalog = discovery.getCatalog();
+    const account = catalog.find(f => f.id === 'customfield_11266')!;
+    const mystery = catalog.find(f => f.id === 'customfield_99999')!;
+    // The classifier still can't produce a JSON schema for either — but the Tempo route can write Account.
+    expect(account.category).toBe('unsupported');
+    expect(account.writable).toBe(true);
+    expect(mystery.category).toBe('unsupported');
+    expect(mystery.writable).toBe(false);
+  });
+
+  it('matches an extension route by schema-custom key when the field name was renamed', async () => {
+    // A Forge-style Tempo Account field that a tenant admin renamed away from "Account" — the route
+    // no longer matches on name, but `io.tempo.jira__account` is also one of the route's claimed keys,
+    // so `extensionCanWrite` falls back to matching on `schema.custom`.
+    const client = {
+      issueFields: {
+        getFieldsPaginated: async () => { throw new Error('Request failed with status code 403'); },
+        getFields: async () => [
+          { id: 'customfield_11266', name: 'Billing Bucket', custom: true, schema: { type: 'any', custom: 'io.tempo.jira__account' } },
+        ],
+      },
+    } as any;
+
+    await discovery.discover(client);
+    const billing = discovery.getCatalog().find(f => f.id === 'customfield_11266')!;
+    expect(billing.category).toBe('unsupported');
+    expect(billing.writable).toBe(true);
+  });
+
   it('handles empty field list', async () => {
     const client = createMockClient([]);
     await discovery.discover(client);
