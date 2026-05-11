@@ -34,6 +34,7 @@ import { promptDefinitions } from './prompts/prompt-definitions.js';
 import { getPrompt } from './prompts/prompt-messages.js';
 import { toolSchemas } from './schemas/tool-schemas.js';
 import type { GraphIssue } from './types/index.js';
+import { classifyFieldErrors } from './utils/field-error-classification.js';
 import { normalizeArgs } from './utils/normalize-args.js';
 
 // Jira credentials from environment variables
@@ -282,6 +283,11 @@ class JiraServer {
             lines.push('', '**Field errors:**');
             for (const [field, msg] of Object.entries(fieldErrors)) {
               lines.push(`- \`${field}\`: ${msg}`);
+            }
+            // Distinguish the failure modes Jira's message conflates (ADR-213 §A5, #49 / #52c).
+            const guidance = classifyFieldErrors(fieldErrors as Record<string, unknown>);
+            if (guidance.length > 0) {
+              lines.push('', '**What to do:**', ...guidance);
             }
           }
 
