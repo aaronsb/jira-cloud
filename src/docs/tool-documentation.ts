@@ -166,11 +166,14 @@ function generateIssueToolDocumentation(schema: any) {
       }
     ],
     custom_fields: {
-      description: "Custom fields are discovered automatically at startup. Use field names (not IDs) in the customFields parameter.",
-      discovery: "Read jira://custom-fields to see the master catalog of discovered fields with types and descriptions.",
-      context: "Read jira://custom-fields/{projectKey}/{issueType} to see fields valid for a specific project and issue type.",
-      name_resolution: "Field names are resolved to IDs automatically — use human-readable names like 'Story Points', not 'customfield_10035'.",
-      requirement: "Only fields with descriptions in Jira are discoverable. Fields without descriptions must use raw field IDs.",
+      description: "Custom fields are discovered automatically. Pass values in customFields as { name | customfield_NNNNN : value } — names are preferred.",
+      discovery: "Read jira://custom-fields for the master catalog of discovered fields with types and descriptions.",
+      context: "Read jira://custom-fields/{projectKey}/{issueType} for fields settable on a specific screen, with jsonSchema hints.",
+      capabilities: "Read jira://capabilities for the fieldRouting table — flags fields that need a dedicated tool or special handling. Examples: Sprint goes through manage_jira_sprint (operation: manage_issues); Epic Link / Parent Link / Parent go through the `parent` parameter on update, not customFields; Rank (backlog order) is not settable through this server; Tempo Account auto-resolves a name or numeric id via the project's account options.",
+      name_resolution: "Field names resolve to ids automatically — prefer 'Story Points' over 'customfield_10035'. Catalog lookup is case-insensitive.",
+      clear_semantics: "Pass null to clear a field. Empty string ('') may collide with name-resolution on extension-routed fields (e.g., Tempo Account: '' matches all account names ambiguously) — null is the safe path.",
+      view_after_write: "Populated custom fields are NOT rendered on `get` by default — a one-line breadcrumb names the count and the opt-in. Pass `expand: [\"custom_fields\"]` to render the full block. Post-write renders drop the block entirely; the `Applied:` section is the read-out.",
+      requirement: "Only fields with descriptions in Jira are discoverable. Fields without descriptions must be referenced by raw customfield_NNNNN id.",
     },
     related_resources: [
       { name: "Project Overview", uri: "jira://projects/{projectKey}/overview", description: "Get detailed information about a project" },

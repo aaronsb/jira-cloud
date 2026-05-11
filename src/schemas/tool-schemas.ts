@@ -144,7 +144,7 @@ export const toolSchemas = {
 
   manage_jira_issue: {
     name: 'manage_jira_issue',
-    description: 'Get, create, update, delete, move, transition, comment on, link, log work on, or explore hierarchy of Jira issues',
+    description: 'Get, create, update, delete, move, transition, comment on, link, log work on, or explore hierarchy of Jira issues. For custom-field writes, consult `jira://capabilities` (field routing) and `jira://custom-fields/{projectKey}/{issueType}` (what is settable here) — some fields need dedicated tools and others auto-resolve names to ids.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -188,7 +188,7 @@ export const toolSchemas = {
         },
         customFields: {
           type: 'object',
-          description: 'Custom field values as key-value pairs.',
+          description: 'Custom field values as { name | id : value }. Names auto-resolve to customfield_NNNNN. Read `jira://capabilities` for the field-routing table (which fields need a dedicated tool or have value-resolution) and `jira://custom-fields/{projectKey}/{issueType}` for what is settable on a given screen, with types and clearing semantics.',
         },
         dueDate: {
           type: ['string', 'null'],
