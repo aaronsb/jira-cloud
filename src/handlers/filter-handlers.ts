@@ -418,9 +418,22 @@ async function handleExecuteJql(jiraClient: JiraClient, args: ManageJiraFilterAr
   const startAt = args.startAt !== undefined ? args.startAt : 0;
   const maxResults = args.maxResults !== undefined ? args.maxResults : 25;
   
+  // Validate field/function names and syntax before searching. The enhanced search endpoint
+  // silently returns zero results for an unknown field, so a typo'd field name would otherwise
+  // be indistinguishable from "that field is empty everywhere" (ADR-213 §A3, #44).
+  const jqlErrors = await jiraClient.parseJqlErrors(args.jql);
+  if (jqlErrors.length > 0) {
+    throw new McpError(
+      ErrorCode.InvalidParams,
+      `Invalid JQL — Jira rejected this query:\n${jqlErrors.map(e => `  - ${e}`).join('\n')}\n\n` +
+      `If you meant a custom field, check its exact name in the jira://custom-fields resource ` +
+      `(or jira://custom-fields/{projectKey}/{issueType} for fields on a specific issue type).`
+    );
+  }
+
   try {
     console.error(`Executing JQL search with args:`, JSON.stringify(args, null, 2));
-    
+
     // Parse search expansion options (not currently used but reserved for future)
     const _searchExpansionOptions: Record<string, boolean> = {};
     if (args.expand) {
@@ -430,7 +443,7 @@ async function handleExecuteJql(jiraClient: JiraClient, args: ManageJiraFilterAr
         }
       }
     }
-    
+
     // Execute the search
     const searchResult = await jiraClient.searchIssues(
       args.jql,

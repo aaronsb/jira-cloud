@@ -740,6 +740,27 @@ export class JiraClient {
     }
   }
 
+  /**
+   * Validate a JQL query's structure and field references via POST /rest/api/3/jql/parse
+   * (ADR-213 §A3, #44). The enhanced search endpoint silently returns zero results for an
+   * unknown field, so this is the only way to distinguish "field doesn't exist" from "field
+   * is empty across all issues". Returns the list of syntax/validation errors — empty if valid.
+   * If the parse endpoint itself fails, returns [] (don't block the search on a flaky validator).
+   */
+  async parseJqlErrors(jql: string): Promise<string[]> {
+    try {
+      const cleanJql = jql.replace(/\\"/g, '"');
+      const result = await this.client.jql.parseJqlQueries({
+        queries: [cleanJql],
+        validation: 'warn',
+      });
+      return result?.queries?.[0]?.errors ?? [];
+    } catch (err) {
+      console.error(`[jql-parse] validation skipped: ${err instanceof Error ? err.message : String(err)}`);
+      return [];
+    }
+  }
+
   async searchIssues(jql: string, startAt = 0, maxResults = 25): Promise<SearchResponse> {
     try {
       // Remove escaped quotes from JQL
