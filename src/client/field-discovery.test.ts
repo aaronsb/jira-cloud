@@ -287,6 +287,25 @@ describe('FieldDiscovery', () => {
     expect(mystery.writable).toBe(false);
   });
 
+  it('matches an extension route by schema-custom key when the field name was renamed', async () => {
+    // A Forge-style Tempo Account field that a tenant admin renamed away from "Account" — the route
+    // no longer matches on name, but `io.tempo.jira__account` is also one of the route's claimed keys,
+    // so `extensionCanWrite` falls back to matching on `schema.custom`.
+    const client = {
+      issueFields: {
+        getFieldsPaginated: async () => { throw new Error('Request failed with status code 403'); },
+        getFields: async () => [
+          { id: 'customfield_11266', name: 'Billing Bucket', custom: true, schema: { type: 'any', custom: 'io.tempo.jira__account' } },
+        ],
+      },
+    } as any;
+
+    await discovery.discover(client);
+    const billing = discovery.getCatalog().find(f => f.id === 'customfield_11266')!;
+    expect(billing.category).toBe('unsupported');
+    expect(billing.writable).toBe(true);
+  });
+
   it('handles empty field list', async () => {
     const client = createMockClient([]);
     await discovery.discover(client);

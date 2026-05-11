@@ -600,6 +600,10 @@ export class FieldDiscovery {
       }
 
       // Filter: supported type
+      // NOTE: this also drops extension-handled fields whose Jira type our classifier can't map
+      // (e.g. Tempo Account on an admin tenant) — the unscored fallback keeps them and flags them
+      // writable via `extensionCanWrite`, but the scored path doesn't. Retaining them here is a
+      // larger change (it shifts what's in the curated catalog, not just a flag). See #45 / #57.
       const typeInfo = classifyFieldType(field.schemaType, field.schemaCustom || undefined, field.schemaItems || undefined);
       if (typeInfo.category === 'unsupported') {
         excludedUnsupportedType++;
