@@ -199,8 +199,11 @@ export function renderIssue(
     }
   } else if (customFieldsMode === 'breadcrumb' && populatedCount > 0) {
     lines.push('');
+    // Issue-type names can contain spaces ("User Story", "Service Request") — the catalog
+    // resource emitter encodes the type and the resolver decodes it (resource-handlers.ts:148, 533),
+    // so the breadcrumb URI has to encode too or the link round-trips wrong.
     const uri = opts.projectKey && opts.issueTypeName
-      ? ` For what's settable on this issue type: read \`jira://custom-fields/${opts.projectKey}/${opts.issueTypeName}\`.`
+      ? ` For what's settable on this issue type: read \`jira://custom-fields/${opts.projectKey}/${encodeURIComponent(opts.issueTypeName)}\`.`
       : '';
     lines.push(
       `📋 ${populatedCount} populated custom field${populatedCount === 1 ? '' : 's'} not shown. ` +

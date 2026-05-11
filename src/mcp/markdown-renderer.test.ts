@@ -66,7 +66,7 @@ describe('renderIssue — custom field reveal modes (ADR-214)', () => {
     expect(out).not.toContain('Tempo Account (option)');
   });
 
-  it('breadcrumb: omits the URI clause when projectKey/issueTypeName are absent', () => {
+  it('breadcrumb: omits the URI clause when both projectKey and issueTypeName are absent', () => {
     const out = renderIssue(
       makeIssue({ customFieldValues: POPULATED_THREE }),
       undefined,
@@ -75,6 +75,34 @@ describe('renderIssue — custom field reveal modes (ADR-214)', () => {
     expect(out).toContain('3 populated custom fields not shown');
     expect(out).toContain('`expand: ["custom_fields"]`');
     expect(out).not.toContain('jira://custom-fields/');
+  });
+
+  it('breadcrumb: omits the URI clause when only projectKey is present', () => {
+    const out = renderIssue(
+      makeIssue({ customFieldValues: POPULATED_THREE }),
+      undefined,
+      { customFields: 'breadcrumb', projectKey: 'PAID' },
+    );
+    expect(out).not.toContain('jira://custom-fields/');
+  });
+
+  it('breadcrumb: omits the URI clause when only issueTypeName is present', () => {
+    const out = renderIssue(
+      makeIssue({ customFieldValues: POPULATED_THREE }),
+      undefined,
+      { customFields: 'breadcrumb', issueTypeName: 'Task' },
+    );
+    expect(out).not.toContain('jira://custom-fields/');
+  });
+
+  it('breadcrumb: URL-encodes issueTypeName so multi-word types round-trip through the resource resolver', () => {
+    const out = renderIssue(
+      makeIssue({ customFieldValues: POPULATED_THREE }),
+      undefined,
+      { customFields: 'breadcrumb', projectKey: 'PAID', issueTypeName: 'User Story' },
+    );
+    expect(out).toContain('`jira://custom-fields/PAID/User%20Story`');
+    expect(out).not.toContain('PAID/User Story`');
   });
 
   it('breadcrumb: singular phrasing when exactly one field is populated', () => {
