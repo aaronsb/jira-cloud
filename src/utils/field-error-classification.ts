@@ -17,6 +17,12 @@
 import { fieldDiscovery } from '../client/field-discovery.js';
 import { routeForField } from '../client/field-routing.js';
 
+/** Looks like a Connect/Forge app field key (e.g. `io.tempo.jira__account`) rather than a
+ *  `customfield_NNNNN` id or a plain field name — Jira sometimes reports field errors this way. */
+function looksLikeAppFieldKey(key: string): boolean {
+  return !key.startsWith('customfield_') && (key.includes('__') || /^[a-z][\w-]*(\.[\w-]+){2,}/i.test(key));
+}
+
 export function classifyFieldErrors(fieldErrors: Record<string, unknown>): string[] {
   const out: string[] = [];
   const catalogState = fieldDiscovery.getState();
@@ -38,9 +44,19 @@ export function classifyFieldErrors(fieldErrors: Record<string, unknown>): strin
     }
     if (isKnownField) {
       out.push(
-        `  → \`${humanName}\` exists on this instance but isn't writable through the standard ` +
-        `issue-edit endpoint — it's likely off the Edit screen for this issue type, hidden by a ` +
-        `field configuration, or owned by an app. It may still be editable inline in the Jira UI.`,
+        `  → \`${humanName}\` exists on this instance but the write was rejected — it may be off ` +
+        `the Edit screen for this issue type, hidden by a field configuration, or an app-managed ` +
+        `field that wants a different value format (e.g. a numeric id rather than a name). It may ` +
+        `still be editable inline in the Jira UI.`,
+      );
+      continue;
+    }
+    if (looksLikeAppFieldKey(fieldKey)) {
+      out.push(
+        `  → \`${fieldKey}\` is a field registered by a Connect/Forge app — the write was rejected ` +
+        `(see the message above). App-managed fields often expect a specific value format ` +
+        `(e.g. a numeric account/option id rather than a name) or must be set through the app's own ` +
+        `interface; setting it inline in the Jira UI usually works.`,
       );
       continue;
     }

@@ -271,7 +271,9 @@ export class JiraClient {
       const metaById = new Map(customFieldMeta.map(m => [m.id, m]));
       const customValues: JiraIssueDetails['customFieldValues'] = [];
       const isPopulated = (v: unknown) =>
-        v !== undefined && v !== null && !(Array.isArray(v) && v.length === 0);
+        v !== undefined && v !== null
+        && !(Array.isArray(v) && v.length === 0)
+        && !(typeof v === 'object' && !Array.isArray(v) && Object.keys(v as object).length === 0);
 
       if (useNavigableWildcard) {
         // The response carries every navigable custom field; surface the populated ones.

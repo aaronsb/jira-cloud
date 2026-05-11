@@ -16,11 +16,20 @@ describe('classifyFieldErrors', () => {
     expect(lines[0]).toContain('"parent" parameter');
   });
 
-  it('flags an unknown field as not exposed by the instance', () => {
+  it('flags an unknown plain field name as not exposed by the instance', () => {
     const lines = classifyFieldErrors({ NotARealField: 'Field cannot be set.' });
     expect(lines).toHaveLength(1);
     expect(lines[0]).toMatch(/isn't a custom field this instance exposes/);
     expect(lines[0]).toContain('jira://custom-fields');
+  });
+
+  it('recognises a Connect/Forge app field key (e.g. io.tempo.jira__account)', () => {
+    const lines = classifyFieldErrors({
+      'io.tempo.jira__account': "Can not construct instance of java.lang.Long from String value 'PRAEAI-OPEX'",
+    });
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain('Connect/Forge app');
+    expect(lines[0]).not.toMatch(/isn't a custom field this instance exposes/);
   });
 
   it('produces one guidance line per rejected field', () => {
