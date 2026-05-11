@@ -247,7 +247,7 @@ function validateManageJiraIssueArgs(args: unknown): args is ManageJiraIssueArgs
       );
     }
     
-    const validExpansions = ['comments', 'transitions', 'attachments', 'related_issues', 'history'];
+    const validExpansions = ['comments', 'transitions', 'attachments', 'related_issues', 'history', 'custom_fields'];
     for (const expansion of normalizedArgs.expand) {
       if (typeof expansion !== 'string' || !validExpansions.includes(expansion)) {
         throw new McpError(
@@ -338,12 +338,14 @@ async function handleGetIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs)
   const includeComments = expansionOptions.comments || false;
   const includeAttachments = expansionOptions.attachments || false;
   const includeHistory = expansionOptions.history || false;
+  const includeAllCustomFields = expansionOptions.custom_fields || false;
   const issue = await jiraClient.getIssue(
     args.issueKey!,
     includeComments,
     includeAttachments,
     getCatalogFieldMeta(),
     includeHistory,
+    includeAllCustomFields,
   );
   
   // Get transitions if requested
@@ -378,7 +380,7 @@ async function handleMoveIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs
   bulkOperationGuard.record('move', issueKey);
 
   // Get the moved issue (it now has a new key in the target project)
-  const movedIssue = await jiraClient.getIssue(issueKey, false, false);
+  const movedIssue = await jiraClient.getIssue(issueKey, false, false, getCatalogFieldMeta());
   const markdown = MarkdownRenderer.renderIssue(movedIssue);
 
   return {
@@ -434,7 +436,7 @@ async function handleCreateIssue(jiraClient: JiraClient, args: ManageJiraIssueAr
   });
   
   // Get the created issue and render to markdown
-  const createdIssue = await jiraClient.getIssue(result.key, false, false);
+  const createdIssue = await jiraClient.getIssue(result.key, false, false, getCatalogFieldMeta());
   const markdown = MarkdownRenderer.renderIssue(createdIssue);
 
   return {
@@ -486,7 +488,7 @@ async function handleTransitionIssue(jiraClient: JiraClient, args: ManageJiraIss
   );
 
   // Get the updated issue and render to markdown
-  const updatedIssue = await jiraClient.getIssue(args.issueKey!, false, false);
+  const updatedIssue = await jiraClient.getIssue(args.issueKey!, false, false, getCatalogFieldMeta());
   const markdown = MarkdownRenderer.renderIssue(updatedIssue);
 
   return {
