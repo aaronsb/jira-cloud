@@ -4,7 +4,7 @@ import { fieldDiscovery } from '../client/field-discovery.js';
 import { categoryLabel } from '../client/field-type-map.js';
 import { JiraClient } from '../client/jira-client.js';
 import { MarkdownRenderer } from '../mcp/markdown-renderer.js';
-import type { HierarchyNode, HierarchyResult } from '../types/index.js';
+import type { HierarchyNode, HierarchyResult, JiraIssueDetails } from '../types/index.js';
 import { bulkOperationGuard } from '../utils/bulk-operation-guard.js';
 import { issueNextSteps } from '../utils/next-steps.js';
 import { normalizeArgs } from '../utils/normalize-args.js';
@@ -274,6 +274,64 @@ function getCatalogFieldMeta() {
   }));
 }
 
+/** Compact rendering of a field value for the "Applied" section. */
+function formatAppliedValue(v: unknown): string {
+  if (v === null || v === undefined) return '(none)';
+  if (Array.isArray(v)) return v.map(formatAppliedValue).join(', ') || '(none)';
+  if (typeof v === 'object') {
+    const o = v as Record<string, unknown>;
+    if (typeof o.name === 'string') return o.name;
+    if (typeof o.value === 'string') return o.value;
+    if (typeof o.displayName === 'string') return o.displayName;
+    const s = JSON.stringify(v);
+    return s.length > 80 ? s.slice(0, 77) + '…' : s;
+  }
+  const s = String(v);
+  return s.length > 80 ? s.slice(0, 77) + '…' : s;
+}
+
+/**
+ * Render an "Applied" section confirming what a create/update wrote (ADR-213 §A4, #48).
+ * For custom fields it cross-checks the re-fetched issue and flags silent drops — a write
+ * Jira accepts but discards (field off the Edit screen, hidden by a config, etc.).
+ */
+function renderAppliedFields(args: ManageJiraIssueArgs, issue: JiraIssueDetails): string {
+  const lines: string[] = [];
+
+  if (args.summary !== undefined) lines.push(`- **Summary**: ${formatAppliedValue(issue.summary ?? args.summary)}`);
+  if (args.description !== undefined) lines.push(`- **Description**: ${issue.description ? `updated (${issue.description.length} chars)` : '(cleared)'}`);
+  if (args.priority !== undefined) lines.push(`- **Priority**: ${formatAppliedValue(issue.priority)}`);
+  if (args.assignee !== undefined) lines.push(`- **Assignee**: ${issue.assignee ?? '(unassigned)'}`);
+  if (args.labels !== undefined) lines.push(`- **Labels**: ${(issue.labels && issue.labels.length) ? issue.labels.join(', ') : '(none)'}`);
+  if (args.dueDate !== undefined) lines.push(`- **Due date**: ${issue.dueDate ?? '(cleared)'}`);
+  if (args.parent !== undefined) lines.push(`- **Parent**: ${issue.parent ?? '(removed)'}`);
+  if (args.originalEstimate !== undefined) lines.push(`- **Original estimate**: ${issue.originalEstimate ?? '(cleared)'}`);
+  if (args.remainingEstimate !== undefined) lines.push(`- **Remaining estimate**: ${issue.timeEstimate ?? '(cleared)'}`);
+
+  if (args.customFields) {
+    const storedByName = new Map((issue.customFieldValues ?? []).map(v => [v.name, v.value]));
+    for (const [requestedName, requestedValue] of Object.entries(args.customFields)) {
+      const fieldId = requestedName.startsWith('customfield_') ? requestedName : fieldDiscovery.resolveNameToId(requestedName);
+      const catalogName = fieldId ? (fieldDiscovery.getFieldById(fieldId)?.name ?? requestedName) : requestedName;
+      const stored = storedByName.has(catalogName) ? storedByName.get(catalogName)
+        : storedByName.has(requestedName) ? storedByName.get(requestedName)
+        : undefined;
+      const requestedNonEmpty = requestedValue !== undefined && requestedValue !== null && requestedValue !== ''
+        && !(Array.isArray(requestedValue) && requestedValue.length === 0);
+
+      if (stored !== undefined) {
+        lines.push(`- **${requestedName}**: ${formatAppliedValue(stored)}`);
+      } else if (requestedNonEmpty && fieldId && fieldDiscovery.getFieldById(fieldId)) {
+        lines.push(`- **${requestedName}**: ⚠️ requested \`${formatAppliedValue(requestedValue)}\` but Jira stored no value — the field may be off the Edit screen for this issue type, hidden by a field configuration, or require a dedicated API. It may still be editable inline in the Jira UI.`);
+      } else {
+        lines.push(`- **${requestedName}**: ${formatAppliedValue(requestedValue)} (sent — could not verify)`);
+      }
+    }
+  }
+
+  return lines.length > 0 ? `\n\n**Applied:**\n${lines.join('\n')}` : '';
+}
+
 /** Resolve field names to IDs in customFields, returns resolved object */
 function resolveCustomFieldNames(customFields: Record<string, any>): Record<string, any> {
   if (!fieldDiscovery.isReady()) return customFields;
@@ -436,14 +494,15 @@ async function handleCreateIssue(jiraClient: JiraClient, args: ManageJiraIssueAr
   });
   
   // Get the created issue and render to markdown
-  const createdIssue = await jiraClient.getIssue(result.key, false, false, getCatalogFieldMeta());
+  const createdIssue = await jiraClient.getIssue(result.key, false, false, getCatalogFieldMeta(), false, !!args.customFields);
   const markdown = MarkdownRenderer.renderIssue(createdIssue);
+  const applied = renderAppliedFields(args, createdIssue);
 
   return {
     content: [
       {
         type: 'text',
-        text: `# Issue Created\n\n${markdown}${issueGuidance('create', result.key)}`,
+        text: `# Issue Created\n\n${markdown}${applied}${issueGuidance('create', result.key)}`,
       },
     ],
   };
@@ -467,14 +526,15 @@ async function handleUpdateIssue(jiraClient: JiraClient, args: ManageJiraIssueAr
   });
 
   // Get the updated issue and render to markdown
-  const updatedIssue = await jiraClient.getIssue(args.issueKey!, false, false);
+  const updatedIssue = await jiraClient.getIssue(args.issueKey!, false, false, getCatalogFieldMeta(), false, !!args.customFields);
   const markdown = MarkdownRenderer.renderIssue(updatedIssue);
+  const applied = renderAppliedFields(args, updatedIssue);
 
   return {
     content: [
       {
         type: 'text',
-        text: `# Issue Updated\n\n${markdown}${issueGuidance('update', args.issueKey)}`,
+        text: `# Issue Updated\n\n${markdown}${applied}${issueGuidance('update', args.issueKey)}`,
       },
     ],
   };
