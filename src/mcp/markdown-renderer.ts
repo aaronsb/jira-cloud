@@ -96,9 +96,26 @@ function stripHtml(html: string): string {
 // ============================================================================
 
 /**
+ * How to render the populated-custom-fields section on an issue (ADR-214).
+ * - `dump`: print the full `Custom Fields:` block (the pre-ADR-214 behaviour).
+ * - `breadcrumb` (default for `get`): one-line hint pointing at `expand: ["custom_fields"]`
+ *   and the scoped `jira://custom-fields/{proj}/{type}` resource. Silent if zero are populated.
+ * - `none`: render nothing — used after writes where the `Applied:` section is the read-out.
+ */
+export interface RenderIssueOptions {
+  customFields?: 'breadcrumb' | 'dump' | 'none';
+  projectKey?: string;
+  issueTypeName?: string;
+}
+
+/**
  * Render a single issue as markdown
  */
-export function renderIssue(issue: JiraIssueDetails, transitions?: TransitionDetails[]): string {
+export function renderIssue(
+  issue: JiraIssueDetails,
+  transitions?: TransitionDetails[],
+  opts: RenderIssueOptions = {},
+): string {
   const lines: string[] = [];
 
   lines.push(`# ${issue.key}: ${issue.summary}`);
@@ -166,16 +183,29 @@ export function renderIssue(issue: JiraIssueDetails, transitions?: TransitionDet
     }
   }
 
-  // Custom fields (from catalog discovery)
-  if (issue.customFieldValues && issue.customFieldValues.length > 0) {
+  // Custom fields — progressive reveal (ADR-214). Default is a breadcrumb pointing at the
+  // opt-in expand and the scoped resource; the full dump is gated behind `customFields: 'dump'`.
+  // Zero populated → silent in every mode.
+  const customFieldsMode = opts.customFields ?? 'breadcrumb';
+  const populatedCount = issue.customFieldValues?.length ?? 0;
+  if (customFieldsMode === 'dump' && populatedCount > 0) {
     lines.push('');
     lines.push('Custom Fields:');
-    for (const cf of issue.customFieldValues) {
+    for (const cf of issue.customFieldValues!) {
       const displayValue = Array.isArray(cf.value)
         ? (cf.value as unknown[]).join(', ')
         : String(cf.value);
       lines.push(`${cf.name} (${cf.type}): ${displayValue}`);
     }
+  } else if (customFieldsMode === 'breadcrumb' && populatedCount > 0) {
+    lines.push('');
+    const uri = opts.projectKey && opts.issueTypeName
+      ? ` For what's settable on this issue type: read \`jira://custom-fields/${opts.projectKey}/${opts.issueTypeName}\`.`
+      : '';
+    lines.push(
+      `📋 ${populatedCount} populated custom field${populatedCount === 1 ? '' : 's'} not shown. ` +
+      `To view: \`expand: ["custom_fields"]\`.${uri}`,
+    );
   }
 
   // Status history (if requested via expand: ["history"])

@@ -269,7 +269,7 @@ export const toolSchemas = {
             type: 'string',
             enum: ['comments', 'transitions', 'attachments', 'related_issues', 'history', 'custom_fields'],
           },
-          description: 'Additional fields to include in the response. Populated custom fields are returned by default once the field catalog is ready; pass "custom_fields" to also surface populated custom fields that fall outside the curated catalog (the full set of fields on the issue).',
+          description: 'Additional fields to include in the response. Populated custom fields are NOT shown by default — `get` emits a one-line breadcrumb with the count and the opt-in. Pass "custom_fields" to render the full populated dump. For what is *settable* on this issue type (with usage hints), read the scoped resource `jira://custom-fields/{projectKey}/{issueType}` instead.',
         },
       },
       required: ['operation'],
