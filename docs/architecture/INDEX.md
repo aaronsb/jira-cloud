@@ -33,4 +33,4 @@ _MCP tool API surface, LLM interaction patterns, schema design_
 | [ADR-210](./tools/ADR-210-townsquare-goals-and-projects-integration.md) | Townsquare Goals and Projects Integration | Draft |
 | [ADR-211](./tools/ADR-211-attachment-and-workspace-management.md) | Attachment and Workspace Management | Draft |
 | [ADR-213](./tools/ADR-213-custom-field-robustness-and-capability-aware-field-routing.md) | Custom field robustness and capability-aware field routing | Accepted |
-| [ADR-214](./tools/ADR-214-progressive-reveal-of-custom-fields-in-manage-jira-issue.md) | Progressive reveal of custom fields in `manage_jira_issue` | Draft |
+| [ADR-214](./tools/ADR-214-progressive-reveal-of-custom-fields-in-manage-jira-issue.md) | Progressive reveal of custom fields in `manage_jira_issue` | Accepted |
