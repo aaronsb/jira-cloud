@@ -451,8 +451,14 @@ async function handleGetIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs)
     transitions = await jiraClient.getTransitions(args.issueKey!);
   }
   
-  // Render to markdown
-  const markdown = MarkdownRenderer.renderIssue(issue, transitions);
+  // Render to markdown — ADR-214: minimal-by-default custom-field reveal.
+  // `expand: ["custom_fields"]` opts into the full dump; otherwise emit a one-line breadcrumb
+  // pointing at the opt-in and the scoped `jira://custom-fields/{proj}/{type}` resource.
+  const markdown = MarkdownRenderer.renderIssue(issue, transitions, {
+    customFields: includeAllCustomFields ? 'dump' : 'breadcrumb',
+    projectKey: args.issueKey!.split('-')[0],
+    issueTypeName: issue.issueType,
+  });
 
   return {
     content: [
@@ -478,7 +484,8 @@ async function handleMoveIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs
 
   // Get the moved issue (it now has a new key in the target project)
   const movedIssue = await jiraClient.getIssue(issueKey, false, false, getCatalogFieldMeta());
-  const markdown = MarkdownRenderer.renderIssue(movedIssue);
+  // ADR-214: post-write — `Applied:` is the read-out; drop the custom-fields block entirely.
+  const markdown = MarkdownRenderer.renderIssue(movedIssue, undefined, { customFields: 'none' });
 
   return {
     content: [
@@ -501,7 +508,9 @@ async function handleDeleteIssue(jiraClient: JiraClient, args: ManageJiraIssueAr
 
   // Get the issue details before deleting for a final snapshot
   const issue = await jiraClient.getIssue(issueKey, false, false);
-  const markdown = MarkdownRenderer.renderIssue(issue);
+  // ADR-214: post-write — the dump is noise on a soon-to-be-deleted issue, and the breadcrumb
+  // would point at expand/resource URIs that no longer apply once the delete lands.
+  const markdown = MarkdownRenderer.renderIssue(issue, undefined, { customFields: 'none' });
 
   await jiraClient.deleteIssue(issueKey);
   bulkOperationGuard.record('delete', issueKey);
@@ -541,7 +550,8 @@ async function handleCreateIssue(jiraClient: JiraClient, args: ManageJiraIssueAr
   
   // Get the created issue and render to markdown
   const createdIssue = await jiraClient.getIssue(result.key, false, false, getCatalogFieldMeta(), false, !!args.customFields);
-  const markdown = MarkdownRenderer.renderIssue(createdIssue);
+  // ADR-214: post-write — `Applied:` is the read-out; drop the custom-fields block entirely.
+  const markdown = MarkdownRenderer.renderIssue(createdIssue, undefined, { customFields: 'none' });
   const applied = renderAppliedFields(args, createdIssue);
 
   return {
@@ -583,7 +593,8 @@ async function handleUpdateIssue(jiraClient: JiraClient, args: ManageJiraIssueAr
 
   // Get the updated issue and render to markdown
   const updatedIssue = await jiraClient.getIssue(args.issueKey!, false, false, getCatalogFieldMeta(), false, !!args.customFields);
-  const markdown = MarkdownRenderer.renderIssue(updatedIssue);
+  // ADR-214: post-write — `Applied:` is the read-out; drop the custom-fields block entirely.
+  const markdown = MarkdownRenderer.renderIssue(updatedIssue, undefined, { customFields: 'none' });
   const applied = renderAppliedFields(args, updatedIssue);
 
   return {
@@ -605,7 +616,9 @@ async function handleTransitionIssue(jiraClient: JiraClient, args: ManageJiraIss
 
   // Get the updated issue and render to markdown
   const updatedIssue = await jiraClient.getIssue(args.issueKey!, false, false, getCatalogFieldMeta());
-  const markdown = MarkdownRenderer.renderIssue(updatedIssue);
+  // ADR-214: post-write — transition has no `Applied:` section, but the custom-fields dump still
+  // adds ~600 tokens of noise unrelated to the state change. Drop it.
+  const markdown = MarkdownRenderer.renderIssue(updatedIssue, undefined, { customFields: 'none' });
 
   return {
     content: [
@@ -622,7 +635,8 @@ async function handleCommentIssue(jiraClient: JiraClient, args: ManageJiraIssueA
 
   // Get the updated issue with comments and render to markdown
   const updatedIssue = await jiraClient.getIssue(args.issueKey!, true, false);
-  const markdown = MarkdownRenderer.renderIssue(updatedIssue);
+  // ADR-214: post-write — the new comment is the read-out; custom-field block is noise.
+  const markdown = MarkdownRenderer.renderIssue(updatedIssue, undefined, { customFields: 'none' });
 
   return {
     content: [
@@ -647,7 +661,8 @@ async function handleLinkIssue(jiraClient: JiraClient, args: ManageJiraIssueArgs
 
   // Get the updated issue and render to markdown
   const updatedIssue = await jiraClient.getIssue(args.issueKey!, false, false);
-  const markdown = MarkdownRenderer.renderIssue(updatedIssue);
+  // ADR-214: post-write — the new link is the read-out; custom-field block is noise.
+  const markdown = MarkdownRenderer.renderIssue(updatedIssue, undefined, { customFields: 'none' });
 
   return {
     content: [
@@ -672,7 +687,8 @@ async function handleWorklogIssue(jiraClient: JiraClient, args: ManageJiraIssueA
 
   // Get the updated issue and render to markdown
   const updatedIssue = await jiraClient.getIssue(args.issueKey!, false, false);
-  const markdown = MarkdownRenderer.renderIssue(updatedIssue);
+  // ADR-214: post-write — the logged worklog is the read-out; custom-field block is noise.
+  const markdown = MarkdownRenderer.renderIssue(updatedIssue, undefined, { customFields: 'none' });
 
   return {
     content: [

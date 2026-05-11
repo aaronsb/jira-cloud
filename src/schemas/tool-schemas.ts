@@ -144,7 +144,7 @@ export const toolSchemas = {
 
   manage_jira_issue: {
     name: 'manage_jira_issue',
-    description: 'Get, create, update, delete, move, transition, comment on, link, log work on, or explore hierarchy of Jira issues',
+    description: 'Get, create, update, delete, move, transition, comment on, link, log work on, or explore hierarchy of Jira issues. For custom-field writes, consult `jira://capabilities` (field routing) and `jira://custom-fields/{projectKey}/{issueType}` (what is settable here) — some fields need dedicated tools and others auto-resolve names to ids.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -188,7 +188,7 @@ export const toolSchemas = {
         },
         customFields: {
           type: 'object',
-          description: 'Custom field values as key-value pairs.',
+          description: 'Custom field values as { name | id : value }. Names auto-resolve to customfield_NNNNN. Read `jira://capabilities` for the field-routing table (which fields need a dedicated tool or have value-resolution) and `jira://custom-fields/{projectKey}/{issueType}` for what is settable on a given screen, with types and clearing semantics.',
         },
         dueDate: {
           type: ['string', 'null'],
@@ -269,7 +269,7 @@ export const toolSchemas = {
             type: 'string',
             enum: ['comments', 'transitions', 'attachments', 'related_issues', 'history', 'custom_fields'],
           },
-          description: 'Additional fields to include in the response. Populated custom fields are returned by default once the field catalog is ready; pass "custom_fields" to also surface populated custom fields that fall outside the curated catalog (the full set of fields on the issue).',
+          description: 'Additional fields to include in the response. Populated custom fields are NOT shown by default — `get` emits a one-line breadcrumb with the count and the opt-in. Pass "custom_fields" to render the full populated dump. For what is *settable* on this issue type (with usage hints), read the scoped resource `jira://custom-fields/{projectKey}/{issueType}` instead.',
         },
       },
       required: ['operation'],
