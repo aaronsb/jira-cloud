@@ -110,6 +110,15 @@ Initial contents: `Sprint` → unhandled, points at `manage_jira_sprint`. `Epic 
 
 **B4. Tempo Account write — the one concrete app handler.** Implemented under `src/client/tempo-client.ts` (transport isolated so the eventual REST→GraphQL migration is a one-file change): set an issue's Tempo Account via Tempo's account-link endpoint; resolve the current Account for display in `get`. Motivated specifically by the CapEx/OpEx classification flow — not "Tempo integration." Tempo Team can follow later by adding a route entry; nothing else changes.
 
+### Implementation status (this ADR's PR)
+
+- **Part A** — shipped in full (A1–A5), verified live against a non-admin Jira connection.
+- **Part B** — partial, deliberately. What lands now:
+  - `src/client/field-routing.ts` — the curated table, seeded with the four Atlassian special-field entries plus a `requires: "tempo"` entry for the Tempo **Account** field. The Account entry carries interim, actionable guidance (the standard edit endpoint *does* accept it but wants the numeric account id, not the key/name; pass `customFields: {"Account": 12345}`, or set it inline in the Jira UI), and is also matched against the Connect field key `io.tempo.jira__account` so `classifyFieldErrors` picks it up.
+  - `jira://capabilities` — reports the custom-field catalog mode, Plans availability, and the routing table.
+  - `classifyFieldErrors` consults the table (reactive: on a rejected write).
+  - **Deferred:** the `write`/`read` hooks on `FieldRoute`, the create/update wiring that consults a `write` hook, the startup tenant-capability *probe*, and the actual Tempo Account `write` handler. The last needs a Tempo API token (separate from the Jira token) to resolve an account key → numeric id — the server doesn't take such a token today. These land together when that mechanism is added; the interim guidance covers the gap, and #52 is materially better (clear, actionable error instead of an opaque one).
+
 ### Non-goals
 
 - **A generic extension / plugin SDK.** No `ExtensionModule` interface that arbitrary app integrations implement and self-register. The routing table is curated by hand; each entry is justified by a common user flow.

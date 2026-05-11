@@ -23,10 +23,18 @@ describe('classifyFieldErrors', () => {
     expect(lines[0]).toContain('jira://custom-fields');
   });
 
-  it('recognises a Connect/Forge app field key (e.g. io.tempo.jira__account)', () => {
+  it('routes a Tempo Account error (keyed by the Connect field key) to the Tempo guidance', () => {
     const lines = classifyFieldErrors({
       'io.tempo.jira__account': "Can not construct instance of java.lang.Long from String value 'PRAEAI-OPEX'",
     });
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain('Tempo');
+    expect(lines[0]).toContain('numeric');
+    expect(lines[0]).not.toMatch(/isn't a custom field this instance exposes/);
+  });
+
+  it('falls back to a generic Connect/Forge hint for an unrecognised app field key', () => {
+    const lines = classifyFieldErrors({ 'com.example.plugin__widget': 'Field cannot be set.' });
     expect(lines).toHaveLength(1);
     expect(lines[0]).toContain('Connect/Forge app');
     expect(lines[0]).not.toMatch(/isn't a custom field this instance exposes/);

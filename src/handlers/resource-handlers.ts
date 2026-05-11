@@ -2,6 +2,7 @@ import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 
 import { setupToolResourceHandlers } from './tool-resource-handlers.js';
 import { fieldDiscovery } from '../client/field-discovery.js';
+import { allFieldRoutes } from '../client/field-routing.js';
 import { categoryLabel } from '../client/field-type-map.js';
 import type { GraphQLClient } from '../client/graphql-client.js';
 import { searchGoals } from '../client/graphql-goals.js';
@@ -54,6 +55,12 @@ export function setupResourceHandlers(jiraClient: JiraClient, graphqlClient?: Gr
             name: 'Analysis Query Recipes',
             mimeType: 'text/markdown',
             description: 'Composition patterns for analyze_jira_issues — how to combine summary counts, groupBy, and JQL for PM dashboards'
+          },
+          {
+            uri: 'jira://capabilities',
+            name: 'Connection Capabilities',
+            mimeType: 'application/json',
+            description: 'What this connection can do — custom-field catalog mode, Plans availability, and fields that need special handling (Sprint, Epic Link, Tempo Account, …)'
           },
           // Add tool resources
           ...toolResources.resources
@@ -116,7 +123,11 @@ export function setupResourceHandlers(jiraClient: JiraClient, graphqlClient?: Gr
         if (uri === 'jira://analysis/recipes') {
           return getAnalysisRecipes();
         }
-        
+
+        if (uri === 'jira://capabilities') {
+          return getCapabilities(graphqlClient);
+        }
+
         // Handle resource templates
         const projectMatch = uri.match(/^jira:\/\/projects\/([^/]+)\/overview$/);
         if (projectMatch) {
@@ -459,6 +470,41 @@ function jsonResource(uri: string, body: unknown) {
       text: JSON.stringify(body, null, 2),
     }],
   };
+}
+
+/**
+ * What this connection can actually do (ADR-213 §B3): the custom-field catalog mode, whether the
+ * Plans/GraphQL surface is reachable, and the curated set of fields that need handling beyond the
+ * standard issue-edit endpoint. `requires` on a routing entry names a capability whose handler may
+ * not be wired yet — the entry's guidance always applies.
+ */
+function getCapabilities(graphqlClient?: GraphQLClient | null) {
+  const catalogState = fieldDiscovery.getState();
+  const catalog = fieldDiscovery.getCatalog();
+  const catalogError = fieldDiscovery.getError();
+
+  const fieldRouting = allFieldRoutes().map(r => ({
+    names: r.names,
+    requires: r.requires ?? null,
+    reason: r.unhandled.reason,
+    guidance: r.unhandled.message,
+    ...(r.unhandled.suggestedTool ? { suggestedTool: r.unhandled.suggestedTool } : {}),
+  }));
+
+  return jsonResource('jira://capabilities', {
+    customFieldCatalog: {
+      mode: catalogState,
+      count: catalog.length,
+      ...(catalogState !== 'scored' && catalogError ? { note: catalogError } : {}),
+    },
+    plans: { available: graphqlClient != null },
+    fieldRouting,
+    note:
+      'Capability-aware field routing (ADR-213 §B). Each fieldRouting entry describes a field that ' +
+      'needs handling beyond a plain customFields write. `requires` names a capability; a write ' +
+      'handler for it is not necessarily wired yet, but the entry\'s guidance always tells you the ' +
+      'right path. Read jira://custom-fields for the field catalog.',
+  });
 }
 
 /**

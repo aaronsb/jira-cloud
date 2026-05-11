@@ -12,18 +12,22 @@
  */
 
 export interface FieldRoute {
-  /** Field names this route claims (matched case-insensitively, against both the field name and,
-   *  for `customfield_*` ids, the catalog name resolved from that id). */
+  /** Field names this route claims (matched case-insensitively, against the field name, the
+   *  catalog name resolved from a `customfield_*` id, and — for app-managed fields — the
+   *  Connect/Forge field key, e.g. `io.tempo.jira__account`). */
   names: string[];
-  /** Capability that must be present for a write handler to apply (Part B). Absent ⇒ no handler. */
+  /** Capability id this route's (future) write handler needs — surfaced by jira://capabilities.
+   *  No handler is wired yet, so today this is a declarative marker only. */
   requires?: string;
-  /** Why this field can't be set through `customFields`, and what to do instead. */
+  /** Why this field can't be set through `customFields` here, and what to do instead. */
   unhandled: {
     reason: string;
     message: string;
     suggestedTool?: string;
   };
-  // write?(ctx, issueKey, value): Promise<...> and read?(ctx, issue): Promise<...> land in Part B.
+  // A `write` handler (and the create/update wiring that consults it) lands with the first real
+  // capability-gated handler — e.g. a Tempo client that resolves an account key → numeric id.
+  // See ADR-213 §B.
 }
 
 const ROUTES: FieldRoute[] = [
@@ -56,6 +60,23 @@ const ROUTES: FieldRoute[] = [
       message:
         'Issue Rank (backlog ordering) is not settable through this server — reorder issues on a ' +
         'board in the Jira UI.',
+    },
+  },
+  {
+    // The Tempo "Account" field. The standard issue-edit endpoint *does* accept it, but expects
+    // the numeric Tempo account id — not the account key/name (e.g. 12345, not "PRAEAI-OPEX").
+    // Jira reports errors for it keyed by the Connect field key `io.tempo.jira__account`.
+    names: ['account', 'tempo account', 'io.tempo.jira__account'],
+    requires: 'tempo',
+    unhandled: {
+      reason: 'tempo_account_needs_numeric_id',
+      message:
+        'The Account field is provided by the Tempo app. It can be set through customFields, but ' +
+        'expects the numeric Tempo account id — not the account key/name. If you know the id: ' +
+        'customFields: {"Account": 12345}. To find the id, look it up in the Tempo UI (Settings → ' +
+        'Accounts) or in Tempo\'s API. Programmatic key→id resolution needs a Tempo API token ' +
+        '(separate from the Jira token) and isn\'t wired here yet — see ADR-213. Setting the field ' +
+        'inline in the Jira UI also works.',
     },
   },
 ];
