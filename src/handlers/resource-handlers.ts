@@ -2,11 +2,11 @@ import { McpError, ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 
 import { setupToolResourceHandlers } from './tool-resource-handlers.js';
 import { fieldDiscovery } from '../client/field-discovery.js';
-import { allFieldRoutes } from '../client/field-routing.js';
 import { categoryLabel } from '../client/field-type-map.js';
 import type { GraphQLClient } from '../client/graphql-client.js';
 import { searchGoals } from '../client/graphql-goals.js';
 import { JiraClient } from '../client/jira-client.js';
+import { allFieldRoutes, moduleStatuses } from '../extensions/index.js';
 
 /**
  * Sets up resource handlers for the Jira MCP server
@@ -125,7 +125,7 @@ export function setupResourceHandlers(jiraClient: JiraClient, graphqlClient?: Gr
         }
 
         if (uri === 'jira://capabilities') {
-          return getCapabilities(graphqlClient);
+          return await getCapabilities(graphqlClient);
         }
 
         // Handle resource templates
@@ -473,19 +473,21 @@ function jsonResource(uri: string, body: unknown) {
 }
 
 /**
- * What this connection can actually do (ADR-213 §B3): the custom-field catalog mode, whether the
- * Plans/GraphQL surface is reachable, and the curated set of fields that need handling beyond the
- * standard issue-edit endpoint. `requires` on a routing entry names a capability whose handler may
- * not be wired yet — the entry's guidance always applies.
+ * What this connection can actually do (ADR-213 §B): the custom-field catalog mode, whether the
+ * Plans/GraphQL surface is reachable, the loaded extension modules and their detection state, and
+ * the field routes those modules contribute (fields that need handling beyond a plain customFields
+ * write — Sprint, Epic Link, Tempo Account, …). `resolves: true` on a route means this server can
+ * transform the value for you (e.g. an account name → id); otherwise the route's guidance names the
+ * path to use.
  */
-function getCapabilities(graphqlClient?: GraphQLClient | null) {
+async function getCapabilities(graphqlClient?: GraphQLClient | null) {
   const catalogState = fieldDiscovery.getState();
   const catalog = fieldDiscovery.getCatalog();
   const catalogError = fieldDiscovery.getError();
 
   const fieldRouting = allFieldRoutes().map(r => ({
     names: r.names,
-    requires: r.requires ?? null,
+    resolves: !!r.resolveWrite,
     reason: r.unhandled.reason,
     guidance: r.unhandled.message,
     ...(r.unhandled.suggestedTool ? { suggestedTool: r.unhandled.suggestedTool } : {}),
@@ -498,12 +500,13 @@ function getCapabilities(graphqlClient?: GraphQLClient | null) {
       ...(catalogState !== 'scored' && catalogError ? { note: catalogError } : {}),
     },
     plans: { available: graphqlClient != null },
+    extensions: await moduleStatuses(),
     fieldRouting,
     note:
-      'Capability-aware field routing (ADR-213 §B). Each fieldRouting entry describes a field that ' +
-      'needs handling beyond a plain customFields write. `requires` names a capability; a write ' +
-      'handler for it is not necessarily wired yet, but the entry\'s guidance always tells you the ' +
-      'right path. Read jira://custom-fields for the field catalog.',
+      'Extension modules + capability-aware field routing (ADR-213 §B). Each fieldRouting entry ' +
+      'describes a field that needs handling beyond a plain customFields write; `resolves: true` ' +
+      'means this server transforms the value for you (pass a name or an id), otherwise `guidance` ' +
+      'names the right path. Read jira://custom-fields for the field catalog.',
   });
 }
 

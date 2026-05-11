@@ -15,7 +15,7 @@
  */
 
 import { fieldDiscovery } from '../client/field-discovery.js';
-import { routeForField } from '../client/field-routing.js';
+import { routeForField } from '../extensions/index.js';
 
 /** Looks like a Connect/Forge app field key (e.g. `io.tempo.jira__account`) rather than a
  *  `customfield_NNNNN` id or a plain field name — Jira sometimes reports field errors this way. */

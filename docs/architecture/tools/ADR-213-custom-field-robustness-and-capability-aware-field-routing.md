@@ -87,43 +87,45 @@ Before propagating a raw field-rejection error, classify it (extract a named `cl
 - **Field not in catalog at all**: "`Foo` isn't a field this instance exposes (checked the custom-field catalog). See `jira://custom-fields` for available names." — meaningfully useful now that the catalog works (A1).
 - **Catalog unavailable** (`status:"unavailable"`): "Couldn't verify field names — the custom-field catalog is unavailable (admin-only API returned 403 and the fallback also failed). The name may be correct but unverifiable."
 
-### Part B — Capability-aware field routing (small and curated, not a plugin framework)
+### Part B — Extension modules + capability-aware field routing
 
-**B1. The routing table.** A single internal registry — `src/client/field-routing.ts` (or similar) — listing the small, curated set of fields the MCP knows need special handling. Each entry:
+Some fields need handling beyond a plain `customFields` write — Atlassian's own special fields (Sprint, Epic Link, Rank) have dedicated paths; the Tempo **Account** field is editable through the standard endpoint but wants a numeric account id, not a name. Rather than scatter `if (field === …)` through the issue handlers, this is organised as **extension modules** under `src/extensions/`.
+
+**B1. Extension modules.** Each module (`src/extensions/<name>.ts`) bundles the handling for one thing and declares its **bounds** — the field routes it owns; it touches those fields and nothing else.
 
 ```ts
 interface FieldRoute {
-  match: { names: string[]; idPatterns?: RegExp[] };   // "Sprint"; "Account" / "Tempo Account"; ...
-  requires?: CapabilityId;                              // optional gate, e.g. "tempo" — absent ⇒ no handler
-  write?(ctx: RouteContext, issueKey: string, value: unknown): Promise<RouteResult>;
-  read?(ctx: RouteContext, issue: IssueData): Promise<unknown>;
-  // When there is no `write` we can implement (Atlassian special fields, or `requires` not met):
-  unhandled: { message: string; suggestedTool?: string };
+  names: string[];                                       // "Sprint"; "Account" / "Tempo Account" / "io.tempo.jira__account"
+  resolveWrite?(ctx, fieldId, value): Promise<unknown>;  // transform the value before the standard edit write
+  unhandled: { reason; message; suggestedTool? };        // recovery guidance when the field can't be set here
+}
+interface ExtensionModule {
+  id: string; displayName: string;
+  routes: FieldRoute[];
+  detect?(): Promise<{ present: boolean; notes?: string }>;   // cheap, read-only; surfaced by jira://capabilities
 }
 ```
 
-Initial contents: `Sprint` → unhandled, points at `manage_jira_sprint`. `Epic Link` / `Parent Link` / `Parent` → unhandled, points at the `parent` param / `hierarchy`. `Rank` → unhandled, "not exposed; reorder in a board." (These four arrive in Part A with A5.) `Account` (aka "Tempo Account") → `requires: "tempo"`, with a `write` handler when Tempo is present, and `unhandled` ("inline-edit in the Jira UI, or in Tempo") when it isn't. (This one — plus the `requires` machinery — arrives in Part B.) That's the whole table for now — and growing it is a deliberate, reviewed act, not an extension point.
+Two modules now:
+- `src/extensions/atlassian-special-fields.ts` — Sprint (→ `manage_jira_sprint manage_issues`), Epic Link / Parent Link / Parent (→ the `parent` param), Rank (→ reorder on a board). All `unhandled` — intrinsic to Jira, no `detect()`.
+- `src/extensions/tempo.ts` — the **Account** field, with a `resolveWrite` handler (B4) and a `detect()` that checks the field catalog for a Tempo-managed field (schema `custom` type matching `io.tempo.`). `CatalogField` gained a `schemaCustom` field so modules can recognise app-managed fields.
 
-**B2. Capability detection.** One small startup probe — `src/client/tenant-capabilities.ts` — that establishes a handful of facts about *this* connection: is Tempo installed (a cheap read-only `GET` on a known Tempo endpoint, ~3s timeout, fail-open ⇒ "not present"); the custom-field catalog posture (`scored` / `unscored` / `unavailable` — already known from A1); whether the agile and JSM-portal surfaces are reachable (already probed elsewhere — just collect it). Run once, cache for the process. The `customFields` write loop in `manage_jira_issue` consults the routing table: if a field matches a route whose `requires` capability is present and has a `write` handler → route there; else fall through to standard edit (and, on rejection, A5). `get` enrichment calls `read` handlers the same way.
+**B2. Composition.** `src/extensions/index.ts` is the assembly point: an explicit, hand-curated `MODULES = [atlassianSpecialFields, tempo]` — **no auto-discovery, no glob**. It exports `routeForField(nameOrKey)`, `allFieldRoutes()`, and `moduleStatuses()`. Adding a module is a reviewed edit justified by a common user flow — this is *not* a generic plugin SDK. A `requires?: string` capability gate is reserved on the interface for a future handler that needs an external token (none does today).
 
-**B3. `jira://capabilities` resource.** A new static resource summarising what this connection can do: detected facts from B2 (Tempo present? version? catalog posture? agile/JSM reachable?), and the routing table's current entries with which are active vs. unhandled-here. Lets agents — and humans debugging a connection — see the limits up front instead of by trial.
+**B3. Wiring into the tools.**
+- `manage_jira_issue` create/update: after name→id resolution, if any `customFields` key maps to a route with a `resolveWrite` hook, the value runs through it before the single edit call (for update, the issue's type is fetched first, since `resolveWrite` may need `createmeta`). A resolution failure surfaces as `InvalidParams` with the handler's actionable message.
+- `classifyFieldErrors` (A5) consults `routeForField` reactively — when Jira rejects a write, the matching route's `unhandled` guidance is appended.
+- `jira://capabilities` reports the catalog mode, Plans availability, `moduleStatuses()` (each module, its `detect()` result, its claimed fields), and the routing table (each route, whether it `resolves` values, its guidance).
 
-**B4. Tempo Account write — the one concrete app handler.** Implemented under `src/client/tempo-client.ts` (transport isolated so the eventual REST→GraphQL migration is a one-file change): set an issue's Tempo Account via Tempo's account-link endpoint; resolve the current Account for display in `get`. Motivated specifically by the CapEx/OpEx classification flow — not "Tempo integration." Tempo Team can follow later by adding a route entry; nothing else changes.
+**B4. Tempo Account `resolveWrite` — no Tempo token needed.** A bare numeric value (or an `{id}` object) passes straight through. A name string is resolved against the field's allowed values from `createmeta` (`FieldDiscovery.getFieldAllowedValues`, cached per project/issue-type) — exact match wins, then a unique substring; ambiguity or no match throws with the available options. The resolved numeric id is what the issue-edit endpoint coerces to a Long. So `customFields: {"Account": "OpEx - Praecipio AI Dev"}` (or the id, or a unique fragment) works with only the Jira token. *Why not Tempo's API:* the legacy `{jiraHost}/rest/tempo-accounts/*` endpoints (which would have needed Tempo-app context) are `404` on a modern Tempo Cloud install, and the public `api.tempo.io` API has its own token — but `createmeta` surfaces the same per-project option list at issue-read permission, so neither is needed. Motivated by the CapEx/OpEx classification flow.
 
-### Implementation status (this ADR's PR)
-
-- **Part A** — shipped in full (A1–A5), verified live against a non-admin Jira connection.
-- **Part B** — partial, deliberately. What lands now:
-  - `src/client/field-routing.ts` — the curated table, seeded with the four Atlassian special-field entries plus a `requires: "tempo"` entry for the Tempo **Account** field. The Account entry carries interim, actionable guidance (the standard edit endpoint *does* accept it but wants the numeric account id, not the key/name; pass `customFields: {"Account": 12345}`, or set it inline in the Jira UI), and is also matched against the Connect field key `io.tempo.jira__account` so `classifyFieldErrors` picks it up.
-  - `jira://capabilities` — reports the custom-field catalog mode, Plans availability, and the routing table.
-  - `classifyFieldErrors` consults the table (reactive: on a rejected write).
-  - **Deferred:** the `write`/`read` hooks on `FieldRoute`, the create/update wiring that consults a `write` hook, the startup tenant-capability *probe*, and the actual Tempo Account `write` handler. The last needs a Tempo API token (separate from the Jira token) to resolve an account key → numeric id — the server doesn't take such a token today. These land together when that mechanism is added; the interim guidance covers the gap, and #52 is materially better (clear, actionable error instead of an opaque one).
+**Deferred (noted, not built):** Tempo Team and worklog-attribute writes; a `read` hook on `FieldRoute` for displaying app-field values (the `get` rendering already shows them via the catalog); any `requires`-gated handler that calls an external service directly. #44 Gap 3 (custom fields as `cube_setup` dimensions) remains a separate follow-up extending ADR-206.
 
 ### Non-goals
 
-- **A generic extension / plugin SDK.** No `ExtensionModule` interface that arbitrary app integrations implement and self-register. The routing table is curated by hand; each entry is justified by a common user flow.
-- **Comprehensive Marketplace-app support** (BigPicture, Structure, Xray, ScriptRunner, …). Out of scope. If one of them ever earns an entry, it will be because it unblocks a concrete common flow, decided then.
-- **`overrideScreenSecurity` / `overrideEditableFlag`** — needs an app/Connect/Forge auth model the server doesn't have.
+- **A generic auto-loading plugin SDK / Marketplace adapter.** `src/extensions/` has an `ExtensionModule` interface, but modules are composed by an explicit hand-curated list — no discovery, no registration magic — and the only modules are the ones with a concrete common-flow need.
+- **Comprehensive Marketplace-app support** (BigPicture, Structure, Xray, ScriptRunner, …). Out of scope. If one ever earns a module, it'll be because it unblocks a concrete common flow, decided then.
+- **`overrideScreenSecurity` / `overrideEditableFlag`** — needs an app / Connect / Forge auth model the server doesn't have.
 - **Custom fields as `analyze_jira_issues` `cube_setup` / `groupBy` dimensions (#44 Gap 3)** — needs a usage-ranking strategy and dimension-validation changes; a follow-up extending ADR-206, tracked separately, not in this PR.
 
 ## Consequences

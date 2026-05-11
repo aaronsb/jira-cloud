@@ -19,6 +19,9 @@ export interface CatalogField {
   category: FieldCategory;
   writable: boolean;
   jsonSchema: Record<string, unknown>;
+  /** Schema "custom" type, e.g. "com.pyxis.greenhopper.jira:gh-sprint" or a Connect app key —
+   *  used by extension modules to recognise app-managed fields. May be "" when unknown. */
+  schemaCustom: string;
   screensCount: number;
   lastUsed: string | null;  // ISO date or null
   score: number;
@@ -35,6 +38,12 @@ export interface RequiredFieldInfo {
   name: string;
   schemaType: string;
   allowedValues?: string[];
+}
+
+/** An enumerable option for a field, as returned by createmeta — `{id, value}`. */
+export interface FieldAllowedValue {
+  id: string | number;
+  value: string;
 }
 
 export interface DiscoveryStats {
@@ -277,11 +286,71 @@ export class FieldDiscovery {
 
   /** Clear required fields cache for a project (on 400 errors, cache may be stale). */
   invalidateRequiredFields(projectKey: string): void {
+    const prefix = projectKey.toLowerCase() + ':';
     for (const key of this.requiredFieldsCache.keys()) {
-      if (key.startsWith(projectKey.toLowerCase() + ':')) {
-        this.requiredFieldsCache.delete(key);
-      }
+      if (key.startsWith(prefix)) this.requiredFieldsCache.delete(key);
     }
+    for (const key of this.fieldOptionsCache.keys()) {
+      if (key.startsWith(prefix)) this.fieldOptionsCache.delete(key);
+    }
+  }
+
+  // ── Field Options (createmeta allowedValues) ─────────────────────────
+
+  private fieldOptionsCache = new Map<string, Map<string, FieldAllowedValue[]>>();
+
+  /**
+   * Enumerable allowed values (`{id, value}`) for a field on a project + issue type, read from
+   * createmeta. Returns `[]` if the field isn't on that issue type's create screen or has no
+   * enumerable options. Cached per project/issue-type — one createmeta walk covers every field.
+   * Used to resolve a human-friendly option name to the id the issue-edit endpoint expects
+   * (e.g. the Tempo Account field — see ADR-213 §B / field-routing.ts).
+   */
+  async getFieldAllowedValues(
+    client: Version3Client,
+    projectKey: string,
+    issueTypeName: string,
+    fieldId: string,
+  ): Promise<FieldAllowedValue[]> {
+    const cacheKey = `${projectKey}:${issueTypeName}`.toLowerCase();
+    let perField = this.fieldOptionsCache.get(cacheKey);
+    if (!perField) {
+      perField = new Map<string, FieldAllowedValue[]>();
+      try {
+        const issueTypes = await this.getIssueTypes(client, projectKey);
+        const matchingType = issueTypes.find(t => t.name.toLowerCase() === issueTypeName.toLowerCase());
+        if (matchingType) {
+          let startAt = 0;
+          const maxResults = 50;
+          let hasMore = true;
+          while (hasMore) {
+            const fieldMeta = await client.issues.getCreateIssueMetaIssueTypeId({
+              projectIdOrKey: projectKey,
+              issueTypeId: matchingType.id,
+              startAt,
+              maxResults,
+            });
+            const fields = (fieldMeta.fields || fieldMeta.results || []) as any[];
+            for (const f of fields) {
+              if (!f.fieldId || !Array.isArray(f.allowedValues) || f.allowedValues.length === 0) continue;
+              const opts: FieldAllowedValue[] = [];
+              for (const v of f.allowedValues) {
+                const id = v?.id ?? v?.value;
+                const value = v?.value ?? v?.name ?? (typeof v === 'string' ? v : undefined);
+                if (id !== undefined && value !== undefined) opts.push({ id, value: String(value) });
+              }
+              if (opts.length > 0) perField.set(f.fieldId, opts);
+            }
+            if (fields.length < maxResults) hasMore = false;
+            startAt += fields.length;
+          }
+        }
+      } catch (err) {
+        console.error(`[field-discovery] Field options fetch failed for ${projectKey}/${issueTypeName}: ${err instanceof Error ? err.message : err}`);
+      }
+      this.fieldOptionsCache.set(cacheKey, perField);
+    }
+    return perField.get(fieldId) ?? [];
   }
 
   /**
@@ -466,6 +535,7 @@ export class FieldDiscovery {
           category: typeInfo.category,
           writable: typeInfo.writable,
           jsonSchema: typeInfo.jsonSchema,
+          schemaCustom: f.schemaCustom,
           screensCount: 0,
           lastUsed: null,
           score: 0,
@@ -598,6 +668,7 @@ export class FieldDiscovery {
       category: f.typeInfo.category,
       writable: f.typeInfo.writable,
       jsonSchema: f.typeInfo.jsonSchema,
+      schemaCustom: f.schemaCustom,
       screensCount: f.screensCount,
       lastUsed: f.lastUsed,
       score: Math.round(f.score * 100) / 100,
