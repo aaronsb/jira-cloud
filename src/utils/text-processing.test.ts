@@ -292,3 +292,36 @@ describe('extractTextFromAdf mention support', () => {
     expect(result).toBe('Hello @Aaron');
   });
 });
+
+describe('formatFieldValue — cascading options', () => {
+  it('renders cascading option as "parent / child" (like JSM "Jira / Jira User")', () => {
+    const result = TextProcessor.formatFieldValue({
+      value: 'Jira',
+      id: '10962',
+      child: { value: 'Jira User', id: '11004' },
+    });
+    expect(result).toBe('Jira / Jira User');
+  });
+
+  it('falls back to parent value when child is missing', () => {
+    const result = TextProcessor.formatFieldValue({ value: 'Jira' });
+    expect(result).toBe('Jira');
+  });
+
+  it('still extracts parent value when child is empty object', () => {
+    // Child present but empty — extractor recurses, meaningful returns '', so we fall back to parent
+    const result = TextProcessor.formatFieldValue({
+      value: 'Jira',
+      child: {},
+    });
+    expect(result).toBe('Jira');
+  });
+
+  it('works inside arrays (multi-select cascading rare but legal)', () => {
+    const result = TextProcessor.formatFieldValue([
+      { value: 'Jira', child: { value: 'Jira User' } },
+      { value: 'Confluence', child: { value: 'Space Admin' } },
+    ]);
+    expect(result).toBe('Jira / Jira User, Confluence / Space Admin');
+  });
+});

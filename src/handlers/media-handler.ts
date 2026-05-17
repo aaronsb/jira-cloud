@@ -153,7 +153,7 @@ export async function handleMediaRequest(
       await fs.writeFile(dlPath, dlBytes);
 
       let text = `Downloaded: ${dlFilename} | ${dlInfo.mimeType} | ${formatSize(dlBytes.length)}\nPath: ${dlPath}`;
-      text += `\n\nUse manage_workspace read or manage_jira_media upload with workspaceFile:"${dlFilename}" to use it.`;
+      text += `\n\nUse manage_local_workspace read or manage_jira_media upload with workspaceFile:"${dlFilename}" to use it.`;
       text += mediaNextSteps('download', {});
       return { content: [{ type: 'text', text }] };
     }

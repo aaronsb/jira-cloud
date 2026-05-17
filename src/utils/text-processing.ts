@@ -562,6 +562,12 @@ export class TextProcessor {
         return TextProcessor.extractTextFromAdf(value);
       }
 
+      // Handle cascading options ({value: parent, child: {value: child}})
+      if (value.value && value.child && typeof value.child === 'object') {
+        const childText = TextProcessor.formatFieldValue(value.child);
+        return childText ? `${value.value} / ${childText}` : value.value;
+      }
+
       // Handle simple name/value objects
       if (value.name) {
         return value.name;

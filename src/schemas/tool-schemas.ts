@@ -71,14 +71,14 @@ export const toolSchemas = {
 
   manage_jira_sprint: {
     name: 'manage_jira_sprint',
-    description: 'Manage sprints: create, start, close, and assign issues to sprints',
+    description: 'Manage iterations: boards, sprints, and sprint issues. Use list_boards/get_board to find boards, then sprint operations for iteration management.',
     inputSchema: {
       type: 'object',
       properties: {
         operation: {
           type: 'string',
-          enum: ['get', 'create', 'update', 'delete', 'list', 'manage_issues'],
-          description: 'Operation to perform',
+          enum: ['get', 'create', 'update', 'delete', 'list', 'manage_issues', 'get_board', 'list_boards'],
+          description: 'Operation to perform. list_boards: all boards. get_board: board detail with optional sprints. get/create/update/delete/list: sprint operations. manage_issues: add/remove issues from sprint.',
         },
         sprintId: {
           type: 'integer',
@@ -86,7 +86,7 @@ export const toolSchemas = {
         },
         boardId: {
           type: 'integer',
-          description: 'Board ID. Required for create and list.',
+          description: 'Board ID. Required for create, list, get_board.',
         },
         name: {
           type: 'string',
@@ -133,9 +133,14 @@ export const toolSchemas = {
           type: 'array',
           items: {
             type: 'string',
-            enum: ['issues', 'report', 'board'],
+            enum: ['issues', 'report', 'board', 'sprints', 'configuration'],
           },
-          description: 'Additional fields to include in the response.',
+          description: 'Additional fields to include in the response. sprints/configuration for get_board.',
+        },
+        includeSprints: {
+          type: 'boolean',
+          description: 'Include sprints in board responses (shorthand for expand: ["sprints"]).',
+          default: false,
         },
       },
       required: ['operation'],
@@ -319,48 +324,6 @@ export const toolSchemas = {
     },
   },
 
-  manage_jira_board: {
-    name: 'manage_jira_board',
-    description: 'List boards or get board details and configuration',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        operation: {
-          type: 'string',
-          enum: ['get', 'list'],
-          description: 'Operation to perform',
-        },
-        boardId: {
-          type: 'integer',
-          description: 'Board ID. Required for get.',
-        },
-        startAt: {
-          type: 'integer',
-          description: 'Pagination offset (0-based).',
-          default: 0,
-        },
-        maxResults: {
-          type: 'integer',
-          description: 'Max items to return.',
-          default: 50,
-        },
-        expand: {
-          type: 'array',
-          items: {
-            type: 'string',
-            enum: ['sprints', 'issues', 'configuration'],
-          },
-          description: 'Additional fields to include in the response.',
-        },
-        include_sprints: {
-          type: 'boolean',
-          description: 'Include active sprints (shorthand for expand: ["sprints"]).',
-          default: false,
-        },
-      },
-      required: ['operation'],
-    },
-  },
 
 
   analyze_jira_issues: {
@@ -498,9 +461,83 @@ export const toolSchemas = {
     },
   },
 
+  manage_jira_request: {
+    name: 'manage_jira_request',
+    description: 'Customer-side Jira Service Management (JSM). Full customer flow: discover portals and request types, see what fields are required per type, raise requests, check status/SLA/comments/transitions in one call, comment, and perform customer-side transitions (reopen, resolve, cancel). Registers only when /rest/servicedeskapi/ is reachable. For agent/admin workflows, use manage_jira_issue instead.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        operation: {
+          type: 'string',
+          enum: ['list_portals', 'list_request_types', 'get_request_type', 'create', 'get', 'comment', 'transition', 'list'],
+          description: 'Operation to perform. list_portals: service desks. list_request_types: request types on a portal (use expand:["fields"] to also fetch field schemas). get_request_type: detail + field schema for one type — shows what to fill out. create: raise request. get: rich view (status, SLA, comments, transitions, attachments) in one call. comment: public-only customer comment. transition: self-service transition on a request (discover IDs via get — often empty because the workflow/permissions don\'t expose any to the customer). list: my requests.',
+        },
+        serviceDeskId: {
+          type: 'string',
+          description: 'Service desk ID (not the project key — use list_portals to find). Required for list_request_types, get_request_type, create; optional for list.',
+        },
+        requestTypeId: {
+          type: 'string',
+          description: 'Request type ID from list_request_types. Required for get_request_type and create.',
+        },
+        issueKey: {
+          type: 'string',
+          description: 'Request/issue key (e.g., INVS-42). Required for get, comment, transition.',
+        },
+        summary: {
+          type: 'string',
+          description: 'Short title for the request. Required for create.',
+        },
+        description: {
+          type: 'string',
+          description: 'Request body / details. Optional for create.',
+        },
+        comment: {
+          type: 'string',
+          description: 'Comment text. Required for comment. Optional for transition (attaches a comment to the transition).',
+        },
+        transitionId: {
+          type: 'string',
+          description: 'Transition ID (from the "Available transitions" section of `get`). Required for transition. Customer-facing transitions depend on the project workflow/permission scheme — many JSM projects expose none, which is normal.',
+        },
+        isPublic: {
+          type: 'boolean',
+          description: 'Must be true (or omitted). Atlassian only permits customers to post public comments; isPublic:false is rejected with a clear error. Internal comments require agent-side tooling.',
+          default: true,
+        },
+        requestFieldValues: {
+          type: 'object',
+          description: 'Additional field values for create. Merged with summary/description. Accepts either human-readable names ("Quote ID") or raw Jira field IDs ("customfield_17375"). Names are resolved via the dynamic custom-field catalog (ADR-201). Use get_request_type or list_request_types with expand:["fields"] to see both forms per request type.',
+        },
+        requestStatus: {
+          type: 'string',
+          enum: ['OPEN_REQUESTS', 'CLOSED_REQUESTS', 'ALL_REQUESTS'],
+          description: 'Which requests to show in list. Default: OPEN_REQUESTS.',
+          default: 'OPEN_REQUESTS',
+        },
+        expand: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Expansion hints. list_request_types: ["fields"] to include field schemas inline. get: ["status","requestType","sla","attachment","comment","participant","action"] (all included by default — override to trim).',
+        },
+        startAt: {
+          type: 'integer',
+          description: 'Pagination offset (0-based).',
+          default: 0,
+        },
+        maxResults: {
+          type: 'integer',
+          description: 'Max items to return.',
+          default: 50,
+        },
+      },
+      required: ['operation'],
+    },
+  },
+
   manage_jira_media: {
     name: 'manage_jira_media',
-    description: 'Manage file attachments on Jira issues (remote). Operations here affect Jira — delete permanently removes an attachment from the issue for all users. Use manage_workspace for local file staging. Downloads copy from Jira to workspace; uploads copy from workspace to Jira.',
+    description: 'Manage file attachments on Jira issues (remote). Operations here affect Jira — delete permanently removes an attachment from the issue for all users. Use manage_local_workspace for local file staging. Downloads copy from Jira to workspace; uploads copy from workspace to Jira.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -531,15 +568,15 @@ export const toolSchemas = {
         },
         workspaceFile: {
           type: 'string',
-          description: 'Filename in workspace to upload. Alternative to content. Use manage_workspace list to see staged files.',
+          description: 'Filename in workspace to upload. Alternative to content. Use manage_local_workspace list to see staged files.',
         },
       },
       required: ['operation'],
     },
   },
 
-  manage_workspace: {
-    name: 'manage_workspace',
+  manage_local_workspace: {
+    name: 'manage_local_workspace',
     description: 'Manage files in the local workspace staging area (local only — no Jira impact). Files downloaded via manage_jira_media land here. Delete only removes the local copy. Use manage_jira_media to affect attachments on Jira issues.',
     inputSchema: {
       type: 'object',
@@ -579,7 +616,7 @@ export const toolSchemas = {
             properties: {
               tool: {
                 type: 'string',
-                enum: ['manage_jira_issue', 'manage_jira_filter', 'manage_jira_sprint', 'manage_jira_project', 'manage_jira_board', 'analyze_jira_issues', 'manage_jira_media', 'manage_workspace'],
+                enum: ['manage_jira_issue', 'manage_jira_filter', 'manage_jira_sprint', 'manage_jira_project', 'analyze_jira_issues', 'manage_jira_media', 'manage_jira_request', 'manage_local_workspace'],
                 description: 'Which tool to call.',
               },
               args: {

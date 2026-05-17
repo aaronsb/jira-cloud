@@ -1,4 +1,4 @@
-import { Version3Client, AgileClient } from 'jira.js';
+import { Version3Client, AgileClient, ServiceDesk } from 'jira.js';
 
 import { JiraConfig, JiraIssueDetails, JiraPerson, FilterResponse, TransitionDetails, SearchResponse, BoardResponse, SprintResponse, JiraAttachment } from '../types/index.js';
 import { TextProcessor } from '../utils/text-processing.js';
@@ -33,6 +33,7 @@ interface SprintReportResponse {
 export class JiraClient {
   private client: Version3Client;
   private agileClient: AgileClient;
+  private serviceDesk: ServiceDesk.ServiceDeskClient;
   private customFields: {
     startDate: string;
     storyPoints: string;
@@ -42,6 +43,11 @@ export class JiraClient {
   /** Expose the underlying Version3Client for field discovery and other direct API access */
   get v3Client(): Version3Client {
     return this.client;
+  }
+
+  /** Expose the ServiceDesk client for customer-side JSM operations (see ADR-212) */
+  get serviceDeskClient(): ServiceDesk.ServiceDeskClient {
+    return this.serviceDesk;
   }
 
   /** Expose custom field IDs for JQL construction outside the client */
@@ -62,6 +68,7 @@ export class JiraClient {
     
     this.client = new Version3Client(clientConfig);
     this.agileClient = new AgileClient(clientConfig);
+    this.serviceDesk = new ServiceDesk.ServiceDeskClient(clientConfig);
 
     // Set custom field mappings with defaults
     this.customFields = {
