@@ -24,7 +24,7 @@ picks it up. It reads the marker out of the version string.
 `make publish-all` still exists for publishing by hand if CI is unavailable. It is not
 the normal path — running it after a tag would republish what CI already shipped.
 
-### Trusted publishing setup (one-time, already done once)
+### Trusted publishing setup (one-time, before the first tagged release)
 
 npmjs.com registers the trusted publisher against this repository AND the workflow
 **filename** `npm-publish.yml`. Renaming or moving that file breaks publishing with a

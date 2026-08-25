@@ -80,7 +80,7 @@ jobs:
         run: |
           VERSION=$(node -p "require('./package.json').version")
           if echo "$VERSION" | grep -qE '(alpha|beta|rc)'; then
-            echo "tag=$(echo "$VERSION" | grep -oE '(alpha|beta|rc)')" >> "$GITHUB_OUTPUT"
+            echo "tag=$(echo "$VERSION" | grep -oE '(alpha|beta|rc)' | head -1)" >> "$GITHUB_OUTPUT"
           else
             echo "tag=latest" >> "$GITHUB_OUTPUT"
           fi
