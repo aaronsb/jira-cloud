@@ -4,16 +4,32 @@ How to ship a new version of jira-cloud-mcp.
 
 ## What Happens on Release
 
-A single `git tag` push triggers two CI workflows:
+Pushing a `v*` tag triggers two CI workflows, publishing three channels:
 
 | Workflow | File | What it does |
 |----------|------|-------------|
-| **Publish to npm** | `.github/workflows/npm-publish.yml` | Builds, tests, publishes to npm with provenance |
-| **Build .mcpb** | `.github/workflows/release-mcpb.yml` | Builds .mcpb bundle, creates GitHub Release, attaches artifact |
+| **Build .mcpb** | `.github/workflows/release-mcpb.yml` | Builds the .mcpb bundle and attaches it to the GitHub Release |
+| **Publish** | `.github/workflows/npm-publish.yml` | Publishes to npm, then to the MCP Registry |
 
-Both trigger on `push: tags: ['v*']`.
+**Nothing needs publishing by hand.** Both npm and the MCP Registry go out from CI by
+OIDC (see issue #60 and google-workspace-mcp ADR-105) — no `NPM_TOKEN`, no secret to
+rotate. The registry job `needs` the npm job, because `server.json` advertises the npm
+package at that version and publishing the registry entry first would point people at a
+tarball that does not exist yet.
 
-The .mcpb is platform-agnostic (pure Node.js/TypeScript, no native modules) so only one bundle is needed.
+The workflow picks the npm dist-tag itself: a pre-release publishes under
+`alpha`/`beta`/`rc`, never `latest`, or every `npm install` and every `^x.y.z` range
+picks it up. It reads the marker out of the version string.
+
+`make publish-all` still exists for publishing by hand if CI is unavailable. It is not
+the normal path — running it after a tag would republish what CI already shipped.
+
+### Trusted publishing setup (one-time, already done once)
+
+npmjs.com registers the trusted publisher against this repository AND the workflow
+**filename** `npm-publish.yml`. Renaming or moving that file breaks publishing with a
+401 that says nothing about OIDC. The registration lives at
+npmjs.com → package → Settings → Trusted Publishers.
 
 ## Release Flow
 
@@ -21,7 +37,7 @@ The .mcpb is platform-agnostic (pure Node.js/TypeScript, no native modules) so o
 
 ```bash
 git checkout main && git pull
-make check          # lint + tests + build must pass
+make check          # lint + test + build must pass
 ```
 
 ### 2. Bump version
@@ -33,7 +49,11 @@ make release-minor  # x.Y.0 — new features
 make release-major  # X.0.0 — breaking changes
 ```
 
-`make release-*` runs `check`, bumps `package.json`, syncs version to `server.json` + `mcpb/manifest.json`, commits, tags, and pushes. CI takes over from there.
+`make release-*` runs `check`, bumps `package.json`, syncs version to `server.json` +
+`mcpb/manifest.json`, commits, tags, and pushes. CI takes over from there.
+
+If `make check` fails (e.g., a flaky test), fix it first. Don't skip the check — fix
+the test and commit before releasing.
 
 ### 3. Manual release (if make fails)
 
@@ -51,30 +71,51 @@ git push && git push --tags
 ### 4. Verify CI
 
 ```bash
-gh run list --limit 3   # should show both workflows running
-gh run watch <run-id>   # watch progress
+gh run list --limit 3   # both the .mcpb build and the publish should be running
+gh run watch <run-id>
 ```
 
-Check:
-- npm publish: green, published to correct tag
-- .mcpb build: green, artifact attached to GitHub Release
+Both workflows must be green. The publish workflow runs npm first and the MCP Registry
+after it, so a red registry job on a green npm job means the package shipped and the
+registry entry did not — those need checking separately in step 5.
 
 ### 5. Verify artifacts
 
+Check the PUBLISHED artifact, not the repo it was built from — those are different
+claims, and only one of them is what a user installs.
+
 ```bash
-# npm
-npm view @aaronsb/jira-cloud-mcp version
+# npm — version, and the dist-tag it landed under
+npm view @aaronsb/jira-cloud-mcp version dist-tags
 
 # GitHub Release
 gh release view vX.Y.Z
+
+# MCP Registry
+curl -s "https://registry.modelcontextprotocol.io/v0/servers?search=io.github.aaronsb/jira-cloud" | head -c 400
 ```
 
-The GitHub Release should have:
-- `jira-cloud-mcp.mcpb` — platform-agnostic bundle for Claude Desktop
+The GitHub Release should have exactly one `.mcpb` file: `jira-cloud-mcp.mcpb`.
+One bundle covers every platform — what ships is Node plus pure JavaScript.
+
+## Pre-release Versions
+
+For alpha/beta/rc releases:
+
+```bash
+npm version preminor --preid alpha --no-git-tag-version
+# → x.y.0-alpha.0
+make version-sync
+# commit, tag, push as above
+```
+
+CI reads the pre-release marker out of the version string and publishes with
+`--tag alpha` (or `beta`/`rc`) rather than `--tag latest`, so a pre-release is available
+to people who ask for it and invisible to everyone else.
 
 ## Retagging
 
-If a tag was pushed before a fix was ready:
+If a tag was pushed before a fix was ready (e.g., tests failed in CI):
 
 ```bash
 git tag -d vX.Y.Z                        # delete local tag
@@ -89,7 +130,7 @@ git push --tags                           # triggers CI again
 For testing or manual distribution without CI:
 
 ```bash
-make mcpb              # builds jira-cloud-mcp.mcpb locally
+make mcpb              # the bundle — one, for every platform
 ```
 
 Requires `mcpb` CLI installed (`npm install -g @anthropic-ai/mcpb`).
@@ -101,17 +142,8 @@ The version lives in three places, kept in sync by `make version-sync`:
 | File | Field | Purpose |
 |------|-------|---------|
 | `package.json` | `version` | Source of truth, npm |
-| `server.json` | `version` | MCP server metadata / registry |
+| `server.json` | `version` (twice — server entry AND `packages[0]`) | MCP server metadata / registry |
 | `mcpb/manifest.json` | `version` | .mcpb bundle metadata |
 
-Never edit these manually — use `npm version` + `make version-sync`.
-
-## Publishing to MCP Registry
-
-Registry publishing is separate from the release flow:
-
-```bash
-make publish-all       # prompts, then publishes to registry + uploads .mcpb
-```
-
-This is manual because registry publishing requires GitHub auth and is not automated in CI.
+Never edit these manually — use `npm version` + `make version-sync`. CI refuses to
+publish a registry entry whose `server.json` disagrees with the tag.
