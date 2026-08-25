@@ -57,7 +57,7 @@ _release-commit:
 	git tag -a "v$(NEW_VERSION)" -m "v$(NEW_VERSION)"
 	git push && git push --tags
 	@echo ""
-	@echo "v$(NEW_VERSION) released. CI handles npm publish, .mcpb build, and GitHub Release."
+	@echo "v$(NEW_VERSION) released. CI publishes npm, the MCP Registry, and the GitHub Release with the .mcpb."
 
 # ── Publishing ──────────────────────────────────────────────────────────
 
@@ -72,9 +72,12 @@ mcpb: build     ## Build .mcpb desktop extension bundle
 	@echo ""
 	@echo "Built: jira-cloud-mcp.mcpb ($$(du -h jira-cloud-mcp.mcpb | cut -f1))"
 
-publish-all: mcpb  ## Manual publish: MCP Registry + upload MCPB to existing GitHub Release
+# CI publishes every channel on tag push (see .github/workflows/npm-publish.yml and
+# release-mcpb.yml). This target is the fallback for when CI cannot do it, and
+# running it after a green CI run would republish what CI already shipped.
+publish-all: mcpb  ## Manual fallback: registry + MCPB upload (CI does all of this on tag push)
 	@echo ""
-	@echo "Publishing v$(VERSION) — npm is handled by CI on tag push."
+	@echo "Publishing v$(VERSION) manually — CI publishes npm, the registry, and the release on tag push."
 	@echo "  1. MCP Registry (requires GitHub auth)"
 	@echo "  2. Upload MCPB to GitHub Release"
 	@echo ""
