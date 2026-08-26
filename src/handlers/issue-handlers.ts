@@ -422,8 +422,9 @@ function issueGuidance(operation: string, issueKey?: string): string {
 }
 
 /** Extract the project key prefix from a Jira issue key (e.g. `PROJ-123` → `PROJ`).
- *  Uppercases the result so handlers don't drift from each other on casing. */
-function projectKeyFromIssueKey(issueKey: string): string {
+ *  Uppercases the result so handlers don't drift from each other on casing.
+ *  @internal Exported only so the casing contract stays under test (#56). */
+export function projectKeyFromIssueKey(issueKey: string): string {
   return issueKey.split('-')[0].toUpperCase();
 }
 
