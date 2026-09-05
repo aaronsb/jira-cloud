@@ -167,20 +167,16 @@ export function renderIssue(
     }
   }
 
-  // Comments (if present)
+  // Comments — only present when the caller opted in via `expand: ["comments"]`, so render
+  // every body in full; a preview here would leave the agent with no way to read the rest.
   if (issue.comments && issue.comments.length > 0) {
     lines.push('');
     lines.push(`Comments (${issue.comments.length}):`);
-    const recentComments = issue.comments.slice(-5);
-    const startIdx = issue.comments.length - recentComments.length + 1;
-    if (issue.comments.length > 5) {
-      lines.push(`  +${issue.comments.length - 5} older comments`);
-    }
-    for (let i = 0; i < recentComments.length; i++) {
-      const comment = recentComments[i];
-      const preview = comment.body.split('\n').filter((l: string) => l.trim()).slice(0, 2).join(' | ');
-      lines.push(`[${startIdx + i}/${issue.comments.length}] ${comment.author} (${formatDate(comment.created)}): ${truncate(preview, 200)}`);
-    }
+    issue.comments.forEach((comment, i) => {
+      lines.push('');
+      lines.push(`[${i + 1}/${issue.comments!.length}] ${comment.author} (${formatDate(comment.created)}) — id ${comment.id}`);
+      lines.push(comment.body.trim());
+    });
   }
 
   // Custom fields — progressive reveal (ADR-214). Default is a breadcrumb pointing at the
