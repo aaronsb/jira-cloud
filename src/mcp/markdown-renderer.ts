@@ -106,6 +106,15 @@ export interface RenderIssueOptions {
   customFields?: 'breadcrumb' | 'dump' | 'none';
   projectKey?: string;
   issueTypeName?: string;
+  /**
+   * How to render `issue.comments`:
+   * - `full` (default): every comment body, untruncated. Used by `get` with
+   *   `expand: ["comments"]`, where the caller explicitly opted in and needs the whole thread.
+   * - `latest`: only the newest comment (last element — Jira returns comments oldest-first).
+   *   Used after `comment` writes, where the reply already knows what it just added and dumping
+   *   the other N-1 bodies would just be noise (and tokens) on every add.
+   */
+  comments?: 'full' | 'latest';
 }
 
 /**
@@ -167,14 +176,20 @@ export function renderIssue(
     }
   }
 
-  // Comments — only present when the caller opted in via `expand: ["comments"]`, so render
-  // every body in full; a preview here would leave the agent with no way to read the rest.
+  // Comments — present either because the caller opted in via `expand: ["comments"]` (`full`,
+  // the default — render every body in full, since a preview here would leave the agent with no
+  // way to read the rest) or because a `comment` write just ran (`latest` — the reply already
+  // knows what it added; dumping the other N-1 bodies on every add would just be noise).
   if (issue.comments && issue.comments.length > 0) {
+    const commentsMode = opts.comments ?? 'full';
+    const total = issue.comments.length;
+    const shown = commentsMode === 'latest' ? issue.comments.slice(-1) : issue.comments;
     lines.push('');
-    lines.push(`Comments (${issue.comments.length}):`);
-    issue.comments.forEach((comment, i) => {
+    lines.push(`Comments (${total}):`);
+    shown.forEach((comment, i) => {
+      const index = commentsMode === 'latest' ? total : i + 1;
       lines.push('');
-      lines.push(`[${i + 1}/${issue.comments!.length}] ${comment.author} (${formatDate(comment.created)}) — id ${comment.id}`);
+      lines.push(`[${index}/${total}] ${comment.author} (${formatDate(comment.created)}) — id ${comment.id}`);
       lines.push(comment.body.trim());
     });
   }
