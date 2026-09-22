@@ -1,5 +1,6 @@
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
+import { fieldDiscovery, type FieldDiscovery } from '../client/field-discovery.js';
 import type { GraphObjectCache } from '../client/graph-object-cache.js';
 import type { GraphQLClient } from '../client/graphql-client.js';
 import { GraphQLHierarchyWalker, walkTree } from '../client/graphql-hierarchy.js';
@@ -646,6 +647,34 @@ function maxGroupsForBudget(implicitCount: number): number {
   return Math.floor(MAX_COUNT_QUERIES / queriesPerGroup);
 }
 
+const SPRINT_DISCOVERY_WAIT_MS = 15_000;
+
+/**
+ * Make sure the sprint custom field id is wired before a sprint groupBy.
+ * Field discovery runs in the background at startup; without the id, every sampled
+ * issue reads as "(no sprint)" and the breakdown collapses to a single zero row (#46).
+ */
+export async function ensureSprintFieldId(
+  jiraClient: JiraClient,
+  discovery: Pick<FieldDiscovery, 'whenSettled' | 'getWellKnownFieldId'> = fieldDiscovery,
+): Promise<void> {
+  if (jiraClient.customFieldIds.sprint) return;
+  await Promise.race([
+    discovery.whenSettled(),
+    new Promise<void>(resolve => setTimeout(resolve, SPRINT_DISCOVERY_WAIT_MS).unref?.()),
+  ]);
+  const fieldId = discovery.getWellKnownFieldId('sprint');
+  if (!fieldId) {
+    throw new McpError(
+      ErrorCode.InvalidRequest,
+      'groupBy "sprint" is unavailable: the Sprint custom field has not been discovered on this instance ' +
+      '(field discovery is still running, failed, or Jira Software sprints are not enabled). Retry shortly, ' +
+      'or scope by sprint in JQL instead (e.g. `sprint in openSprints()`).'
+    );
+  }
+  jiraClient.setCustomFieldId('sprint', fieldId);
+}
+
 async function handleSummary(jiraClient: JiraClient, jql: string, groupBy?: GroupByField, compute?: ComputeColumn[], groupLimit = DEFAULT_GROUP_LIMIT): Promise<string> {
   const lines: string[] = [];
   lines.push(`# Summary: ${jql}`);
@@ -682,6 +711,7 @@ async function handleSummary(jiraClient: JiraClient, jql: string, groupBy?: Grou
       lines.push(`*Capped at ${effectiveGroupCap} groups (${reason})*`);
     }
   } else if (groupBy) {
+    if (groupBy === 'sprint') await ensureSprintFieldId(jiraClient);
     // For non-project groupBy, sample per-project for representative dimension values
     const issues = await samplePerProject(jiraClient, jql);
     if (issues.length === 0) {
@@ -854,7 +884,10 @@ async function samplePerProject(jiraClient: JiraClient, jql: string): Promise<Ji
   return samples.flat();
 }
 
-async function handleCubeSetup(jiraClient: JiraClient, jql: string): Promise<string> {
+export async function handleCubeSetup(jiraClient: JiraClient, jql: string): Promise<string> {
+  // Best-effort: cube setup lists every dimension, so a missing/undiscovered sprint field
+  // shouldn't fail the whole call — just leave the sprint dimension out (#46).
+  await ensureSprintFieldId(jiraClient).catch(() => {});
   const issues = await samplePerProject(jiraClient, jql);
 
   if (issues.length === 0) {
