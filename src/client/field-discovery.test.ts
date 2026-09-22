@@ -306,6 +306,79 @@ describe('FieldDiscovery', () => {
     expect(billing.writable).toBe(true);
   });
 
+  it('indexes a locked Tempo Account field for write routing though curation drops it (#59)', async () => {
+    const client = createMockClient([
+      makeField({
+        id: 'customfield_11266', name: 'Account', description: 'Tempo Account Custom Field',
+        isLocked: true, screensCount: 6,
+        schema: { type: 'option2', custom: 'com.atlassian.plugins.atlassian-connect-plugin:io.tempo.jira__account' },
+      }),
+      makeField({ id: 'customfield_10001', name: 'Locked Other', isLocked: true }),
+    ]);
+    await discovery.discover(client);
+
+    expect(discovery.getFieldById('customfield_11266')).toBeUndefined();
+    expect(discovery.resolveNameToId('Account')).toBe('customfield_11266');
+    expect(discovery.getRoutedField('customfield_11266')?.name).toBe('Account');
+    // Only extension-routed fields get the fallback — other excluded fields stay unresolved.
+    expect(discovery.resolveNameToId('Locked Other')).toBeNull();
+    expect(discovery.getRoutedField('customfield_10001')).toBeUndefined();
+  });
+
+  it('routes a renamed Tempo Account field by its Connect-prefixed schema type (#59)', async () => {
+    const client = {
+      issueFields: {
+        getFieldsPaginated: async () => { throw new Error('Request failed with status code 403'); },
+        getFields: async () => [{
+          id: 'customfield_11266', name: 'Billing Bucket', custom: true,
+          schema: { type: 'option2', custom: 'com.atlassian.plugins.atlassian-connect-plugin:io.tempo.jira__account' },
+        }],
+      },
+    } as any;
+    await discovery.discover(client);
+    expect(discovery.getCatalog().find(f => f.id === 'customfield_11266')!.writable).toBe(true);
+    expect(discovery.resolveNameToId('Billing Bucket')).toBe('customfield_11266');
+  });
+
+  it('lets a schema match win the routed-index alias slot over an earlier name-only match (#59 review)', async () => {
+    // A non-Tempo field also named "Account" (e.g. a CRM connector field, curated out the same way)
+    // appears first in the raw list. It matches the Tempo route by name alone. The real Tempo field
+    // comes second and matches by schema type — that must take the "account" alias, not the first-seen
+    // name-only field.
+    const client = createMockClient([
+      makeField({
+        id: 'customfield_20000', name: 'Account', isLocked: true, screensCount: 4,
+        schema: { type: 'string', custom: 'com.acme.crm:account-lookup' },
+      }),
+      makeField({
+        id: 'customfield_11266', name: 'Account', isLocked: true, screensCount: 6,
+        schema: { type: 'option2', custom: 'com.atlassian.plugins.atlassian-connect-plugin:io.tempo.jira__account' },
+      }),
+    ]);
+    await discovery.discover(client);
+
+    expect(discovery.resolveNameToId('Account')).toBe('customfield_11266');
+  });
+
+  it('does not route a bare vendor schema suffix that merely coincides with a route alias (#59 review)', async () => {
+    // The suffix after the last `:` is "account" — a bare word, not a key-shaped identifier — so it
+    // must not match the Tempo route's `account` alias, even though the two strings are equal.
+    const client = {
+      issueFields: {
+        getFieldsPaginated: async () => { throw new Error('Request failed with status code 403'); },
+        getFields: async () => [
+          { id: 'customfield_30000', name: 'CRM Owner', custom: true, schema: { type: 'any', custom: 'com.vendor.crm:account' } },
+        ],
+      },
+    } as any;
+
+    await discovery.discover(client);
+    const field = discovery.getCatalog().find(f => f.id === 'customfield_30000')!;
+    expect(field.category).toBe('unsupported');
+    expect(field.writable).toBe(false);
+    expect(discovery.getRoutedField('customfield_30000')).toBeUndefined();
+  });
+
   it('handles empty field list', async () => {
     const client = createMockClient([]);
     await discovery.discover(client);

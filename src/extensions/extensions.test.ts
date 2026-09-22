@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { allFieldRoutes, routeForField, moduleStatuses, allModules } from './index.js';
+import { allFieldRoutes, routeForField, routeForFieldMeta, moduleStatuses, allModules } from './index.js';
 import { tempo } from './tempo.js';
 import { matchAllowedValue } from './types.js';
 
@@ -24,6 +24,17 @@ describe('routeForField', () => {
   it('returns undefined for an ordinary field', () => {
     expect(routeForField('Story Points')).toBeUndefined();
     expect(routeForField('customfield_10001')).toBeUndefined();
+  });
+});
+
+describe('routeForFieldMeta (#59)', () => {
+  it('matches a renamed Connect app field by the key suffix of its schema custom type', () => {
+    const r = routeForFieldMeta('Billing Bucket', 'com.atlassian.plugins.atlassian-connect-plugin:io.tempo.jira__account');
+    expect(r).toBe(routeForField('Account'));
+  });
+  it('prefers the name; returns undefined for an unclaimed field', () => {
+    expect(routeForFieldMeta('Account', '')).toBe(routeForField('Account'));
+    expect(routeForFieldMeta('Story Points', 'com.atlassian.jira.plugin.system.customfieldtypes:float')).toBeUndefined();
   });
 });
 

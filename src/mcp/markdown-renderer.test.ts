@@ -150,3 +150,47 @@ describe('renderIssue — custom field reveal modes (ADR-214)', () => {
     });
   });
 });
+
+const THREE_COMMENTS = [
+  { id: '1', author: 'Alice', body: 'First comment', created: '2026-05-01T00:00:00.000Z' },
+  { id: '2', author: 'Bob', body: 'Second comment', created: '2026-05-02T00:00:00.000Z' },
+  { id: '3', author: 'Carol', body: 'Third comment (newest)', created: '2026-05-03T00:00:00.000Z' },
+];
+
+describe('renderIssue — comment rendering modes', () => {
+  it('full (default): renders every comment body, in order', () => {
+    const out = renderIssue(makeIssue({ comments: THREE_COMMENTS }));
+    expect(out).toContain('Comments (3):');
+    expect(out).toContain('[1/3] Alice');
+    expect(out).toContain('First comment');
+    expect(out).toContain('[2/3] Bob');
+    expect(out).toContain('Second comment');
+    expect(out).toContain('[3/3] Carol');
+    expect(out).toContain('Third comment (newest)');
+  });
+
+  it('full: explicit opt-in behaves the same as the default', () => {
+    const out = renderIssue(makeIssue({ comments: THREE_COMMENTS }), undefined, { comments: 'full' });
+    expect(out).toContain('First comment');
+    expect(out).toContain('Second comment');
+    expect(out).toContain('Third comment (newest)');
+  });
+
+  it('latest: renders only the newest comment (last element)', () => {
+    const out = renderIssue(makeIssue({ comments: THREE_COMMENTS }), undefined, { comments: 'latest' });
+    expect(out).toContain('Comments (3):');
+    expect(out).toContain('[3/3] Carol');
+    expect(out).toContain('Third comment (newest)');
+    expect(out).not.toContain('First comment');
+    expect(out).not.toContain('Second comment');
+    expect(out).not.toContain('[1/3]');
+    expect(out).not.toContain('[2/3]');
+  });
+
+  it('no comments: silent regardless of mode', () => {
+    const full = renderIssue(makeIssue({ comments: [] }), undefined, { comments: 'full' });
+    const latest = renderIssue(makeIssue({ comments: [] }), undefined, { comments: 'latest' });
+    expect(full).not.toContain('Comments (');
+    expect(latest).not.toContain('Comments (');
+  });
+});

@@ -237,8 +237,13 @@ export class JiraClient {
       }
     }
 
+    // Comments live in `fields.comment`; they are not an `expand` and `*navigable` omits them,
+    // so the field has to be requested by name.
+    if (includeComments) {
+      fields.push('comment');
+    }
+
     const expands: string[] = [];
-    if (includeComments) expands.push('comments');
     if (includeHistory) expands.push('changelog');
 
     const params: any = {

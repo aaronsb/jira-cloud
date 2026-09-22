@@ -20,6 +20,9 @@ export interface FieldRouteContext {
   client: Version3Client;
   projectKey: string;
   issueTypeName: string;
+  /** Set on update: the issue being edited, so a resolver can read the issue's editmeta (the
+   *  field may be on the edit screen but not the create screen). */
+  issueKey?: string;
 }
 
 export interface FieldRoute {
