@@ -27,11 +27,19 @@ async function resolveTempoAccountWrite(ctx: FieldRouteContext, fieldId: string,
   const trimmed = value.trim();
   if (/^\d+$/.test(trimmed)) return Number(trimmed);              // bare numeric string → the id
 
-  const options = await fieldDiscovery.getFieldAllowedValues(ctx.client, ctx.projectKey, ctx.issueTypeName, fieldId);
+  // On update, the issue's edit screen is authoritative (the field may be settable only
+  // post-create); fall back to the project/issue-type create screen.
+  let options = ctx.issueKey
+    ? await fieldDiscovery.getEditFieldAllowedValues(ctx.client, ctx.issueKey, fieldId)
+    : [];
   if (options.length === 0) {
+    options = await fieldDiscovery.getFieldAllowedValues(ctx.client, ctx.projectKey, ctx.issueTypeName, fieldId);
+  }
+  if (options.length === 0) {
+    const where = ctx.issueKey ? `${ctx.issueKey} (${ctx.projectKey}/${ctx.issueTypeName})` : `${ctx.projectKey}/${ctx.issueTypeName}`;
     throw new Error(
-      `Couldn't resolve the Account value "${value}" — the Account field exposes no enumerable ` +
-      `options on ${ctx.projectKey}/${ctx.issueTypeName} (it may not be on that issue type's screen, ` +
+      `Couldn't resolve the Account value "${value}" — the Account field (${fieldId}) exposes no ` +
+      `enumerable options on ${where} (it may not be on that issue type's screen, ` +
       `or no Tempo accounts are linked to this project). Pass the numeric Tempo account id directly ` +
       `(customFields: {"Account": <id>}), or set it in the Jira UI.`,
     );
@@ -58,7 +66,11 @@ export const tempo: ExtensionModule = {
   routes: [accountRoute],
   async detect() {
     try {
-      const hits = fieldDiscovery.getCatalog().filter(f => TEMPO_FIELD_MARKER.test(f.schemaCustom));
+      // The curated catalog can omit Tempo fields (Account is `isLocked` on admin tenants), so also
+      // consult the extension-routed index, which is built from the raw field list (#59).
+      const byId = new Map<string, { id: string; name: string; schemaCustom: string }>();
+      for (const f of [...fieldDiscovery.getCatalog(), ...fieldDiscovery.getRoutedFields()]) byId.set(f.id, f);
+      const hits = [...byId.values()].filter(f => TEMPO_FIELD_MARKER.test(f.schemaCustom));
       if (hits.length === 0) return { present: false };
       return { present: true, notes: `Tempo-managed field(s): ${hits.map(f => `${f.name} (${f.id})`).join(', ')}` };
     } catch {

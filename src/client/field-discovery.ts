@@ -9,7 +9,7 @@
 import { Version3Client } from 'jira.js';
 
 import { classifyFieldType, type FieldCategory, type FieldTypeInfo } from './field-type-map.js';
-import { routeForField } from '../extensions/index.js';
+import { routeForField, routeForFieldMeta, routeForSchema } from '../extensions/index.js';
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -90,8 +90,26 @@ const RECENCY_HALF_LIFE_DAYS = 30;
  * step with what the write path actually does.)
  */
 function extensionCanWrite(fieldName: string, schemaCustom: string): boolean {
-  const route = routeForField(fieldName) ?? (schemaCustom ? routeForField(schemaCustom) : undefined);
-  return route?.resolveWrite != null;
+  return routeForFieldMeta(fieldName, schemaCustom)?.resolveWrite != null;
+}
+
+/** Normalise a createmeta/editmeta `allowedValues` array to `{id, value}` options. */
+function parseAllowedValues(allowedValues: unknown): FieldAllowedValue[] {
+  if (!Array.isArray(allowedValues)) return [];
+  const opts: FieldAllowedValue[] = [];
+  for (const v of allowedValues) {
+    const id = v?.id ?? v?.value;
+    const value = v?.value ?? v?.name ?? (typeof v === 'string' ? v : undefined);
+    if (id !== undefined && value !== undefined) opts.push({ id, value: String(value) });
+  }
+  return opts;
+}
+
+/** Minimal identity of a field an extension route writes — see {@link FieldDiscovery.getRoutedField}. */
+export interface RoutedField {
+  id: string;
+  name: string;
+  schemaCustom: string;
 }
 
 /** Well-known locked fields identified by schema custom type */
@@ -106,6 +124,10 @@ export class FieldDiscovery {
   private catalog: CatalogField[] = [];
   private nameToId: Map<string, string> = new Map();
   private idToField: Map<string, CatalogField> = new Map();
+  /** Fields claimed by a value-resolving extension route, indexed from the *raw* field list —
+   *  independent of catalog curation, which drops e.g. the locked Tempo Account field (#59). */
+  private routedById: Map<string, RoutedField> = new Map();
+  private routedNameToId: Map<string, string> = new Map();
   private wellKnown: Map<string, string> = new Map(); // logical name → field ID
   private stats: DiscoveryStats | null = null;
   private mode: CatalogMode = 'loading';
@@ -148,12 +170,28 @@ export class FieldDiscovery {
 
   /** Resolve a human-readable field name to its Jira field ID */
   resolveNameToId(name: string): string | null {
-    return this.nameToId.get(name.toLowerCase()) ?? null;
+    const lower = name.toLowerCase();
+    // Catalog first; then fields an extension route writes even though curation left them out of
+    // the catalog (e.g. Tempo Account is `isLocked` on admin tenants — #59).
+    return this.nameToId.get(lower) ?? this.routedNameToId.get(lower) ?? null;
   }
 
   /** Look up a catalog field by ID */
   getFieldById(id: string): CatalogField | undefined {
     return this.idToField.get(id);
+  }
+
+  /**
+   * Look up a field claimed by a value-resolving extension route by ID — whether or not it made the
+   * curated catalog. Lets the write path route `customfield_NNNNN` keys for such fields (#59).
+   */
+  getRoutedField(id: string): RoutedField | undefined {
+    return this.routedById.get(id);
+  }
+
+  /** Every field claimed by a value-resolving extension route (catalog-independent). */
+  getRoutedFields(): RoutedField[] {
+    return [...this.routedById.values()];
   }
 
   /**
@@ -346,13 +384,8 @@ export class FieldDiscovery {
             });
             const fields = (fieldMeta.fields || fieldMeta.results || []) as any[];
             for (const f of fields) {
-              if (!f.fieldId || !Array.isArray(f.allowedValues) || f.allowedValues.length === 0) continue;
-              const opts: FieldAllowedValue[] = [];
-              for (const v of f.allowedValues) {
-                const id = v?.id ?? v?.value;
-                const value = v?.value ?? v?.name ?? (typeof v === 'string' ? v : undefined);
-                if (id !== undefined && value !== undefined) opts.push({ id, value: String(value) });
-              }
+              if (!f.fieldId) continue;
+              const opts = parseAllowedValues(f.allowedValues);
               if (opts.length > 0) perField.set(f.fieldId, opts);
             }
             if (fields.length < maxResults) hasMore = false;
@@ -365,6 +398,26 @@ export class FieldDiscovery {
       this.fieldOptionsCache.set(cacheKey, perField);
     }
     return perField.get(fieldId) ?? [];
+  }
+
+  /**
+   * Enumerable allowed values for a field on an existing issue, read from its editmeta. The edit
+   * screen can carry a field the create screen doesn't (e.g. Tempo Account settable only
+   * post-create), so update-path resolution reads this first (#59). Returns `[]` on any failure or
+   * when the field isn't editable there. Not cached — one call per update that needs it.
+   */
+  async getEditFieldAllowedValues(
+    client: Version3Client,
+    issueKey: string,
+    fieldId: string,
+  ): Promise<FieldAllowedValue[]> {
+    try {
+      const meta = await client.issues.getEditIssueMeta({ issueIdOrKey: issueKey });
+      return parseAllowedValues((meta?.fields as Record<string, any> | undefined)?.[fieldId]?.allowedValues);
+    } catch (err) {
+      console.error(`[field-discovery] Edit meta fetch failed for ${issueKey}: ${err instanceof Error ? err.message : err}`);
+      return [];
+    }
   }
 
   /**
@@ -422,6 +475,8 @@ export class FieldDiscovery {
           console.error(`[field-discovery] Well-known: ${logicalName} → ${field.id} (${field.name})`);
         }
       }
+
+      this.buildRoutedIndex(rawFields);
 
       if (degraded) {
         this.catalog = this.buildUnscoredCatalog(rawFields);
@@ -718,6 +773,37 @@ export class FieldDiscovery {
     }
 
     return kneeIndex;
+  }
+
+  /**
+   * Build the extension-routed index (id → field, name → id) from the raw, unfiltered field list —
+   * covers fields curation drops from the catalog (e.g. Tempo Account is `isLocked`) but an
+   * extension route still owns (#59).
+   *
+   * A field can match a route by name (any field literally called "Account") or by schema type
+   * (Tempo's Connect key). Name matching alone is unreliable — some tenants have a *different*
+   * field also named "Account" (e.g. a CRM connector field), and first-wins-by-name would let
+   * whichever one appears earlier in the raw list steal the alias. A schema match identifies the
+   * field unambiguously, so it always wins the alias slot, even over an earlier name-only match
+   * (review of #59).
+   */
+  private buildRoutedIndex(rawFields: RawField[]): void {
+    this.routedById.clear();
+    this.routedNameToId.clear();
+    for (const f of rawFields) {
+      const schemaRoute = routeForSchema(f.schemaCustom);
+      const route = schemaRoute ?? routeForField(f.name);
+      if (!route?.resolveWrite) continue;
+
+      this.routedById.set(f.id, { id: f.id, name: f.name, schemaCustom: f.schemaCustom });
+
+      const key = f.name.toLowerCase();
+      if (schemaRoute) {
+        this.routedNameToId.set(key, f.id);
+      } else if (!this.routedNameToId.has(key)) {
+        this.routedNameToId.set(key, f.id);
+      }
+    }
   }
 
   private buildIndexes(): void {

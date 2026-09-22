@@ -33,6 +33,37 @@ export function routeForField(nameOrKey: string): FieldRoute | undefined {
   return undefined;
 }
 
+/** True for a key-shaped identifier — a Connect/Forge field key (`io.tempo.jira__account`) or a
+ *  dotted vendor type — as opposed to a bare word like `account`. Used to keep schema-suffix
+ *  matching from firing on a vendor type that merely ends in a route's display-name alias (e.g.
+ *  `com.vendor.crm:account` must not route to Tempo just because `account` is also an alias). */
+function isKeyShaped(s: string): boolean {
+  return s.includes('.') || s.includes('__');
+}
+
+/**
+ * Find the route claiming a field by its schema `custom` type alone — both verbatim and with any
+ * vendor prefix stripped. Jira reports a Connect app field's type as
+ * `com.atlassian.plugins.atlassian-connect-plugin:io.tempo.jira__account`, while routes claim the
+ * bare field key (`io.tempo.jira__account`), so the suffix after the last `:` is what matches a
+ * renamed app field (#59). The suffix must itself be key-shaped, or it's rejected — a bare word
+ * there (`com.vendor.crm:account`) doesn't count as a schema match, since routes list bare words
+ * only as display-name aliases (review of #59).
+ */
+export function routeForSchema(schemaCustom: string): FieldRoute | undefined {
+  if (!schemaCustom) return undefined;
+  const direct = routeForField(schemaCustom);
+  if (direct) return direct;
+  const key = schemaCustom.slice(schemaCustom.lastIndexOf(':') + 1);
+  return key && isKeyShaped(key) ? routeForField(key) : undefined;
+}
+
+/** Find the route claiming a field, given its catalog metadata: its name first, then its schema
+ *  `custom` type (see {@link routeForSchema}). */
+export function routeForFieldMeta(name: string, schemaCustom: string): FieldRoute | undefined {
+  return routeForField(name) ?? routeForSchema(schemaCustom);
+}
+
 export interface ModuleStatus {
   id: string;
   displayName: string;
