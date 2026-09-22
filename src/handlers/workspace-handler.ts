@@ -1,5 +1,5 @@
 /**
- * Handler for manage_workspace tool.
+ * Handler for manage_local_workspace tool.
  * See ADR-211: Attachment and Workspace Management.
  */
 
@@ -153,7 +153,7 @@ async function handleRead(args: WorkspaceArgs): Promise<{ content: Array<{ type:
   return {
     content: [{
       type: 'text',
-      text: `File: ${args.filename} | ${formatSize(stat.size)} | ${label}\nPath: ${filePath}\n\nUse manage_jira_media upload with workspaceFile to upload, or manage_workspace delete to remove.`,
+      text: `File: ${args.filename} | ${formatSize(stat.size)} | ${label}\nPath: ${filePath}\n\nUse manage_jira_media upload with workspaceFile to upload, or manage_local_workspace delete to remove.`,
     }],
   };
 }

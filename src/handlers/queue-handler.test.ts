@@ -17,7 +17,6 @@ function createMockHandlers(overrides: Record<string, any> = {}) {
     manage_jira_filter: overrides.manage_jira_filter ?? mockHandler('Found 5 issues'),
     manage_jira_sprint: overrides.manage_jira_sprint ?? mockHandler('Sprint 1'),
     manage_jira_project: overrides.manage_jira_project ?? mockHandler('Project PROJ'),
-    manage_jira_board: overrides.manage_jira_board ?? mockHandler('Board 1'),
   };
 }
 

@@ -114,7 +114,7 @@ describe('media-handler', () => {
       expect(result.isError).toBeUndefined();
       expect(result.content[0].text).toContain('Downloaded');
       expect(result.content[0].text).toContain('/mock/workspace/');
-      expect(result.content[0].text).toContain('manage_workspace read');
+      expect(result.content[0].text).toContain('manage_local_workspace read');
     });
 
     it('respects filename override', async () => {

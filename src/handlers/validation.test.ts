@@ -21,7 +21,7 @@ async function expectValidationError(
       { params: { name: handlerName === 'handleIssueRequest' ? 'manage_jira_issue'
         : handlerName === 'handleFilterRequest' ? 'manage_jira_filter'
         : handlerName === 'handleProjectRequest' ? 'manage_jira_project'
-        : handlerName === 'handleBoardRequest' ? 'manage_jira_board'
+        : handlerName === 'handleRequestRequest' ? 'manage_jira_request'
         : 'manage_jira_sprint', arguments: args } }
     );
     expect.fail('Should have thrown');
@@ -195,22 +195,78 @@ describe('project handler validation', () => {
   });
 });
 
-describe('board handler validation', () => {
-  const mod = './board-handlers.js';
-  const fn = 'handleBoardRequest';
+describe('board operations in sprint handler', () => {
+  const mod = './sprint-handlers.js';
+  const fn = 'handleSprintRequest';
 
-  it('rejects missing operation', async () => {
-    await expectValidationError(mod, fn, {}, 'Invalid operation');
+  it('rejects get_board without boardId', async () => {
+    await expectValidationError(mod, fn, { operation: 'get_board' }, 'boardId');
   });
 
-  it('rejects admin operations', async () => {
-    await expectValidationError(mod, fn, { operation: 'create' }, 'Invalid operation');
-    await expectValidationError(mod, fn, { operation: 'update' }, 'Invalid operation');
-    await expectValidationError(mod, fn, { operation: 'delete' }, 'Invalid operation');
-    await expectValidationError(mod, fn, { operation: 'get_configuration' }, 'Invalid operation');
+  it('accepts list_boards without params', async () => {
+    // list_boards has no required params — validation should pass
+    // (will fail at the client call, not at validation)
+    try {
+      await (await import(mod))[fn](
+        {} as any,
+        { params: { name: 'manage_jira_sprint', arguments: { operation: 'list_boards' } } }
+      );
+    } catch (error: any) {
+      // Should NOT be an InvalidParams error — it should fail downstream
+      expect(error.code).not.toBe(ErrorCode.InvalidParams);
+    }
+  });
+});
+
+describe('request handler validation', () => {
+  const mod = './request-handlers.js';
+  const fn = 'handleRequestRequest';
+
+  it('rejects unknown operation', async () => {
+    await expectValidationError(mod, fn, { operation: 'explode' }, 'Unknown operation');
   });
 
-  it('rejects get without boardId', async () => {
-    await expectValidationError(mod, fn, { operation: 'get' }, 'boardId');
+  it('rejects list_request_types without serviceDeskId', async () => {
+    await expectValidationError(mod, fn, { operation: 'list_request_types' }, 'serviceDeskId');
+  });
+
+  it('rejects create without serviceDeskId', async () => {
+    await expectValidationError(mod, fn, { operation: 'create', requestTypeId: '1', summary: 's' }, 'serviceDeskId');
+  });
+
+  it('rejects create without requestTypeId', async () => {
+    await expectValidationError(mod, fn, { operation: 'create', serviceDeskId: '1', summary: 's' }, 'requestTypeId');
+  });
+
+  it('rejects create without summary', async () => {
+    await expectValidationError(mod, fn, { operation: 'create', serviceDeskId: '1', requestTypeId: '1' }, 'summary');
+  });
+
+  it('rejects get without issueKey', async () => {
+    await expectValidationError(mod, fn, { operation: 'get' }, 'issueKey');
+  });
+
+  it('rejects comment without issueKey', async () => {
+    await expectValidationError(mod, fn, { operation: 'comment', comment: 'hi' }, 'issueKey');
+  });
+
+  it('rejects comment without comment', async () => {
+    await expectValidationError(mod, fn, { operation: 'comment', issueKey: 'INVS-1' }, 'comment');
+  });
+
+  it('rejects get_request_type without serviceDeskId', async () => {
+    await expectValidationError(mod, fn, { operation: 'get_request_type', requestTypeId: '1' }, 'serviceDeskId');
+  });
+
+  it('rejects get_request_type without requestTypeId', async () => {
+    await expectValidationError(mod, fn, { operation: 'get_request_type', serviceDeskId: '1' }, 'requestTypeId');
+  });
+
+  it('rejects transition without issueKey', async () => {
+    await expectValidationError(mod, fn, { operation: 'transition', transitionId: '31' }, 'issueKey');
+  });
+
+  it('rejects transition without transitionId', async () => {
+    await expectValidationError(mod, fn, { operation: 'transition', issueKey: 'INVS-1' }, 'transitionId');
   });
 });

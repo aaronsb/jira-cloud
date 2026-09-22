@@ -1,12 +1,12 @@
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 
 import { JiraClient } from '../client/jira-client.js';
-import { MarkdownRenderer } from '../mcp/markdown-renderer.js';
-import { sprintNextSteps } from '../utils/next-steps.js';
+import { MarkdownRenderer, BoardData } from '../mcp/markdown-renderer.js';
+import { boardNextSteps, sprintNextSteps } from '../utils/next-steps.js';
 import { normalizeArgs } from '../utils/normalize-args.js';
 
 type ManageJiraSprintArgs = {
-  operation: 'get' | 'create' | 'update' | 'delete' | 'list' | 'manage_issues';
+  operation: 'get' | 'create' | 'update' | 'delete' | 'list' | 'manage_issues' | 'get_board' | 'list_boards';
   sprintId?: number;
   boardId?: number;
   name?: string;
@@ -19,6 +19,7 @@ type ManageJiraSprintArgs = {
   add?: string[];
   remove?: string[];
   expand?: string[];
+  includeSprints?: boolean;
 };
 
 // Validate the consolidated sprint management arguments
@@ -33,11 +34,11 @@ function validateManageJiraSprintArgs(args: unknown): args is ManageJiraSprintAr
   const normalizedArgs = normalizeArgs(args as Record<string, unknown>);
   
   // Validate operation parameter
-  if (typeof normalizedArgs.operation !== 'string' || 
-      !['get', 'create', 'update', 'delete', 'list', 'manage_issues'].includes(normalizedArgs.operation as string)) {
+  if (typeof normalizedArgs.operation !== 'string' ||
+      !['get', 'create', 'update', 'delete', 'list', 'manage_issues', 'get_board', 'list_boards'].includes(normalizedArgs.operation as string)) {
     throw new McpError(
       ErrorCode.InvalidParams,
-      'Invalid operation parameter. Valid values are: get, create, update, delete, list, manage_issues'
+      'Invalid operation parameter. Valid values are: get, create, update, delete, list, manage_issues, get_board, list_boards'
     );
   }
 
@@ -107,6 +108,19 @@ function validateManageJiraSprintArgs(args: unknown): args is ManageJiraSprintAr
       }
       break;
       
+    case 'get_board':
+      if (typeof normalizedArgs.boardId !== 'number') {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          'Missing or invalid boardId parameter. Please provide a valid board ID as a number for the get_board operation.'
+        );
+      }
+      break;
+
+    case 'list_boards':
+      // No required params — lists all boards
+      break;
+
     case 'manage_issues':
       if (typeof normalizedArgs.sprintId !== 'number') {
         throw new McpError(
@@ -519,6 +533,113 @@ async function handleManageIssues(jiraClient: JiraClient, args: ManageJiraSprint
   }
 }
 
+// ── Board Operations (merged from board-handlers.ts per ADR-212) ─────
+
+async function handleGetBoard(jiraClient: JiraClient, args: ManageJiraSprintArgs) {
+  const boardId = args.boardId!;
+
+  const expansionOptions: Record<string, boolean> = {};
+  if (args.expand) {
+    for (const expansion of args.expand) {
+      expansionOptions[expansion] = true;
+    }
+  }
+  if (args.includeSprints === true) {
+    expansionOptions.sprints = true;
+  }
+
+  const boards = await jiraClient.listBoards();
+  const board = boards.find((b: { id: number }) => b.id === boardId);
+  if (!board) {
+    throw new McpError(ErrorCode.InvalidRequest, `Board not found: ${boardId}`);
+  }
+
+  const boardData: BoardData = {
+    id: board.id,
+    name: board.name,
+    type: board.type,
+    projectName: board.location?.projectName,
+  };
+
+  if (expansionOptions.sprints) {
+    try {
+      boardData.sprints = await jiraClient.listBoardSprints(boardId);
+    } catch (error) {
+      console.error(`Error getting sprints for board ${boardId}:`, error);
+    }
+  }
+
+  const markdown = MarkdownRenderer.renderBoard({
+    id: boardData.id,
+    name: boardData.name,
+    type: boardData.type,
+    projectName: boardData.projectName,
+    sprints: boardData.sprints?.map((s: { id: number; name: string; state: string; goal?: string }) => ({
+      id: s.id,
+      name: s.name,
+      state: s.state,
+      goal: s.goal,
+    })),
+  });
+
+  return {
+    content: [{ type: 'text', text: markdown + boardNextSteps('get', boardId) }],
+  };
+}
+
+async function handleListBoards(jiraClient: JiraClient, args: ManageJiraSprintArgs) {
+  const startAt = args.startAt ?? 0;
+  const maxResults = args.maxResults ?? 50;
+  const includeSprints = args.includeSprints === true;
+
+  const boards = await jiraClient.listBoards();
+  const paginatedBoards = boards.slice(startAt, startAt + maxResults);
+
+  const boardDataList: BoardData[] = paginatedBoards.map(board => ({
+    id: board.id,
+    name: board.name,
+    type: board.type,
+    projectName: board.location?.projectName,
+  }));
+
+  if (includeSprints) {
+    for (const board of boardDataList) {
+      try {
+        board.sprints = await jiraClient.listBoardSprints(board.id);
+      } catch (error) {
+        console.error(`Error getting sprints for board ${board.id}:`, error);
+      }
+    }
+  }
+
+  const rendererBoards = boardDataList.map(board => ({
+    id: board.id,
+    name: board.name,
+    type: board.type,
+    projectName: board.projectName,
+    sprints: board.sprints?.map((s: { id: number; name: string; state: string; goal?: string }) => ({
+      id: s.id,
+      name: s.name,
+      state: s.state,
+      goal: s.goal,
+    })),
+  }));
+
+  let markdown = MarkdownRenderer.renderBoardList(rendererBoards);
+  markdown += '\n\n---\n';
+  if (startAt + maxResults < boards.length) {
+    markdown += `Showing ${startAt + 1}-${startAt + boardDataList.length} of ${boards.length}\n`;
+    markdown += `**Next page:** Use startAt=${startAt + maxResults}`;
+  } else {
+    markdown += `Showing all ${boardDataList.length} board${boardDataList.length !== 1 ? 's' : ''}`;
+  }
+  markdown += boardNextSteps('list');
+
+  return {
+    content: [{ type: 'text', text: markdown }],
+  };
+}
+
 // Main handler function
 export async function handleSprintRequest(
   jiraClient: JiraClient,
@@ -581,7 +702,17 @@ export async function handleSprintRequest(
         console.error('Processing manage issues operation');
         return await handleManageIssues(jiraClient, normalizedArgs as ManageJiraSprintArgs);
       }
-      
+
+      case 'get_board': {
+        console.error('Processing get board operation');
+        return await handleGetBoard(jiraClient, normalizedArgs as ManageJiraSprintArgs);
+      }
+
+      case 'list_boards': {
+        console.error('Processing list boards operation');
+        return await handleListBoards(jiraClient, normalizedArgs as ManageJiraSprintArgs);
+      }
+
       default: {
         console.error(`Unknown operation: ${normalizedArgs.operation}`);
         throw new McpError(ErrorCode.MethodNotFound, `Unknown operation: ${normalizedArgs.operation}`);

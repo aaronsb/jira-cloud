@@ -28,7 +28,7 @@ export const promptDefinitions: PromptDef[] = [
     name: 'sprint_review',
     description: 'Sprint review preparation — velocity, scope changes, at-risk items, and completion forecast',
     arguments: [
-      { name: 'board_id', description: 'Jira board ID (find via manage_jira_board list)', required: true },
+      { name: 'board_id', description: 'Jira board ID (find via manage_jira_sprint list_boards)', required: true },
     ],
   },
   {

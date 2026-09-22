@@ -187,7 +187,7 @@ export function projectNextSteps(operation: string, projectKey?: string): string
       steps.push(
         { description: 'Create an issue in this project (use issue types shown above)', tool: 'manage_jira_issue', example: { operation: 'create', projectKey, summary: '<title>', issueType: '<type from list above>' } },
         { description: 'Search issues in this project', tool: 'manage_jira_filter', example: { operation: 'execute_jql', jql: `project = ${projectKey}` } },
-        { description: 'View project boards', tool: 'manage_jira_board', example: { operation: 'list' } },
+        { description: 'View project boards', tool: 'manage_jira_sprint', example: { operation: 'list_boards' } },
       );
       break;
   }
@@ -199,7 +199,7 @@ export function boardNextSteps(operation: string, boardId?: number): string {
   switch (operation) {
     case 'list':
       steps.push(
-        { description: 'Get board details', tool: 'manage_jira_board', example: { operation: 'get', boardId: '<id>', expand: ['sprints'] } },
+        { description: 'Get board details', tool: 'manage_jira_sprint', example: { operation: 'get_board', boardId: '<id>', expand: ['sprints'] } },
       );
       break;
     case 'get':
@@ -320,6 +320,70 @@ export function goalNextSteps(operation: string, goalKey?: string, workItemCount
   return steps.length > 0 ? formatSteps(steps) : '';
 }
 
+export function requestNextSteps(
+  operation: string,
+  context: { issueKey?: string; serviceDeskId?: string; requestTypeId?: string; hasTransitions?: boolean } = {},
+): string {
+  const steps: NextStep[] = [];
+  switch (operation) {
+    case 'list_portals':
+      steps.push(
+        { description: 'Show request types on a portal', tool: 'manage_jira_request', example: { operation: 'list_request_types', serviceDeskId: '<id>' } },
+        { description: 'Show request types with field schemas in one call', tool: 'manage_jira_request', example: { operation: 'list_request_types', serviceDeskId: '<id>', expand: ['fields'] } },
+        { description: 'List my open requests', tool: 'manage_jira_request', example: { operation: 'list' } },
+      );
+      break;
+    case 'list_request_types':
+      steps.push(
+        { description: 'See what fields a specific type requires', tool: 'manage_jira_request', example: { operation: 'get_request_type', serviceDeskId: context.serviceDeskId, requestTypeId: '<id>' } },
+        { description: 'Raise a request', tool: 'manage_jira_request', example: { operation: 'create', serviceDeskId: context.serviceDeskId, requestTypeId: '<id>', summary: '<title>' } },
+      );
+      break;
+    case 'get_request_type':
+      steps.push(
+        { description: 'Raise a request with these fields', tool: 'manage_jira_request', example: { operation: 'create', serviceDeskId: context.serviceDeskId, requestTypeId: context.requestTypeId, summary: '<title>', requestFieldValues: { '<fieldId>': '<value>' } } },
+      );
+      break;
+    case 'create':
+      steps.push(
+        { description: 'Check request status + SLA', tool: 'manage_jira_request', example: { operation: 'get', issueKey: context.issueKey } },
+        { description: 'Attach a file to the request', tool: 'manage_jira_media', example: { operation: 'upload', issueKey: context.issueKey, filename: '<name>', mediaType: '<mime>', workspaceFile: '<staged file>' } },
+        { description: 'Add a comment', tool: 'manage_jira_request', example: { operation: 'comment', issueKey: context.issueKey, comment: '<text>' } },
+      );
+      break;
+    case 'get':
+      steps.push(
+        { description: 'Add a customer-visible comment', tool: 'manage_jira_request', example: { operation: 'comment', issueKey: context.issueKey, comment: '<text>' } },
+      );
+      if (context.hasTransitions) {
+        steps.push(
+          { description: 'Perform a customer-side transition (ID from "Available transitions" above)', tool: 'manage_jira_request', example: { operation: 'transition', issueKey: context.issueKey, transitionId: '<id>' } },
+        );
+      }
+      steps.push(
+        { description: 'Manage attachments', tool: 'manage_jira_media', example: { operation: 'list', issueKey: context.issueKey } },
+      );
+      break;
+    case 'comment':
+      steps.push(
+        { description: 'Check updated request status', tool: 'manage_jira_request', example: { operation: 'get', issueKey: context.issueKey } },
+      );
+      break;
+    case 'transition':
+      steps.push(
+        { description: 'Check updated request status', tool: 'manage_jira_request', example: { operation: 'get', issueKey: context.issueKey } },
+      );
+      break;
+    case 'list':
+      steps.push(
+        { description: 'Get detail on a specific request', tool: 'manage_jira_request', example: { operation: 'get', issueKey: '<key>' } },
+        { description: 'Raise a new request', tool: 'manage_jira_request', example: { operation: 'list_portals' } },
+      );
+      break;
+  }
+  return steps.length > 0 ? formatSteps(steps) : '';
+}
+
 export function mediaNextSteps(operation: string, context: { issueKey?: string }): string {
   const steps: NextStep[] = [];
   switch (operation) {
@@ -338,9 +402,9 @@ export function mediaNextSteps(operation: string, context: { issueKey?: string }
       break;
     case 'download':
       steps.push(
-        { description: 'View staged files in workspace', tool: 'manage_workspace', example: { operation: 'list' } },
+        { description: 'View staged files in workspace', tool: 'manage_local_workspace', example: { operation: 'list' } },
         { description: 'Upload to another issue', tool: 'manage_jira_media', example: { operation: 'upload', issueKey: '<target issue>', workspaceFile: '<filename>', mediaType: '<mime>', filename: '<filename>' } },
-        { description: 'Read the downloaded file', tool: 'manage_workspace', example: { operation: 'read', filename: '<filename>' } },
+        { description: 'Read the downloaded file', tool: 'manage_local_workspace', example: { operation: 'read', filename: '<filename>' } },
       );
       break;
   }
