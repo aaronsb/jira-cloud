@@ -9,7 +9,7 @@
 import { Version3Client } from 'jira.js';
 
 import { classifyFieldType, type FieldCategory, type FieldTypeInfo } from './field-type-map.js';
-import { routeForFieldMeta } from '../extensions/index.js';
+import { routeForField, routeForFieldMeta, routeForSchema } from '../extensions/index.js';
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -775,13 +775,34 @@ export class FieldDiscovery {
     return kneeIndex;
   }
 
+  /**
+   * Build the extension-routed index (id → field, name → id) from the raw, unfiltered field list —
+   * covers fields curation drops from the catalog (e.g. Tempo Account is `isLocked`) but an
+   * extension route still owns (#59).
+   *
+   * A field can match a route by name (any field literally called "Account") or by schema type
+   * (Tempo's Connect key). Name matching alone is unreliable — some tenants have a *different*
+   * field also named "Account" (e.g. a CRM connector field), and first-wins-by-name would let
+   * whichever one appears earlier in the raw list steal the alias. A schema match identifies the
+   * field unambiguously, so it always wins the alias slot, even over an earlier name-only match
+   * (review of #59).
+   */
   private buildRoutedIndex(rawFields: RawField[]): void {
     this.routedById.clear();
     this.routedNameToId.clear();
     for (const f of rawFields) {
-      if (!extensionCanWrite(f.name, f.schemaCustom)) continue;
+      const schemaRoute = routeForSchema(f.schemaCustom);
+      const route = schemaRoute ?? routeForField(f.name);
+      if (!route?.resolveWrite) continue;
+
       this.routedById.set(f.id, { id: f.id, name: f.name, schemaCustom: f.schemaCustom });
-      if (!this.routedNameToId.has(f.name.toLowerCase())) this.routedNameToId.set(f.name.toLowerCase(), f.id);
+
+      const key = f.name.toLowerCase();
+      if (schemaRoute) {
+        this.routedNameToId.set(key, f.id);
+      } else if (!this.routedNameToId.has(key)) {
+        this.routedNameToId.set(key, f.id);
+      }
     }
   }
 

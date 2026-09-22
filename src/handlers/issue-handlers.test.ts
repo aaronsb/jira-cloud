@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { ErrorCode } from '@modelcontextprotocol/sdk/types.js';
 import { fieldDiscovery } from '../client/field-discovery.js';
 import { handleIssueRequest, projectKeyFromIssueKey } from './issue-handlers.js';
 
@@ -99,5 +100,53 @@ describe('update: Tempo Account alias resolves to the raw-id payload (#59)', () 
 
   it('raw customfield_11266 + account name is resolved too', async () => {
     expect(await update({ customfield_11266: 'OpEx - Praecipio AI Dev' })).toEqual({ customfield_11266: 2044 });
+  });
+
+  // The Account field can be settable only post-create, so it may be absent from a screen's
+  // editmeta while still present in createmeta — the resolver falls back there (#59 review).
+  function makeCreatemetaClient(createmetaFields: Array<Record<string, unknown>>) {
+    const sent: Array<Record<string, unknown> | undefined> = [];
+    const client = {
+      v3Client: {
+        issues: {
+          getEditIssueMeta: vi.fn(async () => ({ fields: {} })),
+          getCreateIssueMetaIssueTypes: vi.fn(async () => ({ issueTypes: [{ id: '10001', name: 'Story' }] })),
+          getCreateIssueMetaIssueTypeId: vi.fn(async () => ({ fields: createmetaFields })),
+        },
+      },
+      getIssue: vi.fn(async () => ({ issueType: 'Story' })),
+      updateIssue: vi.fn(async (p: { customFields?: Record<string, unknown> }) => {
+        sent.push(p.customFields);
+        throw new Error('stop-after-write');
+      }),
+    } as any;
+    return { client, sent };
+  }
+
+  it('falls back to createmeta when editmeta omits the field', async () => {
+    // Clear the project's cached createmeta so this test's field options aren't shadowed by an
+    // earlier test's cache entry.
+    fieldDiscovery.invalidateRequiredFields('PAID');
+    const { client, sent } = makeCreatemetaClient([
+      { fieldId: 'customfield_11266', allowedValues: ALLOWED.map(a => ({ id: a.id, value: a.value })) },
+    ]);
+
+    await expect(handleIssueRequest(client, {
+      params: { name: 'manage_jira_issue', arguments: { operation: 'update', issueKey: 'PAID-395', customFields: { Account: 'CapEx - Praecipio AI Dev' } } },
+    })).rejects.toThrow('stop-after-write');
+
+    expect(sent[0]).toEqual({ customfield_11266: 2043 });
+  });
+
+  it('fails with InvalidParams when both editmeta and createmeta have no options', async () => {
+    fieldDiscovery.invalidateRequiredFields('PAID');
+    const { client } = makeCreatemetaClient([]);
+
+    await expect(handleIssueRequest(client, {
+      params: { name: 'manage_jira_issue', arguments: { operation: 'update', issueKey: 'PAID-395', customFields: { Account: 'CapEx - Praecipio AI Dev' } } },
+    })).rejects.toMatchObject({
+      code: ErrorCode.InvalidParams,
+      message: expect.stringContaining('PAID-395'),
+    });
   });
 });
