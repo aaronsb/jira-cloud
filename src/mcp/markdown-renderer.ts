@@ -106,6 +106,15 @@ export interface RenderIssueOptions {
   customFields?: 'breadcrumb' | 'dump' | 'none';
   projectKey?: string;
   issueTypeName?: string;
+  /**
+   * How to render `issue.comments`:
+   * - `full` (default): every comment body, untruncated. Used by `get` with
+   *   `expand: ["comments"]`, where the caller explicitly opted in and needs the whole thread.
+   * - `latest`: only the newest comment (last element — Jira returns comments oldest-first).
+   *   Used after `comment` writes, where the reply already knows what it just added and dumping
+   *   the other N-1 bodies would just be noise (and tokens) on every add.
+   */
+  comments?: 'full' | 'latest';
 }
 
 /**
@@ -167,20 +176,22 @@ export function renderIssue(
     }
   }
 
-  // Comments (if present)
+  // Comments — present either because the caller opted in via `expand: ["comments"]` (`full`,
+  // the default — render every body in full, since a preview here would leave the agent with no
+  // way to read the rest) or because a `comment` write just ran (`latest` — the reply already
+  // knows what it added; dumping the other N-1 bodies on every add would just be noise).
   if (issue.comments && issue.comments.length > 0) {
+    const commentsMode = opts.comments ?? 'full';
+    const total = issue.comments.length;
+    const shown = commentsMode === 'latest' ? issue.comments.slice(-1) : issue.comments;
     lines.push('');
-    lines.push(`Comments (${issue.comments.length}):`);
-    const recentComments = issue.comments.slice(-5);
-    const startIdx = issue.comments.length - recentComments.length + 1;
-    if (issue.comments.length > 5) {
-      lines.push(`  +${issue.comments.length - 5} older comments`);
-    }
-    for (let i = 0; i < recentComments.length; i++) {
-      const comment = recentComments[i];
-      const preview = comment.body.split('\n').filter((l: string) => l.trim()).slice(0, 2).join(' | ');
-      lines.push(`[${startIdx + i}/${issue.comments.length}] ${comment.author} (${formatDate(comment.created)}): ${truncate(preview, 200)}`);
-    }
+    lines.push(`Comments (${total}):`);
+    shown.forEach((comment, i) => {
+      const index = commentsMode === 'latest' ? total : i + 1;
+      lines.push('');
+      lines.push(`[${index}/${total}] ${comment.author} (${formatDate(comment.created)}) — id ${comment.id}`);
+      lines.push(comment.body.trim());
+    });
   }
 
   // Custom fields — progressive reveal (ADR-214). Default is a breadcrumb pointing at the

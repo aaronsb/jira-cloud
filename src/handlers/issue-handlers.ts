@@ -643,7 +643,9 @@ async function handleCommentIssue(jiraClient: JiraClient, args: ManageJiraIssueA
   // Get the updated issue with comments and render to markdown
   const updatedIssue = await jiraClient.getIssue(args.issueKey!, true, false);
   // ADR-214: post-write — the new comment is the read-out; custom-field block is noise.
-  const markdown = MarkdownRenderer.renderIssue(updatedIssue, undefined, { customFields: 'none' });
+  // Only render the newest comment — an issue with 150 comments shouldn't dump all 150 bodies
+  // just because one more was added.
+  const markdown = MarkdownRenderer.renderIssue(updatedIssue, undefined, { customFields: 'none', comments: 'latest' });
 
   return {
     content: [
