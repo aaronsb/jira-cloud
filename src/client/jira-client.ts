@@ -147,8 +147,11 @@ export class JiraClient {
     if (active) return active.name ?? null;
     const future = sprints.find((s: any) => s.state === 'future');
     if (future) return future.name ?? null;
-    // Fall back to last sprint in array (most recent)
-    return sprints[sprints.length - 1]?.name ?? null;
+    // Fall back to the most recently finished sprint. The array is not reliably
+    // chronological (ids from different boards/quarters interleave), so order by date.
+    const finished = (s: any): string => s.completeDate ?? s.endDate ?? s.startDate ?? '';
+    const latest = sprints.reduce((a: any, b: any) => (finished(b) >= finished(a) ? b : a));
+    return latest?.name ?? null;
   }
 
   /** Maps a raw Jira API issue to our JiraIssueDetails shape */

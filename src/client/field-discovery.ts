@@ -110,6 +110,7 @@ export class FieldDiscovery {
   private stats: DiscoveryStats | null = null;
   private mode: CatalogMode = 'loading';
   private error: string | null = null;
+  private pending: Promise<void> | null = null;
 
   /** Whether a usable catalog exists (scored or unscored). */
   isReady(): boolean {
@@ -374,8 +375,13 @@ export class FieldDiscovery {
   startAsync(client: Version3Client): Promise<void> {
     const promise = this.discover(client);
     // Fire-and-forget for the server — errors are logged and stored
-    promise.catch(() => {});
+    this.pending = promise.catch(() => {});
     return promise;
+  }
+
+  /** Resolves once any in-flight discovery has settled (success or failure). Never rejects. */
+  whenSettled(): Promise<void> {
+    return this.pending ?? Promise.resolve();
   }
 
   /**

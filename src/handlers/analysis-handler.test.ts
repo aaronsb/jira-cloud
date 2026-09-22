@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { parseComputeList } from '../utils/cube-dsl.js';
-import { renderPoints, renderTime, renderSchedule, renderCycle, renderDistribution, renderSummaryTable, extractProjectKeys, removeProjectClause, extractDimensions, renderCubeSetup, groupByJqlClause, stripOrderBy } from './analysis-handler.js';
+import { renderPoints, renderTime, renderSchedule, renderCycle, renderDistribution, renderSummaryTable, extractProjectKeys, removeProjectClause, extractDimensions, renderCubeSetup, groupByJqlClause, stripOrderBy, ensureSprintFieldId } from './analysis-handler.js';
+import { JiraClient } from '../client/jira-client.js';
 import { JiraIssueDetails } from '../types/index.js';
 
 // ── Test Helpers ───────────────────────────────────────────────────────
@@ -581,5 +582,51 @@ describe('stripOrderBy', () => {
 
   it('should handle multiple fields in ORDER BY', () => {
     expect(stripOrderBy('project = PROJ ORDER BY priority DESC, created ASC')).toBe('project = PROJ');
+  });
+});
+
+describe('ensureSprintFieldId (#46)', () => {
+  const makeClient = () => new JiraClient({ host: 'https://example.atlassian.net', email: 'a@b.c', apiToken: 't' });
+
+  it('waits for background discovery and wires the sprint field id', async () => {
+    const client = makeClient();
+    expect(client.customFieldIds.sprint).toBeNull();
+    let discovered: string | null = null;
+    const discovery = {
+      whenSettled: () => new Promise<void>(resolve => setTimeout(() => { discovered = 'customfield_10024'; resolve(); }, 5)),
+      getWellKnownFieldId: (name: string) => (name === 'sprint' ? discovered : null),
+    };
+    await ensureSprintFieldId(client, discovery);
+    expect(client.customFieldIds.sprint).toBe('customfield_10024');
+  });
+
+  it('is a no-op when the sprint field id is already wired', async () => {
+    const client = makeClient();
+    client.setCustomFieldId('sprint', 'customfield_10020');
+    const discovery = {
+      whenSettled: () => { throw new Error('should not wait'); },
+      getWellKnownFieldId: () => 'customfield_99999',
+    };
+    await ensureSprintFieldId(client, discovery);
+    expect(client.customFieldIds.sprint).toBe('customfield_10020');
+  });
+
+  it('fails loudly instead of returning an empty breakdown when no sprint field exists', async () => {
+    const client = makeClient();
+    const discovery = { whenSettled: () => Promise.resolve(), getWellKnownFieldId: () => null };
+    await expect(ensureSprintFieldId(client, discovery)).rejects.toThrow(/groupBy "sprint" is unavailable/);
+  });
+
+  it('buckets multi-sprint issues by active sprint, else the most recently finished one', () => {
+    const client = makeClient() as unknown as { extractSprintName(s: unknown): string | null };
+    // Order as returned live by Jira: not chronological
+    const closed = [
+      { name: 'Q3 S1', state: 'closed', completeDate: '2026-07-16T03:29:35.933Z' },
+      { name: 'Q3 S5', state: 'closed', completeDate: '2026-09-16T14:54:04.326Z' },
+      { name: 'Q2 S6', state: 'closed', completeDate: '2026-07-01T15:09:24.627Z' },
+    ];
+    expect(client.extractSprintName(closed)).toBe('Q3 S5');
+    expect(client.extractSprintName([...closed, { name: 'Q3 S6', state: 'active' }])).toBe('Q3 S6');
+    expect(client.extractSprintName([])).toBeNull();
   });
 });
