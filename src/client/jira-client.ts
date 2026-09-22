@@ -149,7 +149,9 @@ export class JiraClient {
     if (future) return future.name ?? null;
     // Fall back to the most recently finished sprint. The array is not reliably
     // chronological (ids from different boards/quarters interleave), so order by date.
-    const finished = (s: any): string => s.completeDate ?? s.endDate ?? s.startDate ?? '';
+    // Date.parse (not string comparison) so non-Z-normalized offsets sort correctly;
+    // `|| 0` treats missing/unparsable dates as epoch so ties still resolve to the last element.
+    const finished = (s: any): number => Date.parse(s.completeDate ?? s.endDate ?? s.startDate ?? '') || 0;
     const latest = sprints.reduce((a: any, b: any) => (finished(b) >= finished(a) ? b : a));
     return latest?.name ?? null;
   }

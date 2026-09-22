@@ -884,7 +884,10 @@ async function samplePerProject(jiraClient: JiraClient, jql: string): Promise<Ji
   return samples.flat();
 }
 
-async function handleCubeSetup(jiraClient: JiraClient, jql: string): Promise<string> {
+export async function handleCubeSetup(jiraClient: JiraClient, jql: string): Promise<string> {
+  // Best-effort: cube setup lists every dimension, so a missing/undiscovered sprint field
+  // shouldn't fail the whole call — just leave the sprint dimension out (#46).
+  await ensureSprintFieldId(jiraClient).catch(() => {});
   const issues = await samplePerProject(jiraClient, jql);
 
   if (issues.length === 0) {

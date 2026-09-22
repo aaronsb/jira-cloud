@@ -1,7 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { parseComputeList } from '../utils/cube-dsl.js';
-import { renderPoints, renderTime, renderSchedule, renderCycle, renderDistribution, renderSummaryTable, extractProjectKeys, removeProjectClause, extractDimensions, renderCubeSetup, groupByJqlClause, stripOrderBy, ensureSprintFieldId } from './analysis-handler.js';
+import { renderPoints, renderTime, renderSchedule, renderCycle, renderDistribution, renderSummaryTable, extractProjectKeys, removeProjectClause, extractDimensions, renderCubeSetup, groupByJqlClause, stripOrderBy, ensureSprintFieldId, handleCubeSetup } from './analysis-handler.js';
 import { JiraClient } from '../client/jira-client.js';
+import { FieldDiscovery } from '../client/field-discovery.js';
 import { JiraIssueDetails } from '../types/index.js';
 
 // ── Test Helpers ───────────────────────────────────────────────────────
@@ -617,6 +618,37 @@ describe('ensureSprintFieldId (#46)', () => {
     await expect(ensureSprintFieldId(client, discovery)).rejects.toThrow(/groupBy "sprint" is unavailable/);
   });
 
+  it('gives up after 15s and throws instead of hanging when discovery never settles', async () => {
+    vi.useFakeTimers();
+    try {
+      const client = makeClient();
+      const discovery = {
+        whenSettled: () => new Promise<void>(() => {}), // never resolves
+        getWellKnownFieldId: () => null,
+      };
+      const outcome = expect(ensureSprintFieldId(client, discovery)).rejects.toThrow(/groupBy "sprint" is unavailable/);
+      await vi.advanceTimersByTimeAsync(15_000);
+      await outcome;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('resolves whenSettled() rather than rejecting when the real FieldDiscovery client throws on every fetch', async () => {
+    const client = makeClient();
+    const realDiscovery = new FieldDiscovery();
+    const throwingClient = {
+      issueFields: {
+        getFieldsPaginated: async () => { throw new Error('API down'); },
+        getFields: async () => { throw new Error('also down'); },
+      },
+    } as any;
+
+    realDiscovery.startAsync(throwingClient);
+    await expect(realDiscovery.whenSettled()).resolves.toBeUndefined();
+    await expect(ensureSprintFieldId(client, realDiscovery)).rejects.toThrow(/groupBy "sprint" is unavailable/);
+  });
+
   it('buckets multi-sprint issues by active sprint, else the most recently finished one', () => {
     const client = makeClient() as unknown as { extractSprintName(s: unknown): string | null };
     // Order as returned live by Jira: not chronological
@@ -628,5 +660,47 @@ describe('ensureSprintFieldId (#46)', () => {
     expect(client.extractSprintName(closed)).toBe('Q3 S5');
     expect(client.extractSprintName([...closed, { name: 'Q3 S6', state: 'active' }])).toBe('Q3 S6');
     expect(client.extractSprintName([])).toBeNull();
+  });
+
+  it('falls back to endDate when completeDate is absent', () => {
+    const client = makeClient() as unknown as { extractSprintName(s: unknown): string | null };
+    const closed = [
+      { name: 'Q3 S1', state: 'closed', endDate: '2026-07-16T03:29:35.933Z' },
+      { name: 'Q3 S5', state: 'closed', endDate: '2026-09-16T14:54:04.326Z' },
+    ];
+    expect(client.extractSprintName(closed)).toBe('Q3 S5');
+  });
+
+  it('orders by parsed date, not string comparison, so non-Z offset timestamps sort correctly', () => {
+    const client = makeClient() as unknown as { extractSprintName(s: unknown): string | null };
+    const closed = [
+      // String-wise this sorts after the Z entry below (offset digits look "larger"), but it's
+      // actually 2026-09-16T04:54:04.326Z — earlier — once the offset is accounted for.
+      { name: 'Q3 S1 (offset)', state: 'closed', completeDate: '2026-09-16T14:54:04.326+10:00' },
+      { name: 'Q3 S5', state: 'closed', completeDate: '2026-09-16T10:00:00.000Z' },
+    ];
+    expect(client.extractSprintName(closed)).toBe('Q3 S5');
+  });
+});
+
+describe('handleCubeSetup (#46)', () => {
+  const makeClient = () => new JiraClient({ host: 'https://example.atlassian.net', email: 'a@b.c', apiToken: 't' });
+
+  it('waits for sprint field discovery before sampling, but never fails cube setup because of it', async () => {
+    const client = makeClient();
+    // Discovery hasn't run (no startAsync call), so ensureSprintFieldId's default path
+    // resolves whenSettled() immediately and then finds no sprint field id — it throws,
+    // and handleCubeSetup must swallow that so every other dimension still gets listed.
+    expect(client.customFieldIds.sprint).toBeNull();
+    client.searchIssuesLean = async () => ({
+      issues: [makeIssue()],
+      pagination: { startAt: 0, maxResults: 50, total: 1, hasMore: false },
+    });
+    client.countIssues = async () => 1;
+
+    const output = await handleCubeSetup(client, 'project = TEST');
+
+    expect(output).toContain('# Cube Setup: project = TEST');
+    expect(client.customFieldIds.sprint).toBeNull();
   });
 });
