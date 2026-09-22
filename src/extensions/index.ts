@@ -33,6 +33,20 @@ export function routeForField(nameOrKey: string): FieldRoute | undefined {
   return undefined;
 }
 
+/**
+ * Find the route claiming a field, given its catalog metadata: its name first, then its schema
+ * `custom` type — both verbatim and with any vendor prefix stripped. Jira reports a Connect app
+ * field's type as `com.atlassian.plugins.atlassian-connect-plugin:io.tempo.jira__account`, while
+ * routes claim the bare field key (`io.tempo.jira__account`), so the suffix after the last `:` is
+ * what matches a renamed app field (#59).
+ */
+export function routeForFieldMeta(name: string, schemaCustom: string): FieldRoute | undefined {
+  const direct = routeForField(name);
+  if (direct || !schemaCustom) return direct;
+  const key = schemaCustom.slice(schemaCustom.lastIndexOf(':') + 1);
+  return routeForField(schemaCustom) ?? (key ? routeForField(key) : undefined);
+}
+
 export interface ModuleStatus {
   id: string;
   displayName: string;

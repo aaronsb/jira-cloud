@@ -3,7 +3,7 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { fieldDiscovery } from '../client/field-discovery.js';
 import { categoryLabel } from '../client/field-type-map.js';
 import { JiraClient } from '../client/jira-client.js';
-import { routeForField } from '../extensions/index.js';
+import { routeForField, routeForFieldMeta } from '../extensions/index.js';
 import { MarkdownRenderer } from '../mcp/markdown-renderer.js';
 import type { HierarchyNode, HierarchyResult, JiraIssueDetails } from '../types/index.js';
 import { bulkOperationGuard } from '../utils/bulk-operation-guard.js';
@@ -334,13 +334,15 @@ function renderAppliedFields(args: ManageJiraIssueArgs, issue: JiraIssueDetails)
 }
 
 /** The extension route claiming a customFields payload key — checks the key directly (covers a raw
- *  field name or a Connect field key) and, for a `customfield_*` id, the resolved catalog name. */
+ *  field name or a Connect field key) and, for a `customfield_*` id, the field's name / schema type
+ *  from the catalog or — for a field curation left out of it, like Tempo Account (#59) — the
+ *  extension-routed index. */
 function routeForPayloadKey(key: string) {
   const direct = routeForField(key);
   if (direct) return direct;
   if (key.startsWith('customfield_')) {
-    const name = fieldDiscovery.getFieldById(key)?.name;
-    if (name) return routeForField(name);
+    const field = fieldDiscovery.getFieldById(key) ?? fieldDiscovery.getRoutedField(key);
+    if (field) return routeForFieldMeta(field.name, field.schemaCustom);
   }
   return undefined;
 }
@@ -360,12 +362,13 @@ async function applyRouteResolutions(
   customFields: Record<string, any>,
   projectKey: string,
   issueTypeName: string,
+  issueKey?: string,
 ): Promise<Record<string, any>> {
   const out: Record<string, any> = {};
   for (const [key, value] of Object.entries(customFields)) {
     const route = routeForPayloadKey(key);
     out[key] = route?.resolveWrite
-      ? await route.resolveWrite({ client: jiraClient.v3Client, projectKey, issueTypeName }, key, value)
+      ? await route.resolveWrite({ client: jiraClient.v3Client, projectKey, issueTypeName, issueKey }, key, value)
       : value;
   }
   return out;
@@ -578,7 +581,7 @@ async function handleUpdateIssue(jiraClient: JiraClient, args: ManageJiraIssueAr
     const probe = await jiraClient.getIssue(args.issueKey!, false, false);
     const projectKey = projectKeyFromIssueKey(args.issueKey!);
     try {
-      customFields = await applyRouteResolutions(jiraClient, customFields, projectKey, probe.issueType);
+      customFields = await applyRouteResolutions(jiraClient, customFields, projectKey, probe.issueType, args.issueKey!);
     } catch (e) {
       throw new McpError(ErrorCode.InvalidParams, e instanceof Error ? e.message : String(e));
     }
